@@ -140,6 +140,9 @@ function Dashboard({
     if (!config) return "读取中";
     return `${config.host}:${config.port}`;
   }, [config]);
+  const appServerStatus = config?.appServer
+    ? `${config.appServer.status}${config.appServer.initialized ? " / initialized" : ""}`
+    : "未连接";
 
   return (
     <Shell title="Codex Manage" action={<button className="ghostButton" onClick={onLogout}>登出</button>}>
@@ -159,6 +162,8 @@ function Dashboard({
       <section className="infoGrid" aria-label="当前配置">
         <InfoItem label="监听地址" value={listenAddress} />
         <InfoItem label="Codex CLI" value={config?.codexCliPath ?? "读取中"} />
+        <InfoItem label="Codex 版本" value={config?.codexCliVersion ?? config?.codexVersionError ?? "读取中"} />
+        <InfoItem label="App Server" value={appServerStatus} />
         <InfoItem label="Sessions 目录" value={config?.sessionsDir ?? "读取中"} />
       </section>
     </Shell>
