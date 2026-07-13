@@ -142,7 +142,7 @@ function Dashboard({
   }, [config]);
 
   return (
-    <Shell title="Codex Manage" action={<button className="ghostButton" onClick={onLogout}>退出</button>}>
+    <Shell title="Codex Manage" action={<button className="ghostButton" onClick={onLogout}>登出</button>}>
       {defaultPassword ? (
         <div className="warning" role="status">
           当前使用默认密码 admin。请通过 CODEX_WEB_PASSWORD 配置强密码。

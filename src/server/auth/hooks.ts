@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { isAuthenticated } from "./session";
 import { sendError } from "../httpErrors";
 
-const PUBLIC_PATHS = new Set(["/api/login"]);
+const PUBLIC_PATHS = new Set(["/api/login", "/api/me"]);
 
 export function registerAuthHook(app: FastifyInstance) {
   app.addHook("preHandler", async (request, reply) => {
