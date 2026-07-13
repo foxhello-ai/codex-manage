@@ -152,11 +152,19 @@ CODEX_WEB_SESSION_SECRET=<auto-or-env>
 - `POST /api/logout`
 - `GET /api/me`
 
+接口语义：
+
+- `GET /api/me` 允许未登录访问，返回当前认证状态。
+- 未登录时返回 `{ authenticated: false, defaultPassword: boolean }`，前端据此渲染登录页。
+- 登录后返回 `{ authenticated: true, defaultPassword: boolean }`。
+- 登出接口应清除 cookie，并返回未登录状态，保证登录/登出闭环可验证。
+
 权限边界：
 
-- 除登录接口和静态资源外，所有 API 和 WebSocket 连接都必须认证。
+- 除登录接口、`GET /api/me` 和静态资源外，所有 API 和 WebSocket 连接都必须认证。
 - WebSocket 握手时校验 cookie。
-- 未登录返回 `401`。
+- 未登录访问管理接口返回 `401`。
+- 未登录访问 `GET /api/me` 返回 `200` 和未登录状态。
 
 ## 7. Codex App Server 适配设计
 
@@ -460,6 +468,8 @@ WebSocket 消息：
 - `POST /api/logout`
 - `GET /api/me`
 
+说明：`GET /api/me` 是认证状态探测接口，允许未登录访问并返回 `authenticated: false`；其他管理接口仍必须要求登录。
+
 会话：
 
 - `GET /api/sessions`
@@ -514,7 +524,8 @@ WebSocket 消息：
 - 状态筛选。
 - 会话卡片。
 - 设置入口。
-- 退出登录。
+- 登出按钮。
+- 登录按钮必须在未登录首屏可见。
 
 ### 16.3 会话详情页
 
@@ -642,8 +653,10 @@ MVP 只读展示：
 
 ## 21. MVP 验收标准
 
-- 能登录和退出。
-- 未登录不能访问 API 和 WebSocket。
+- 未登录打开 Web 时能看到登录页和登录按钮。
+- 能登录和登出。
+- 登出后回到未登录状态。
+- 未登录不能访问管理 API 和 WebSocket，`GET /api/me` 除外。
 - 能显示历史会话列表。
 - 能搜索会话。
 - 能查看历史消息。
