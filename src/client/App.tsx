@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { getMe, getPublicConfig, login, logout } from "../shared/api";
-import type { PublicConfig, UserSession } from "../shared/models";
+import { getMe, getPublicConfig, getSessions, login, logout } from "../shared/api";
+import type { PublicConfig, SessionSummary, SessionStatus, UserSession } from "../shared/models";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -136,6 +136,11 @@ function Dashboard({
   defaultPassword: boolean;
   onLogout: () => Promise<void>;
 }) {
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [search, setSearch] = useState("");
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
   const listenAddress = useMemo(() => {
     if (!config) return "读取中";
     return `${config.host}:${config.port}`;
@@ -143,6 +148,29 @@ function Dashboard({
   const appServerStatus = config?.appServer
     ? `${config.appServer.status}${config.appServer.initialized ? " / initialized" : ""}`
     : "未连接";
+
+  async function loadSessions(nextSearch = search) {
+    setLoadingSessions(true);
+    setSessionError(null);
+
+    try {
+      const response = await getSessions(nextSearch);
+      setSessions(response.sessions);
+    } catch (caught) {
+      setSessionError(caught instanceof Error ? caught.message : "会话列表加载失败");
+    } finally {
+      setLoadingSessions(false);
+    }
+  }
+
+  useEffect(() => {
+    loadSessions("");
+  }, []);
+
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    loadSessions(search);
+  }
 
   return (
     <Shell title="Codex Manage" action={<button className="ghostButton" onClick={onLogout}>登出</button>}>
@@ -155,19 +183,72 @@ function Dashboard({
       <section className="toolbar">
         <div>
           <h2>会话管理</h2>
-          <p className="muted">M0/M1 已完成：项目骨架、配置读取和登录保护。</p>
+          <p className="muted">查看 ~/.codex/sessions 中的历史会话，后续阶段将支持详情和恢复。</p>
         </div>
+        <button className="ghostButton" onClick={() => loadSessions(search)} disabled={loadingSessions}>
+          {loadingSessions ? "刷新中" : "刷新"}
+        </button>
       </section>
 
-      <section className="infoGrid" aria-label="当前配置">
+      <section className="infoGrid compact" aria-label="当前配置">
         <InfoItem label="监听地址" value={listenAddress} />
-        <InfoItem label="Codex CLI" value={config?.codexCliPath ?? "读取中"} />
         <InfoItem label="Codex 版本" value={config?.codexCliVersion ?? config?.codexVersionError ?? "读取中"} />
         <InfoItem label="App Server" value={appServerStatus} />
-        <InfoItem label="Sessions 目录" value={config?.sessionsDir ?? "读取中"} />
+      </section>
+
+      <section className="sessionSection" aria-labelledby="sessions-title">
+        <div className="sectionHeader">
+          <div>
+            <h2 id="sessions-title">会话列表</h2>
+            <p className="muted">共 {sessions.length} 个会话</p>
+          </div>
+          <form className="searchForm" onSubmit={handleSearchSubmit}>
+            <input
+              aria-label="搜索会话"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="搜索 ID、标题或工作目录"
+            />
+            <button type="submit">搜索</button>
+          </form>
+        </div>
+
+        {sessionError ? <div className="errorBanner">{sessionError}</div> : null}
+        {loadingSessions ? <div className="emptyState">正在加载会话...</div> : null}
+        {!loadingSessions && sessions.length === 0 ? <div className="emptyState">没有匹配的会话</div> : null}
+        {!loadingSessions && sessions.length > 0 ? <SessionList sessions={sessions} /> : null}
       </section>
     </Shell>
   );
+}
+
+function SessionList({ sessions }: { sessions: SessionSummary[] }) {
+  return (
+    <div className="sessionList">
+      {sessions.map((session) => (
+        <article className="sessionItem" key={session.id}>
+          <div className="sessionMain">
+            <div className="sessionTitleRow">
+              <h3>{session.title}</h3>
+              <StatusBadge status={session.status} />
+            </div>
+            <p className="sessionSummary">{session.summary}</p>
+            <div className="sessionMeta">
+              <span>{session.workspace}</span>
+              <span>{formatDateTime(session.updatedAt)}</span>
+            </div>
+          </div>
+          <div className="sessionId" title={session.id}>
+            {session.id}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: SessionStatus }) {
+  return <span className={`statusBadge ${status}`}>{statusLabel(status)}</span>;
 }
 
 function Shell({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
@@ -189,4 +270,35 @@ function InfoItem({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function statusLabel(status: SessionStatus): string {
+  switch (status) {
+    case "starting":
+      return "启动中";
+    case "running":
+      return "运行中";
+    case "waiting_input":
+      return "待输入";
+    case "waiting_approval":
+      return "待审批";
+    case "exited":
+      return "已退出";
+    case "failed":
+      return "失败";
+    case "history":
+    default:
+      return "历史";
+  }
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "未知时间";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
 }

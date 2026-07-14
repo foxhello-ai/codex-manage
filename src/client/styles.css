@@ -48,7 +48,9 @@ input {
 
 .loginPage {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
+  align-content: center;
   place-items: center;
   padding: 24px;
 }
@@ -189,12 +191,12 @@ h2 {
 
 @media (max-width: 767px) {
   .loginPage {
-    align-items: stretch;
+    align-content: center;
+    align-items: center;
     padding: 16px;
   }
 
   .loginPanel {
-    align-self: center;
     padding: 22px;
   }
 
@@ -214,5 +216,179 @@ h2 {
 
   .infoGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+.infoGrid.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sessionSection {
+  display: grid;
+  gap: 14px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.searchForm {
+  width: min(460px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.searchForm button {
+  padding: 0 16px;
+}
+
+.errorBanner,
+.emptyState {
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.errorBanner {
+  border-color: #f2b8b5;
+  color: #b42318;
+  background: #fff5f5;
+}
+
+.sessionList {
+  display: grid;
+  gap: 10px;
+}
+
+.sessionItem {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 14px;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.sessionMain {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.sessionTitleRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sessionTitleRow h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 1rem;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionSummary {
+  margin: 0;
+  color: #384650;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.sessionMeta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: #5f6f7a;
+  font-size: 0.88rem;
+}
+
+.sessionMeta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sessionId {
+  align-self: center;
+  overflow: hidden;
+  color: #5f6f7a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusBadge {
+  flex: 0 0 auto;
+  border: 1px solid #c9d1d9;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #384650;
+  background: #f6f7f9;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.statusBadge.running,
+.statusBadge.starting {
+  border-color: #8ec5ff;
+  color: #074b80;
+  background: #eaf5ff;
+}
+
+.statusBadge.waiting_approval,
+.statusBadge.waiting_input {
+  border-color: #f0c36a;
+  color: #513a00;
+  background: #fff8e5;
+}
+
+.statusBadge.failed {
+  border-color: #f2b8b5;
+  color: #b42318;
+  background: #fff5f5;
+}
+
+@media (max-width: 767px) {
+  .infoGrid.compact {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .searchForm {
+    grid-template-columns: 1fr;
+  }
+
+  .sessionItem {
+    grid-template-columns: 1fr;
+  }
+
+  .sessionTitleRow {
+    align-items: flex-start;
+  }
+
+  .sessionTitleRow h3 {
+    white-space: normal;
+  }
+
+  .sessionId {
+    align-self: auto;
   }
 }

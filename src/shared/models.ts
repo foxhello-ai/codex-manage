@@ -19,6 +19,25 @@ export type PublicConfig = {
   } | null;
 };
 
+export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
+
+export type SessionSummary = {
+  id: string;
+  sessionId: string;
+  title: string;
+  summary: string;
+  workspace: string;
+  createdAt: string;
+  updatedAt: string;
+  status: SessionStatus;
+  cliVersion: string | null;
+  source: string | null;
+};
+
+export type SessionsResponse = {
+  sessions: SessionSummary[];
+};
+
 export type ApiErrorBody = {
   error: {
     code: string;

@@ -1,4 +1,4 @@
-import type { ApiErrorBody, PublicConfig, UserSession } from "./models";
+import type { ApiErrorBody, PublicConfig, SessionsResponse, UserSession } from "./models";
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -43,4 +43,10 @@ export function logout(): Promise<UserSession> {
     method: "POST",
     body: JSON.stringify({})
   });
+}
+
+export function getSessions(search?: string): Promise<SessionsResponse> {
+  const params = new URLSearchParams();
+  if (search?.trim()) params.set("search", search.trim());
+  return apiRequest<SessionsResponse>(`/api/sessions${params.size ? `?${params.toString()}` : ""}`);
 }
