@@ -6,7 +6,9 @@ const apiPort = process.env.CODEX_WEB_PORT ?? "3000";
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    port: 5902,
+    strictPort: true,
+    allowedHosts: ["codex.foxhello.com", "codex.foxhello.cn"],
     proxy: {
       "/api": {
         target: "http://127.0.0.1:" + apiPort,
