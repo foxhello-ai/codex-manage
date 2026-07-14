@@ -523,7 +523,7 @@ function Dashboard({
               </button>
               <div>
                 <p className="detailEyebrow">当前会话</p>
-                <h2>{selectedSession?.title ?? "会话不存在或已被过滤"}</h2>
+                <h2 title={selectedSession?.title ?? "会话不存在或已被过滤"}>{selectedSession?.title ?? "会话不存在或已被过滤"}</h2>
               </div>
             </div>
             <div className="toolbarActions">

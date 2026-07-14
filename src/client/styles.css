@@ -198,7 +198,9 @@ h2 {
   margin: 0;
   font-size: 1.35rem;
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detailEyebrow {
@@ -381,6 +383,8 @@ h2 {
 
 .commandText,
 .commandOutput {
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   overflow: auto;
   border: 1px solid #d9e0e7;
@@ -979,7 +983,40 @@ h2 {
   }
 
   .detailToolbar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     gap: 12px;
+  }
+
+  .detailToolbar .toolbarActions {
+    flex: 0 0 auto;
+  }
+
+  .detailToolbar .toolbarActions button {
+    min-width: 64px;
+    padding: 0 12px;
+  }
+
+  .detailTitleBar {
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .detailTitleBar .iconButton {
+    flex: 0 0 auto;
+  }
+
+  .detailTitleBar h2 {
+    max-width: 100%;
+    font-size: 1rem;
+  }
+
+  .detailEyebrow {
+    font-size: 0.72rem;
   }
 
   .mobileOnly {
@@ -1443,6 +1480,8 @@ textarea {
 .runtimePanel,
 .approvalPanel,
 .livePanel {
+  min-width: 0;
+  width: 100%;
   display: grid;
   gap: 12px;
   border: 1px solid #d9e0e7;
@@ -1710,6 +1749,9 @@ textarea {
 }
 
 .approvalCard {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   display: grid;
   gap: 10px;
   border: 1px solid #f0c36a;
@@ -1719,26 +1761,38 @@ textarea {
 }
 
 .approvalHeader {
+  min-width: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
+.approvalHeader > div {
+  min-width: 0;
+}
+
 .approvalHeader strong {
   display: block;
   margin-bottom: 4px;
+  overflow-wrap: anywhere;
 }
 
 .approvalQuestions {
+  min-width: 0;
   display: grid;
   gap: 10px;
 }
 
 .approvalQuestions label {
+  min-width: 0;
   display: grid;
   gap: 6px;
   font-weight: 700;
+}
+
+.approvalQuestions label > span {
+  overflow-wrap: anywhere;
 }
 
 .approvalActions {
@@ -1748,7 +1802,9 @@ textarea {
 }
 
 .approvalActions button {
+  min-width: 0;
   padding: 0 10px;
+  overflow-wrap: anywhere;
 }
 
 .taskInput {
@@ -1821,7 +1877,18 @@ textarea {
   }
 
   .approvalActions {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .approvalPanel,
+  .livePanel {
+    max-width: 100%;
+    padding: 12px;
+  }
+
+  .approvalCard {
+    width: 100%;
+    padding: 10px;
   }
 
   .taskInput {
