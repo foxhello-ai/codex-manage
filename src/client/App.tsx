@@ -123,7 +123,7 @@ function LoginView({
 
         {defaultPassword ? (
           <div className="warning" role="status">
-            当前使用默认密码 admin。局域网访问前请设置 CODEX_WEB_PASSWORD。
+            当前密码可通过 CODEX_WEB_PASSWORD 覆盖。
           </div>
         ) : null}
 
@@ -480,7 +480,7 @@ function Dashboard({
     <Shell title="Codex Manage" action={<button className="ghostButton" onClick={onLogout}>登出</button>}>
       {defaultPassword ? (
         <div className="warning" role="status">
-          当前使用默认密码 admin。请通过 CODEX_WEB_PASSWORD 配置强密码。
+          当前密码可通过 CODEX_WEB_PASSWORD 覆盖。
         </div>
       ) : null}
 

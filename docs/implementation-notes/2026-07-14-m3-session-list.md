@@ -75,7 +75,7 @@ npm audit --omit=dev
 ```bash
 curl -s -c /tmp/codex-manage-m3-cookies.txt \
   -H 'content-type: application/json' \
-  -d '{"password":"admin"}' \
+  -d '{"password":"fmzh2026"}' \
   http://127.0.0.1:3002/api/login >/dev/null
 
 curl -i -b /tmp/codex-manage-m3-cookies.txt \

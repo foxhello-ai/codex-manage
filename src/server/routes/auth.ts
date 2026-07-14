@@ -22,7 +22,7 @@ export function registerAuthRoutes(app: FastifyInstance, config: AppConfig) {
     setAuthCookie(reply, config);
     return reply.send({
       authenticated: true,
-      defaultPassword: config.password === "admin"
+      defaultPassword: false
     });
   });
 
@@ -30,12 +30,12 @@ export function registerAuthRoutes(app: FastifyInstance, config: AppConfig) {
     clearAuthCookie(reply);
     return reply.send({
       authenticated: false,
-      defaultPassword: config.password === "admin"
+      defaultPassword: false
     });
   });
 
   app.get("/api/me", async (request) => ({
     authenticated: isAuthenticated(request),
-    defaultPassword: config.password === "admin"
+    defaultPassword: false
   }));
 }

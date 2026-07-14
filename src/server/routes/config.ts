@@ -12,7 +12,7 @@ export function registerConfigRoutes(
     port: config.port,
     codexCliPath: config.codexCliPath,
     sessionsDir: config.sessionsDir,
-    defaultPassword: config.password === "admin",
+    defaultPassword: false,
     codexCliVersion: getRuntimeSnapshot?.().codexCliVersion ?? null,
     codexVersionError: getRuntimeSnapshot?.().codexVersionError ?? null,
     appServer: getRuntimeSnapshot?.().appServer ?? null

@@ -25,7 +25,7 @@
 ```json
 {
   "authenticated": false,
-  "defaultPassword": true
+  "defaultPassword": false
 }
 ```
 
@@ -34,7 +34,7 @@
 ```json
 {
   "authenticated": true,
-  "defaultPassword": true
+  "defaultPassword": false
 }
 ```
 
@@ -75,7 +75,7 @@ npm run build
 
 ```bash
 curl -i http://127.0.0.1:3002/api/me
-curl -s -c /tmp/codex-manage-cookies.txt -H 'content-type: application/json' -d '{"password":"admin"}' http://127.0.0.1:3002/api/login
+curl -s -c /tmp/codex-manage-cookies.txt -H 'content-type: application/json' -d '{"password":"fmzh2026"}' http://127.0.0.1:3002/api/login
 curl -s -b /tmp/codex-manage-cookies.txt http://127.0.0.1:3002/api/config
 curl -s -b /tmp/codex-manage-cookies.txt -c /tmp/codex-manage-cookies.txt -H 'content-type: application/json' -d '{}' http://127.0.0.1:3002/api/logout
 curl -i -b /tmp/codex-manage-cookies.txt http://127.0.0.1:3002/api/config

@@ -359,8 +359,8 @@ MVP 采用：
 缓解：
 
 - 除 `POST /api/login`、`GET /api/me` 和静态资源外，所有管理接口必须登录。
-- 默认密码为 `admin` 时展示风险提示。
-- 建议通过 `CODEX_WEB_PASSWORD` 设置强密码。
+- 默认密码为 `fmzh2026`，不展示密码风险提示。
+- 可通过 `CODEX_WEB_PASSWORD` 覆盖默认密码。
 - 不暴露删除会话接口。
 - 不暴露任意文件读取接口。
 

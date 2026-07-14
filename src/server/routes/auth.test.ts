@@ -10,7 +10,7 @@ function testConfig(): AppConfig {
   return {
     host: "0.0.0.0",
     port: 3000,
-    password: "admin",
+    password: "fmzh2026",
     sessionSecret: "test-secret-at-least-thirty-two-chars",
     codexCliPath: "codex",
     sessionsDir: "/tmp/sessions",
@@ -46,7 +46,7 @@ describe("auth routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       authenticated: false,
-      defaultPassword: true
+      defaultPassword: false
     });
   });
 
@@ -63,7 +63,7 @@ describe("auth routes", () => {
       method: "POST",
       url: "/api/login",
       payload: {
-        password: "admin"
+        password: "fmzh2026"
       }
     });
     expect(login.statusCode).toBe(200);
@@ -91,7 +91,7 @@ describe("auth routes", () => {
     expect(logout.statusCode).toBe(200);
     expect(logout.json()).toEqual({
       authenticated: false,
-      defaultPassword: true
+      defaultPassword: false
     });
   });
 });

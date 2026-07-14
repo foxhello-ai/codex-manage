@@ -119,7 +119,7 @@ Codex 集成：
 ```text
 CODEX_WEB_HOST=0.0.0.0
 CODEX_WEB_PORT=3000
-CODEX_WEB_PASSWORD=admin
+CODEX_WEB_PASSWORD=fmzh2026
 CODEX_CLI_PATH=codex
 CODEX_SESSIONS_DIR=~/.codex/sessions
 CODEX_WEB_SESSION_SECRET=<auto-or-env>
@@ -129,13 +129,13 @@ CODEX_WEB_SESSION_SECRET=<auto-or-env>
 
 - 监听地址：`0.0.0.0`
 - 监听端口：`3000`
-- 默认密码：`admin`
+- 默认密码：`fmzh2026`
 - Codex CLI：`codex`
 - 会话目录：`~/.codex/sessions`
 
 安全要求：
 
-- 当密码为 `admin` 时，前端展示风险提示。
+- 默认不展示密码风险提示。
 - session secret 未设置时，开发模式可自动生成；正式使用建议显式配置。
 
 ## 6. 认证设计
