@@ -1,4 +1,4 @@
-import type { ApiErrorBody, PublicConfig, SessionDetailResponse, SessionMetadataResponse, SessionsResponse, UserSession } from "./models";
+import type { ApiErrorBody, PublicConfig, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionsResponse, UserSession } from "./models";
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -53,6 +53,10 @@ export function getSessions(search?: string): Promise<SessionsResponse> {
 
 export function getSessionDetail(sessionId: string): Promise<SessionDetailResponse> {
   return apiRequest<SessionDetailResponse>(`/api/sessions/${encodeURIComponent(sessionId)}`);
+}
+
+export function getSessionCommands(sessionId: string): Promise<SessionCommandsResponse> {
+  return apiRequest<SessionCommandsResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/commands`);
 }
 
 export function updateSessionMetadata(sessionId: string, remarkTitle: string | null): Promise<SessionMetadataResponse> {

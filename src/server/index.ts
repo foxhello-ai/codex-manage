@@ -8,6 +8,7 @@ import { registerSessionRoutes } from "./routes/sessions";
 import { AppRuntime } from "./services/AppRuntime";
 import { SessionService } from "./services/SessionService";
 import { SessionMetadataStore } from "./services/SessionMetadataStore";
+import { JsonlSessionParser } from "./services/JsonlSessionParser";
 
 const config = loadConfig();
 
@@ -17,6 +18,7 @@ const app = Fastify({
 const runtime = new AppRuntime(config);
 const metadataStore = new SessionMetadataStore(config.metadataFile);
 const sessionService = new SessionService(runtime.appServer, metadataStore);
+const jsonlSessionParser = new JsonlSessionParser(config.sessionsDir);
 
 await app.register(cookie, {
   secret: config.sessionSecret
@@ -25,7 +27,7 @@ await app.register(cookie, {
 registerAuthHook(app);
 registerAuthRoutes(app, config);
 registerConfigRoutes(app, config, () => runtime.getSnapshot());
-registerSessionRoutes(app, sessionService);
+registerSessionRoutes(app, sessionService, jsonlSessionParser);
 
 try {
   try {

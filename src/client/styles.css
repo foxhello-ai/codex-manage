@@ -279,6 +279,115 @@ h2 {
   gap: 14px;
 }
 
+
+.commandsPanel {
+  border-top: 1px solid #d9e0e7;
+  padding-top: 14px;
+}
+
+.commandsSummary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.commandsSummary h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.commandsPanelBody {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.commandList {
+  display: grid;
+  gap: 10px;
+}
+
+.commandCard {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.commandCard.running {
+  border-color: #f0c36a;
+  background: #fffdf7;
+}
+
+.commandHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.commandHeader strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.commandHeader button {
+  padding: 0 14px;
+}
+
+.commandText,
+.commandOutput {
+  margin: 0;
+  overflow: auto;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f6f7f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.commandMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.commandMeta span {
+  border: 1px solid #d9e0e7;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #5f6f7a;
+  background: #f6f7f9;
+  font-size: 0.78rem;
+}
+
+.commandOutputDetails {
+  display: grid;
+  gap: 8px;
+}
+
+.commandOutputDetails summary {
+  color: #1769aa;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.commandOutput.completed {
+  max-height: 320px;
+}
+
+.commandOutput.running {
+  max-height: none;
+}
+
 .timeline {
   display: grid;
   gap: 14px;
@@ -849,6 +958,115 @@ h2 {
 .detailStack {
   display: grid;
   gap: 14px;
+}
+
+
+.commandsPanel {
+  border-top: 1px solid #d9e0e7;
+  padding-top: 14px;
+}
+
+.commandsSummary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.commandsSummary h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.commandsPanelBody {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.commandList {
+  display: grid;
+  gap: 10px;
+}
+
+.commandCard {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.commandCard.running {
+  border-color: #f0c36a;
+  background: #fffdf7;
+}
+
+.commandHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.commandHeader strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.commandHeader button {
+  padding: 0 14px;
+}
+
+.commandText,
+.commandOutput {
+  margin: 0;
+  overflow: auto;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f6f7f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.commandMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.commandMeta span {
+  border: 1px solid #d9e0e7;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #5f6f7a;
+  background: #f6f7f9;
+  font-size: 0.78rem;
+}
+
+.commandOutputDetails {
+  display: grid;
+  gap: 8px;
+}
+
+.commandOutputDetails summary {
+  color: #1769aa;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.commandOutput.completed {
+  max-height: 320px;
+}
+
+.commandOutput.running {
+  max-height: none;
 }
 
 .timeline {

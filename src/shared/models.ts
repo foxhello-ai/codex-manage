@@ -79,6 +79,37 @@ export type SessionFileChange = {
   diff: string | null;
 };
 
+
+export type SessionCommandsResponse = {
+  commands: SessionCommand[];
+  diagnostics: SessionCommandDiagnostics;
+};
+
+export type SessionCommandDiagnostics = {
+  scannedFiles: number;
+  parsedLines: number;
+  parseErrors: number;
+  matchedSessionFile: boolean;
+};
+
+export type SessionCommand = {
+  id: string;
+  callId: string;
+  turnId: string | null;
+  timestamp: string | null;
+  status: "completed" | "running";
+  cmd: string;
+  workdir: string;
+  sandboxPermissions: string | null;
+  justification: string | null;
+  prefixRule: string[] | null;
+  tty: boolean | null;
+  yieldTimeMs: number | null;
+  maxOutputTokens: number | null;
+  output: string | null;
+  outputLength: number;
+};
+
 export type ApiErrorBody = {
   error: {
     code: string;

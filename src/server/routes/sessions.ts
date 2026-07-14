@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sendError } from "../httpErrors";
 import type { SessionService } from "../services/SessionService";
+import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 
 const ListQuery = z.object({
   search: z.string().optional(),
@@ -16,7 +17,7 @@ const MetadataBody = z.object({
   remarkTitle: z.string().max(120).nullable()
 });
 
-export function registerSessionRoutes(app: FastifyInstance, sessionService: SessionService) {
+export function registerSessionRoutes(app: FastifyInstance, sessionService: SessionService, jsonlSessionParser?: JsonlSessionParser) {
   app.get("/api/sessions", async (request, reply) => {
     const parsed = ListQuery.safeParse(request.query);
     if (!parsed.success) {
@@ -36,6 +37,30 @@ export function registerSessionRoutes(app: FastifyInstance, sessionService: Sess
     }
   });
 
+
+
+  app.get("/api/sessions/:id/commands", async (request, reply) => {
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
+    }
+
+    if (!jsonlSessionParser) {
+      return sendError(reply, 503, "JSONL_PARSER_UNAVAILABLE", "历史命令解析器不可用");
+    }
+
+    try {
+      const result = await jsonlSessionParser.listCommands(params.data.id);
+      return reply.send(result);
+    } catch (error) {
+      return sendError(
+        reply,
+        500,
+        "SESSION_COMMANDS_UNAVAILABLE",
+        error instanceof Error ? error.message : "历史命令读取失败"
+      );
+    }
+  });
 
   app.get("/api/sessions/:id", async (request, reply) => {
     const params = SessionParams.safeParse(request.params);

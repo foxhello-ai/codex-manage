@@ -2,10 +2,14 @@ import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import { registerSessionRoutes } from "./sessions";
 import type { SessionService } from "../services/SessionService";
+import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 
-function buildApp(service: Pick<SessionService, "listSessions" | "getSessionDetail" | "updateMetadata">) {
+function buildApp(
+  service: Pick<SessionService, "listSessions" | "getSessionDetail" | "updateMetadata">,
+  parser?: Pick<JsonlSessionParser, "listCommands">
+) {
   const app = Fastify();
-  registerSessionRoutes(app, service as SessionService);
+  registerSessionRoutes(app, service as SessionService, parser as JsonlSessionParser | undefined);
   return app;
 }
 
@@ -68,4 +72,51 @@ describe("session routes", () => {
       }
     });
   });
+
+  it("returns session commands", async () => {
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => {
+          throw new Error("not used");
+        },
+        getSessionDetail: async () => {
+          throw new Error("not used");
+        }
+      },
+      {
+        listCommands: async (sessionId: string) => ({
+          commands: [
+            {
+              id: "call-1",
+              callId: "call-1",
+              turnId: "turn-1",
+              timestamp: "2026-07-14T00:00:01Z",
+              status: "completed",
+              cmd: "npm test",
+              workdir: "/workspace/app",
+              sandboxPermissions: null,
+              justification: null,
+              prefixRule: null,
+              tty: null,
+              yieldTimeMs: 30000,
+              maxOutputTokens: 12000,
+              output: "passed",
+              outputLength: 6
+            }
+          ],
+          diagnostics: { scannedFiles: 1, parsedLines: 4, parseErrors: 0, matchedSessionFile: sessionId === "thread-1" }
+        })
+      }
+    );
+
+    const response = await app.inject({ method: "GET", url: "/api/sessions/thread-1/commands" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      commands: [{ callId: "call-1", cmd: "npm test", output: "passed" }],
+      diagnostics: { matchedSessionFile: true }
+    });
+  });
+
 });

@@ -1,6 +1,6 @@
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { getMe, getPublicConfig, getSessionDetail, getSessions, login, logout, updateSessionMetadata } from "../shared/api";
-import type { PublicConfig, SessionDetail, SessionSummary, SessionStatus, SessionTurnItem, UserSession } from "../shared/models";
+import { getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessions, login, logout, updateSessionMetadata } from "../shared/api";
+import type { PublicConfig, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionSummary, SessionStatus, SessionTurnItem, UserSession } from "../shared/models";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -144,6 +144,10 @@ function Dashboard({
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [commands, setCommands] = useState<SessionCommand[]>([]);
+  const [commandDiagnostics, setCommandDiagnostics] = useState<SessionCommandDiagnostics | null>(null);
+  const [loadingCommands, setLoadingCommands] = useState(false);
+  const [commandsError, setCommandsError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const listenAddress = useMemo(() => {
@@ -165,6 +169,8 @@ function Dashboard({
       if (selectedSessionId && !response.sessions.some((session) => session.id === selectedSessionId)) {
         setSelectedSessionId(null);
         setSessionDetail(null);
+        setCommands([]);
+        setCommandDiagnostics(null);
       }
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "会话列表加载失败");
@@ -197,11 +203,31 @@ function Dashboard({
     }
   }
 
+  async function loadSessionCommands(sessionId: string) {
+    setLoadingCommands(true);
+    setCommandsError(null);
+    setCommandDiagnostics(null);
+
+    try {
+      const response = await getSessionCommands(sessionId);
+      setCommands(response.commands);
+      setCommandDiagnostics(response.diagnostics);
+    } catch (caught) {
+      setCommands([]);
+      setCommandsError(caught instanceof Error ? caught.message : "历史命令加载失败");
+    } finally {
+      setLoadingCommands(false);
+    }
+  }
+
   function handleSelectSession(session: SessionSummary) {
     setSelectedSessionId(session.id);
     setSessionDetail(null);
+    setCommands([]);
+    setCommandDiagnostics(null);
     setDrawerOpen(false);
     loadSessionDetail(session.id);
+    loadSessionCommands(session.id);
   }
 
   function handleMetadataSaved(updated: SessionSummary) {
@@ -271,6 +297,10 @@ function Dashboard({
             detail={sessionDetail}
             loading={loadingDetail}
             error={detailError}
+            commands={commands}
+            commandDiagnostics={commandDiagnostics}
+            loadingCommands={loadingCommands}
+            commandsError={commandsError}
           />
         ) : null}
       </section>
@@ -300,18 +330,26 @@ function Dashboard({
 }
 
 
-const DEFAULT_VISIBLE_TURNS = 10;
+const DEFAULT_VISIBLE_TURNS = 5;
 
 function SessionDetailPanel({
   fallbackSession,
   detail,
   loading,
-  error
+  error,
+  commands,
+  commandDiagnostics,
+  loadingCommands,
+  commandsError
 }: {
   fallbackSession: SessionSummary;
   detail: SessionDetail | null;
   loading: boolean;
   error: string | null;
+  commands: SessionCommand[];
+  commandDiagnostics: SessionCommandDiagnostics | null;
+  loadingCommands: boolean;
+  commandsError: string | null;
 }) {
   const session = detail ?? fallbackSession;
   const [expandedMessage, setExpandedMessage] = useState<{ title: string; text: string; meta?: string } | null>(null);
@@ -346,8 +384,88 @@ function SessionDetailPanel({
           onOpenMessage={setExpandedMessage}
         />
       ) : null}
+      <SessionCommandsPanel
+        commands={commands}
+        diagnostics={commandDiagnostics}
+        loading={loadingCommands}
+        error={commandsError}
+      />
       {expandedMessage ? <MessageDetailDialog message={expandedMessage} onClose={() => setExpandedMessage(null)} /> : null}
     </div>
+  );
+}
+
+
+function SessionCommandsPanel({
+  commands,
+  diagnostics,
+  loading,
+  error
+}: {
+  commands: SessionCommand[];
+  diagnostics: SessionCommandDiagnostics | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  return (
+    <details className="commandsPanel" aria-labelledby="commands-title">
+      <summary className="commandsSummary">
+        <div>
+          <h3 id="commands-title">历史命令</h3>
+          <p className="muted">
+            {loading ? "正在加载历史命令..." : `共 ${commands.length} 条命令`}
+            {diagnostics && !diagnostics.matchedSessionFile ? "，未匹配到 JSONL 文件" : ""}
+          </p>
+        </div>
+      </summary>
+      <div className="commandsPanelBody">
+        {error ? <div className="errorBanner">{error}</div> : null}
+        {!loading && !error && commands.length === 0 ? <div className="emptyState">暂无历史命令</div> : null}
+        {commands.length > 0 ? (
+          <div className="commandList">
+            {commands.map((command) => (
+              <CommandCard command={command} key={command.callId} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function CommandCard({ command }: { command: SessionCommand }) {
+  const completed = command.status === "completed";
+  const output = command.output ?? "输出缺失，命令可能仍在运行或历史记录不完整。";
+
+  async function copyCommand() {
+    await navigator.clipboard?.writeText(command.cmd);
+  }
+
+  return (
+    <article className={`commandCard ${command.status}`}>
+      <div className="commandHeader">
+        <div>
+          <strong>{command.status === "completed" ? "已完成" : "运行中"}</strong>
+          <p className="muted">{command.workdir || "未知工作目录"}</p>
+        </div>
+        <button className="ghostButton" type="button" onClick={copyCommand}>复制</button>
+      </div>
+      <pre className="commandText">{command.cmd}</pre>
+      <div className="commandMeta">
+        {command.sandboxPermissions ? <span>{command.sandboxPermissions}</span> : null}
+        {command.justification ? <span>{command.justification}</span> : null}
+        {command.prefixRule ? <span>prefix: {command.prefixRule.join(" ")}</span> : null}
+        {command.tty ? <span>TTY</span> : null}
+      </div>
+      {completed ? (
+        <details className="commandOutputDetails">
+          <summary>查看输出（{command.outputLength} 字符）</summary>
+          <pre className="commandOutput completed">{output}</pre>
+        </details>
+      ) : (
+        <pre className="commandOutput running">{output}</pre>
+      )}
+    </article>
   );
 }
 
