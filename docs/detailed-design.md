@@ -241,6 +241,8 @@ codex --version
 - `id`
 - `sessionId`
 - `name`
+- `remarkTitle`
+- `displayTitle`
 - `preview`
 - `cwd`
 - `createdAt`
@@ -257,6 +259,8 @@ codex --version
 搜索：
 
 - 优先使用 `thread/list.searchTerm`。
+- Web 管理台应将备注标题纳入搜索。
+- 如果 app-server 搜索无法覆盖备注标题，后端应对本地会话元数据做补充过滤。
 - 前端可做本页补充过滤。
 
 状态映射：
@@ -270,6 +274,14 @@ failed -> failed
 ```
 
 实际映射应以当前 app-server schema 的 `ThreadStatus` 为准。
+
+备注标题：
+
+- 备注标题是 Codex Manage 自己的会话展示元数据。
+- 备注标题不写入 `~/.codex/sessions`，避免破坏 Codex 原生会话。
+- 列表显示标题优先级：备注标题 > Codex thread name > preview 摘要 > thread id。
+- 备注标题支持设置、修改和清空。
+- 备注标题存储可以在 MVP 使用本地 JSON 元数据文件，后续再替换为数据库。
 
 ## 9. 会话详情设计
 
@@ -475,6 +487,17 @@ WebSocket 消息：
 - `GET /api/sessions`
 - `GET /api/sessions/:id`
 - `GET /api/sessions/:id/commands`
+- `PATCH /api/sessions/:id/metadata`
+
+备注标题请求示例：
+
+```json
+{
+  "remarkTitle": "string"
+}
+```
+
+`remarkTitle` 为空字符串或 `null` 时表示清空备注标题。
 
 运行：
 
@@ -515,14 +538,18 @@ WebSocket 消息：
 
 移动端：
 
-- 单栏列表。
-- 点击进入详情页。
+- 默认展示当前工作区或详情内容，不直接占满首屏显示完整会话列表。
+- 会话列表默认收起在侧边栏/抽屉中。
+- 点击会话列表按钮后，从侧边或底部打开列表抽屉。
+- 抽屉内保留搜索框、刷新按钮和会话列表。
+- 点击会话后关闭抽屉并进入详情页。
 
 元素：
 
 - 搜索框。
 - 状态筛选。
 - 会话卡片。
+- 备注标题编辑入口。
 - 设置入口。
 - 登出按钮。
 - 登录按钮必须在未登录首屏可见。
@@ -564,6 +591,9 @@ MVP 只读展示：
 
 交互要求：
 
+- H5 会话列表默认收起，使用侧边栏或抽屉承载。
+- H5 会话列表抽屉内必须支持搜索。
+- H5 会话列表抽屉打开时应有明确关闭方式。
 - 主要按钮触控区域不小于 44px。
 - 输入框固定底部时避开安全区域。
 - 使用 `env(safe-area-inset-bottom)`。
@@ -658,7 +688,10 @@ MVP 只读展示：
 - 登出后回到未登录状态。
 - 未登录不能访问管理 API 和 WebSocket，`GET /api/me` 除外。
 - 能显示历史会话列表。
+- H5 移动端会话列表默认收起，点击后以侧边栏或抽屉展示。
+- H5 会话列表抽屉内能搜索会话。
 - 能搜索会话。
+- 能设置、修改和清空会话备注标题。
 - 能查看历史消息。
 - 能查看历史命令记录。
 - 能通过 `thread/resume` 恢复会话。
