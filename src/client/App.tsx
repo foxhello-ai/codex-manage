@@ -522,8 +522,8 @@ function Dashboard({
                 <span aria-hidden="true">←</span>
               </button>
               <div>
-                <h2>当前会话</h2>
-                <p className="muted">{selectedSession?.title ?? "会话不存在或已被过滤"}</p>
+                <p className="detailEyebrow">当前会话</p>
+                <h2>{selectedSession?.title ?? "会话不存在或已被过滤"}</h2>
               </div>
             </div>
             <div className="toolbarActions">
@@ -692,8 +692,9 @@ function defaultFloatingRuntimePosition(): FloatingPosition {
 }
 
 function clampFloatingRuntimePosition(position: FloatingPosition): FloatingPosition {
-  const width = 280;
-  const height = 126;
+  const compact = window.innerWidth <= 767;
+  const width = compact ? 210 : 280;
+  const height = compact ? 82 : 126;
   const margin = 12;
   return {
     x: Math.min(Math.max(position.x, margin), Math.max(margin, window.innerWidth - width - margin)),
