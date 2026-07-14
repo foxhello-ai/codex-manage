@@ -8,7 +8,8 @@ describe("loadConfig", () => {
       CODEX_WEB_PORT: process.env.CODEX_WEB_PORT,
       CODEX_WEB_PASSWORD: process.env.CODEX_WEB_PASSWORD,
       CODEX_CLI_PATH: process.env.CODEX_CLI_PATH,
-      CODEX_SESSIONS_DIR: process.env.CODEX_SESSIONS_DIR
+      CODEX_SESSIONS_DIR: process.env.CODEX_SESSIONS_DIR,
+      CODEX_MANAGE_METADATA_FILE: process.env.CODEX_MANAGE_METADATA_FILE
     };
 
     delete process.env.CODEX_WEB_HOST;
@@ -16,6 +17,7 @@ describe("loadConfig", () => {
     delete process.env.CODEX_WEB_PASSWORD;
     delete process.env.CODEX_CLI_PATH;
     delete process.env.CODEX_SESSIONS_DIR;
+    delete process.env.CODEX_MANAGE_METADATA_FILE;
 
     const config = loadConfig();
 
@@ -24,6 +26,7 @@ describe("loadConfig", () => {
     expect(config.password).toBe("admin");
     expect(config.codexCliPath).toBe("codex");
     expect(config.sessionsDir).toContain(".codex/sessions");
+    expect(config.metadataFile).toContain(".codex-manage/session-metadata.json");
 
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) {

@@ -1,4 +1,5 @@
 import type { CodexAppServerClient } from "./CodexAppServerClient";
+import type { SessionMetadataStore } from "./SessionMetadataStore";
 
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
 
@@ -6,6 +7,8 @@ export type SessionSummary = {
   id: string;
   sessionId: string;
   title: string;
+  defaultTitle: string;
+  remarkTitle: string | null;
   summary: string;
   workspace: string;
   createdAt: string;
@@ -25,8 +28,13 @@ type ListSessionsParams = {
   limit?: number;
 };
 
+type MetadataStore = Pick<SessionMetadataStore, "getAll" | "update">;
+
 export class SessionService {
-  constructor(private readonly appServer: Pick<CodexAppServerClient, "request" | "getSnapshot">) {}
+  constructor(
+    private readonly appServer: Pick<CodexAppServerClient, "request" | "getSnapshot">,
+    private readonly metadataStore?: MetadataStore
+  ) {}
 
   async listSessions(params: ListSessionsParams = {}): Promise<SessionSummary[]> {
     const snapshot = this.appServer.getSnapshot();
@@ -39,28 +47,60 @@ export class SessionService {
       sortDirection: "desc",
       sortKey: "updated_at",
       archived: false,
-      searchTerm: params.search?.trim() || null
+      searchTerm: null
     });
 
-    return (response.data ?? []).map((thread) => this.toSummary(thread)).filter((session) => session !== null);
+    const metadata = await this.readMetadata();
+    const searchTerm = params.search?.trim().toLocaleLowerCase() ?? "";
+    const sessions = (response.data ?? [])
+      .map((thread) => this.toSummary(thread, metadata))
+      .filter((session) => session !== null);
+
+    if (!searchTerm) return sessions;
+
+    return sessions.filter((session) => matchesSearch(session, searchTerm));
   }
 
-  private toSummary(thread: unknown): SessionSummary | null {
+  async updateMetadata(sessionId: string, remarkTitle: string | null): Promise<SessionSummary> {
+    if (!this.metadataStore) {
+      throw new Error("Session metadata store is not configured");
+    }
+
+    await this.metadataStore.update(sessionId, { remarkTitle });
+    const sessions = await this.listSessions({ limit: 200 });
+    const session = sessions.find((item) => item.id === sessionId || item.sessionId === sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    return session;
+  }
+
+  private async readMetadata(): Promise<Record<string, { remarkTitle: string | null }>> {
+    return this.metadataStore ? this.metadataStore.getAll() : {};
+  }
+
+  private toSummary(thread: unknown, metadata: Record<string, { remarkTitle: string | null }>): SessionSummary | null {
     if (!thread || typeof thread !== "object") return null;
     const source = thread as Record<string, unknown>;
     const id = readString(source.id);
     if (!id) return null;
 
+    const sessionId = readString(source.sessionId) ?? id;
     const preview = readString(source.preview);
     const name = readString(source.name);
     const cwd = readString(source.cwd);
     const createdAt = readUnixSeconds(source.createdAt);
     const updatedAt = readUnixSeconds(source.updatedAt);
+    const defaultTitle = name ?? makeTitle(preview, id);
+    const remarkTitle = metadata[id]?.remarkTitle ?? metadata[sessionId]?.remarkTitle ?? null;
 
     return {
       id,
-      sessionId: readString(source.sessionId) ?? id,
-      title: name ?? makeTitle(preview, id),
+      sessionId,
+      title: remarkTitle ?? defaultTitle,
+      defaultTitle,
+      remarkTitle,
       summary: preview ?? "无摘要",
       workspace: cwd ?? "未知工作目录",
       createdAt,
@@ -70,6 +110,12 @@ export class SessionService {
       source: readSource(source.source)
     };
   }
+}
+
+function matchesSearch(session: SessionSummary, searchTerm: string): boolean {
+  return [session.id, session.sessionId, session.title, session.defaultTitle, session.remarkTitle, session.summary, session.workspace]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .some((value) => value.toLocaleLowerCase().includes(searchTerm));
 }
 
 function readString(value: unknown): string | null {

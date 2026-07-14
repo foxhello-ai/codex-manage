@@ -9,6 +9,7 @@ type AppConfig = {
   sessionSecret: string;
   codexCliPath: string;
   sessionsDir: string;
+  metadataFile: string;
 };
 
 function readPort(value: string | undefined, fallback: number): number {
@@ -33,7 +34,8 @@ export function loadConfig(): AppConfig {
     password,
     sessionSecret,
     codexCliPath: process.env.CODEX_CLI_PATH ?? "codex",
-    sessionsDir: expandHome(process.env.CODEX_SESSIONS_DIR ?? "~/.codex/sessions")
+    sessionsDir: expandHome(process.env.CODEX_SESSIONS_DIR ?? "~/.codex/sessions"),
+    metadataFile: expandHome(process.env.CODEX_MANAGE_METADATA_FILE ?? join(process.cwd(), ".codex-manage/session-metadata.json"))
   };
 }
 

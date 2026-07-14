@@ -25,6 +25,8 @@ export type SessionSummary = {
   id: string;
   sessionId: string;
   title: string;
+  defaultTitle: string;
+  remarkTitle: string | null;
   summary: string;
   workspace: string;
   createdAt: string;
@@ -36,6 +38,10 @@ export type SessionSummary = {
 
 export type SessionsResponse = {
   sessions: SessionSummary[];
+};
+
+export type SessionMetadataResponse = {
+  session: SessionSummary;
 };
 
 export type ApiErrorBody = {

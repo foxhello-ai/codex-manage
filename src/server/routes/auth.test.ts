@@ -13,7 +13,8 @@ function testConfig(): AppConfig {
     password: "admin",
     sessionSecret: "test-secret-at-least-thirty-two-chars",
     codexCliPath: "codex",
-    sessionsDir: "/tmp/sessions"
+    sessionsDir: "/tmp/sessions",
+    metadataFile: "/tmp/codex-manage-test-session-metadata.json"
   };
 }
 

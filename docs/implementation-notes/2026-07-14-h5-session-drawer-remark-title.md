@@ -48,3 +48,7 @@ H5 移动端展示时，会话列表不应一直占据主界面空间。
 - 备注标题可设置、修改、清空。
 - 设置备注标题后，会话列表主标题立即更新。
 - 清空备注标题后，主标题恢复默认标题或摘要。
+
+## 实现记录
+
+- 已按本文需求补充代码实现，记录见 `docs/implementation-notes/2026-07-14-h5-session-drawer-remark-title-implementation.md`。

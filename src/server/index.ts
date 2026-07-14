@@ -7,6 +7,7 @@ import { registerConfigRoutes } from "./routes/config";
 import { registerSessionRoutes } from "./routes/sessions";
 import { AppRuntime } from "./services/AppRuntime";
 import { SessionService } from "./services/SessionService";
+import { SessionMetadataStore } from "./services/SessionMetadataStore";
 
 const config = loadConfig();
 
@@ -14,7 +15,8 @@ const app = Fastify({
   logger: true
 });
 const runtime = new AppRuntime(config);
-const sessionService = new SessionService(runtime.appServer);
+const metadataStore = new SessionMetadataStore(config.metadataFile);
+const sessionService = new SessionService(runtime.appServer, metadataStore);
 
 await app.register(cookie, {
   secret: config.sessionSecret
