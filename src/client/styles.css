@@ -179,6 +179,29 @@ h2 {
   padding: 0;
 }
 
+.detailToolbar {
+  align-items: flex-start;
+}
+
+.detailTitleBar {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.detailTitleBar > div {
+  min-width: 0;
+}
+
+.detailTitleBar h2 {
+  margin-top: 0;
+}
+
+.detailTitleBar .muted {
+  overflow-wrap: anywhere;
+}
+
 .iconButton {
   width: 44px;
   min-width: 44px;
@@ -196,6 +219,15 @@ h2 {
 
 .mobileOnly {
   display: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .infoGrid,
@@ -939,6 +971,10 @@ h2 {
     flex-direction: column;
   }
 
+  .detailToolbar {
+    gap: 12px;
+  }
+
   .mobileOnly {
     display: inline-flex;
     align-items: center;
@@ -1580,6 +1616,19 @@ textarea {
   background: #d8ecff;
 }
 
+.panelHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.panelHeaderActions button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
 .livePanel .messageItem,
 .livePanel .commandCard {
   background: #ffffff;
@@ -1602,6 +1651,42 @@ textarea {
   background: #f7fbff;
   font-size: 0.86rem;
   font-weight: 700;
+}
+
+.historyHiddenNotice {
+  border: 1px solid #8ec5ff;
+  border-radius: 8px;
+  padding: 12px;
+  color: #074b80;
+  background: #f7fbff;
+  font-weight: 700;
+}
+
+.historyContent {
+  display: grid;
+  gap: 14px;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #8ec5ff;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f7fbff;
+}
+
+.historyHeader h3 {
+  margin: 0 0 4px;
+  color: #074b80;
+  font-size: 1rem;
+}
+
+.historyHeader button {
+  flex: 0 0 auto;
+  padding: 0 12px;
 }
 
 .panelHeaderCompact {

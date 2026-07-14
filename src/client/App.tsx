@@ -4,6 +4,7 @@ import type { ApprovalDecision, ApprovalSummary, PublicConfig, RuntimeSnapshot, 
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
+type DashboardView = "list" | "detail";
 
 type LiveCommand = {
   id: string;
@@ -169,7 +170,7 @@ function Dashboard({
   const [commandDiagnostics, setCommandDiagnostics] = useState<SessionCommandDiagnostics | null>(null);
   const [loadingCommands, setLoadingCommands] = useState(false);
   const [commandsError, setCommandsError] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<DashboardView>("list");
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalSummary[]>([]);
   const [liveCommands, setLiveCommands] = useState<LiveCommand[]>([]);
@@ -198,6 +199,7 @@ function Dashboard({
       setSessions(response.sessions);
       if (selectedSessionId && !response.sessions.some((session) => session.id === selectedSessionId)) {
         setSelectedSessionId(null);
+        setViewMode("list");
         setSessionDetail(null);
         setCommands([]);
         setCommandDiagnostics(null);
@@ -369,7 +371,7 @@ function Dashboard({
     setLiveMessages([]);
     setRuntimeError(null);
     lastEventSeqRef.current = 0;
-    setDrawerOpen(false);
+    setViewMode("detail");
     refreshCurrentSession(session.id);
   }
 
@@ -458,6 +460,10 @@ function Dashboard({
     }
   }
 
+  function handleBackToList() {
+    setViewMode("list");
+  }
+
   function renderSessionBrowser(showHeading = true) {
     return (
       <SessionBrowser
@@ -484,79 +490,77 @@ function Dashboard({
         </div>
       ) : null}
 
-      <section className="toolbar">
-        <div>
-          <h2>会话管理</h2>
-          <p className="muted">查看 ~/.codex/sessions 中的历史会话，恢复会话并继续任务。</p>
-        </div>
-        <div className="toolbarActions">
-          <button className="iconButton mobileOnly" aria-label="打开会话列表" title="会话列表" onClick={() => setDrawerOpen(true)}>
-            <span aria-hidden="true">☰</span>
-          </button>
-          <button className="ghostButton" onClick={handleRefresh} disabled={loadingSessions || loadingDetail || loadingCommands}>
-            {loadingSessions || loadingDetail || loadingCommands ? "刷新中" : "刷新"}
-          </button>
-        </div>
-      </section>
-
-      <section className="infoGrid compact" aria-label="当前配置">
-        <InfoItem label="监听地址" value={listenAddress} />
-        <InfoItem label="Codex 版本" value={config?.codexCliVersion ?? config?.codexVersionError ?? "读取中"} />
-        <InfoItem label="App Server" value={appServerStatus} />
-      </section>
-
-      <section className="sessionDetail" aria-labelledby="session-detail-title">
-        <div>
-          <h2 id="session-detail-title">当前会话</h2>
-          {selectedSession ? (
-            <p className="muted">{selectedSession.title}</p>
-          ) : (
-            <p className="muted">选择一个会话后将在这里继续展示会话内容。</p>
-          )}
-        </div>
-        {selectedSession ? (
-          <SessionDetailPanel
-            fallbackSession={selectedSession}
-            detail={sessionDetail}
-            loading={loadingDetail}
-            error={detailError}
-            commands={commands}
-            commandDiagnostics={commandDiagnostics}
-            loadingCommands={loadingCommands}
-            commandsError={commandsError}
-            runtime={runtime}
-            runtimeError={runtimeError}
-            pendingApprovals={pendingApprovals}
-            liveCommands={liveCommands}
-            liveMessages={liveMessages}
-            wsStatus={wsStatus}
-            onResume={handleResume}
-            onSendInput={handleSendInput}
-            onSubmitApproval={handleSubmitApproval}
-          />
-        ) : null}
-      </section>
-
-      <section className="sessionSection desktopSessionPanel" aria-label="会话列表">
-        {renderSessionBrowser()}
-      </section>
-
-      {drawerOpen ? (
-        <div className="drawerBackdrop" role="presentation" onClick={() => setDrawerOpen(false)}>
-          <aside className="sessionDrawer" aria-label="会话列表" onClick={(event) => event.stopPropagation()}>
-            <div className="drawerHeader">
-              <div>
-                <h2>会话列表</h2>
-                <p className="muted">共 {sessions.length} 个会话</p>
-              </div>
-              <button className="ghostButton" onClick={() => setDrawerOpen(false)}>
-                关闭
+      {viewMode === "list" ? (
+        <>
+          <section className="toolbar">
+            <div>
+              <h2>会话管理</h2>
+              <p className="muted">查看 ~/.codex/sessions 中的历史会话，恢复会话并继续任务。</p>
+            </div>
+            <div className="toolbarActions">
+              <button className="ghostButton" onClick={() => loadSessions(search)} disabled={loadingSessions}>
+                {loadingSessions ? "刷新中" : "刷新"}
               </button>
             </div>
-            {renderSessionBrowser(false)}
-          </aside>
-        </div>
-      ) : null}
+          </section>
+
+          <section className="infoGrid compact" aria-label="当前配置">
+            <InfoItem label="监听地址" value={listenAddress} />
+            <InfoItem label="Codex 版本" value={config?.codexCliVersion ?? config?.codexVersionError ?? "读取中"} />
+            <InfoItem label="App Server" value={appServerStatus} />
+          </section>
+
+          <section className="sessionSection" aria-label="会话列表">
+            {renderSessionBrowser()}
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="toolbar detailToolbar">
+            <div className="detailTitleBar">
+              <button className="iconButton" aria-label="返回会话列表" title="返回会话列表" onClick={handleBackToList}>
+                <span aria-hidden="true">←</span>
+              </button>
+              <div>
+                <h2>当前会话</h2>
+                <p className="muted">{selectedSession?.title ?? "会话不存在或已被过滤"}</p>
+              </div>
+            </div>
+            <div className="toolbarActions">
+              <button className="ghostButton" onClick={handleRefresh} disabled={loadingSessions || loadingDetail || loadingCommands}>
+                {loadingSessions || loadingDetail || loadingCommands ? "刷新中" : "刷新"}
+              </button>
+            </div>
+          </section>
+
+          <section className="sessionDetail" aria-labelledby="session-detail-title">
+            <h2 id="session-detail-title" className="srOnly">当前会话详情</h2>
+            {selectedSession ? (
+              <SessionDetailPanel
+                fallbackSession={selectedSession}
+                detail={sessionDetail}
+                loading={loadingDetail}
+                error={detailError}
+                commands={commands}
+                commandDiagnostics={commandDiagnostics}
+                loadingCommands={loadingCommands}
+                commandsError={commandsError}
+                runtime={runtime}
+                runtimeError={runtimeError}
+                pendingApprovals={pendingApprovals}
+                liveCommands={liveCommands}
+                liveMessages={liveMessages}
+                wsStatus={wsStatus}
+                onResume={handleResume}
+                onSendInput={handleSendInput}
+                onSubmitApproval={handleSubmitApproval}
+              />
+            ) : (
+              <div className="emptyState">会话不存在或已被过滤，请返回会话列表重新选择。</div>
+            )}
+          </section>
+        </>
+      )}
 
       {selectedSession ? (
         <FloatingRuntimeStatus
@@ -737,15 +741,30 @@ function SessionDetailPanel({
   const session = detail ?? fallbackSession;
   const [expandedMessage, setExpandedMessage] = useState<{ title: string; text: string; meta?: string } | null>(null);
   const [visibleTurnCount, setVisibleTurnCount] = useState(DEFAULT_VISIBLE_TURNS);
+  const [showHistoryDuringLive, setShowHistoryDuringLive] = useState(false);
+  const hasLiveOutput = liveMessages.length > 0 || liveCommands.some((command) => !isLiveCommandCompleted(command));
+  const showHistory = !hasLiveOutput || showHistoryDuringLive;
 
   useEffect(() => {
     setVisibleTurnCount(DEFAULT_VISIBLE_TURNS);
+    setShowHistoryDuringLive(false);
   }, [session.id]);
+
+  async function handleSendInput(text: string) {
+    setShowHistoryDuringLive(false);
+    await onSendInput(text);
+  }
 
   return (
     <div className="detailStack">
       <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
-      <LiveOutputPanel liveMessages={liveMessages} liveCommands={liveCommands} />
+      {!showHistoryDuringLive ? (
+        <LiveOutputPanel
+          liveMessages={liveMessages}
+          liveCommands={liveCommands}
+          onShowHistory={() => setShowHistoryDuringLive(true)}
+        />
+      ) : null}
 
       <div className="sessionHero">
         <div>
@@ -761,29 +780,44 @@ function SessionDetailPanel({
 
       <RuntimePanel runtime={runtime} wsStatus={wsStatus} error={runtimeError} onResume={onResume} />
 
-      {loading ? <div className="emptyState">正在加载详情...</div> : null}
-      {error ? <div className="errorBanner">{error}</div> : null}
-      {detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
-      {detail && detail.turns.length > 0 ? (
-        <SessionTimeline
-          detail={detail}
-          visibleTurnCount={visibleTurnCount}
-          onLoadMore={() => setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS)}
-          onOpenMessage={setExpandedMessage}
-        />
+      {hasLiveOutput && !showHistory ? <div className="historyHiddenNotice">实时输出进行中，历史会话内容已隐藏。</div> : null}
+      {showHistory ? (
+        <div className="historyContent">
+          {hasLiveOutput ? (
+            <div className="historyHeader">
+              <div>
+                <h3>历史会话内容</h3>
+                <p className="muted">实时输出已隐藏。</p>
+              </div>
+              <button className="ghostButton" type="button" onClick={() => setShowHistoryDuringLive(false)}>
+                返回实时输出
+              </button>
+            </div>
+          ) : null}
+          {loading ? <div className="emptyState">正在加载详情...</div> : null}
+          {error ? <div className="errorBanner">{error}</div> : null}
+          {detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
+          {detail && detail.turns.length > 0 ? (
+            <SessionTimeline
+              detail={detail}
+              visibleTurnCount={visibleTurnCount}
+              onLoadMore={() => setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS)}
+              onOpenMessage={setExpandedMessage}
+            />
+          ) : null}
+          <SessionCommandsPanel
+            commands={commands}
+            diagnostics={commandDiagnostics}
+            loading={loadingCommands}
+            error={commandsError}
+          />
+        </div>
       ) : null}
-      <SessionCommandsPanel
-        commands={commands}
-        diagnostics={commandDiagnostics}
-        loading={loadingCommands}
-        error={commandsError}
-      />
-      <TaskInput runtime={runtime} onSend={onSendInput} />
+      <TaskInput runtime={runtime} onSend={handleSendInput} />
       {expandedMessage ? <MessageDetailDialog message={expandedMessage} onClose={() => setExpandedMessage(null)} /> : null}
     </div>
   );
 }
-
 
 
 function RuntimePanel({
@@ -916,7 +950,15 @@ function ApprovalCard({
   );
 }
 
-function LiveOutputPanel({ liveMessages, liveCommands }: { liveMessages: LiveAgentMessage[]; liveCommands: LiveCommand[] }) {
+function LiveOutputPanel({
+  liveMessages,
+  liveCommands,
+  onShowHistory
+}: {
+  liveMessages: LiveAgentMessage[];
+  liveCommands: LiveCommand[];
+  onShowHistory: () => void;
+}) {
   const outputBodyRef = useRef<HTMLDivElement | null>(null);
   const runningCommands = liveCommands.filter((command) => !isLiveCommandCompleted(command));
   const visibleMessages = liveMessages.slice(-MAX_VISIBLE_LIVE_MESSAGES);
@@ -936,7 +978,12 @@ function LiveOutputPanel({ liveMessages, liveCommands }: { liveMessages: LiveAge
     <section className="livePanel" aria-label="实时输出">
       <div className="panelHeaderCompact">
         <h3>实时输出</h3>
-        <span>{visibleCount}</span>
+        <div className="panelHeaderActions">
+          <button className="ghostButton" type="button" onClick={onShowHistory}>
+            查看历史会话内容
+          </button>
+          <span>{visibleCount}</span>
+        </div>
       </div>
       <div className="liveOutputBody" ref={outputBodyRef}>
         {hiddenCount > 0 ? <div className="liveHiddenNotice">已隐藏较早的 {hiddenCount} 条实时输出</div> : null}
