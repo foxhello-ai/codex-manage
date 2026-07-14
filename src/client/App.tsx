@@ -1,6 +1,6 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { getMe, getPublicConfig, getSessions, login, logout, updateSessionMetadata } from "../shared/api";
-import type { PublicConfig, SessionSummary, SessionStatus, UserSession } from "../shared/models";
+import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { getMe, getPublicConfig, getSessionDetail, getSessions, login, logout, updateSessionMetadata } from "../shared/api";
+import type { PublicConfig, SessionDetail, SessionSummary, SessionStatus, SessionTurnItem, UserSession } from "../shared/models";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -141,6 +141,9 @@ function Dashboard({
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const listenAddress = useMemo(() => {
@@ -161,6 +164,7 @@ function Dashboard({
       setSessions(response.sessions);
       if (selectedSessionId && !response.sessions.some((session) => session.id === selectedSessionId)) {
         setSelectedSessionId(null);
+        setSessionDetail(null);
       }
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "会话列表加载失败");
@@ -178,13 +182,31 @@ function Dashboard({
     loadSessions(search);
   }
 
+  async function loadSessionDetail(sessionId: string) {
+    setLoadingDetail(true);
+    setDetailError(null);
+
+    try {
+      const response = await getSessionDetail(sessionId);
+      setSessionDetail(response.session);
+    } catch (caught) {
+      setSessionDetail(null);
+      setDetailError(caught instanceof Error ? caught.message : "会话详情加载失败");
+    } finally {
+      setLoadingDetail(false);
+    }
+  }
+
   function handleSelectSession(session: SessionSummary) {
     setSelectedSessionId(session.id);
+    setSessionDetail(null);
     setDrawerOpen(false);
+    loadSessionDetail(session.id);
   }
 
   function handleMetadataSaved(updated: SessionSummary) {
     setSessions((current) => current.map((session) => (session.id === updated.id ? updated : session)));
+    setSessionDetail((current) => (current && current.id === updated.id ? { ...current, ...updated } : current));
   }
 
   function renderSessionBrowser(showHeading = true) {
@@ -244,11 +266,12 @@ function Dashboard({
           )}
         </div>
         {selectedSession ? (
-          <div className="detailGrid">
-            <InfoItem label="工作目录" value={selectedSession.workspace} />
-            <InfoItem label="更新时间" value={formatDateTime(selectedSession.updatedAt)} />
-            <InfoItem label="会话 ID" value={selectedSession.id} />
-          </div>
+          <SessionDetailPanel
+            fallbackSession={selectedSession}
+            detail={sessionDetail}
+            loading={loadingDetail}
+            error={detailError}
+          />
         ) : null}
       </section>
 
@@ -274,6 +297,198 @@ function Dashboard({
       ) : null}
     </Shell>
   );
+}
+
+
+const DEFAULT_VISIBLE_TURNS = 10;
+
+function SessionDetailPanel({
+  fallbackSession,
+  detail,
+  loading,
+  error
+}: {
+  fallbackSession: SessionSummary;
+  detail: SessionDetail | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const session = detail ?? fallbackSession;
+  const [expandedMessage, setExpandedMessage] = useState<{ title: string; text: string; meta?: string } | null>(null);
+  const [visibleTurnCount, setVisibleTurnCount] = useState(DEFAULT_VISIBLE_TURNS);
+
+  useEffect(() => {
+    setVisibleTurnCount(DEFAULT_VISIBLE_TURNS);
+  }, [session.id]);
+
+  return (
+    <div className="detailStack">
+      <div className="sessionHero">
+        <div>
+          <p className="eyebrow">{session.remarkTitle ? "会话备注" : "会话名称"}</p>
+          <h3>{session.title}</h3>
+          {session.remarkTitle ? <p className="muted">默认标题：{session.defaultTitle}</p> : null}
+        </div>
+        <div className="sessionHeroMeta">
+          <span>{formatDateTime(session.updatedAt)}</span>
+          <span title={session.id}>{shortId(session.id)}</span>
+        </div>
+      </div>
+
+      {loading ? <div className="emptyState">正在加载详情...</div> : null}
+      {error ? <div className="errorBanner">{error}</div> : null}
+      {detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
+      {detail && detail.turns.length > 0 ? (
+        <SessionTimeline
+          detail={detail}
+          visibleTurnCount={visibleTurnCount}
+          onLoadMore={() => setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS)}
+          onOpenMessage={setExpandedMessage}
+        />
+      ) : null}
+      {expandedMessage ? <MessageDetailDialog message={expandedMessage} onClose={() => setExpandedMessage(null)} /> : null}
+    </div>
+  );
+}
+
+function SessionTimeline({
+  detail,
+  visibleTurnCount,
+  onLoadMore,
+  onOpenMessage
+}: {
+  detail: SessionDetail;
+  visibleTurnCount: number;
+  onLoadMore: () => void;
+  onOpenMessage: (message: { title: string; text: string; meta?: string }) => void;
+}) {
+  const hiddenTurnCount = Math.max(0, detail.turns.length - visibleTurnCount);
+  const visibleTurns = detail.turns.slice(hiddenTurnCount);
+
+  return (
+    <div className="timeline" aria-label="历史消息">
+      {hiddenTurnCount > 0 ? (
+        <button className="ghostButton loadMoreButton" onClick={onLoadMore}>
+          加载更早 {Math.min(DEFAULT_VISIBLE_TURNS, hiddenTurnCount)} 轮
+        </button>
+      ) : null}
+      {visibleTurns.map((turn, visibleIndex) => {
+        const absoluteIndex = hiddenTurnCount + visibleIndex;
+        return (
+          <section className="turnBlock" key={turn.id}>
+            <div className="turnHeader">
+              <h3>Turn {absoluteIndex + 1}</h3>
+              <span>{turn.status}</span>
+              <span>{formatDateTime(turn.startedAt)}</span>
+            </div>
+            <div className="turnItems">
+              {turn.items.map((item) => (
+                <TurnItemView item={item} key={item.id} onOpenMessage={onOpenMessage} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function TurnItemView({
+  item,
+  onOpenMessage
+}: {
+  item: SessionTurnItem;
+  onOpenMessage: (message: { title: string; text: string; meta?: string }) => void;
+}) {
+  switch (item.type) {
+    case "user_message":
+      return <MessageItem role="user" label="用户" text={item.text} onOpenMessage={onOpenMessage} />;
+    case "agent_message":
+      return <MessageItem role="agent" label="Codex" text={item.text} meta={item.phase ?? undefined} onOpenMessage={onOpenMessage} />;
+    case "file_change":
+      return (
+        <article className="messageItem fileChangeItem">
+          <div className="messageHeader">
+            <strong>文件变更</strong>
+            {item.status ? <span>{item.status}</span> : null}
+          </div>
+          <div className="fileChangeList">
+            {item.changes.map((change, index) => (
+              <details key={`${change.path}-${index}`}>
+                <summary>
+                  <span>{change.path}</span>
+                  {change.kind ? <small>{change.kind}</small> : null}
+                </summary>
+                {change.diff ? <pre>{change.diff}</pre> : <p className="muted">无 diff</p>}
+              </details>
+            ))}
+          </div>
+        </article>
+      );
+    case "context_compaction":
+      return <SystemItem text="上下文已压缩" />;
+    case "unknown":
+    default:
+      return <SystemItem text={item.rawType ? `未识别事件：${item.rawType}` : "未识别事件"} />;
+  }
+}
+
+function MessageItem({
+  role,
+  label,
+  text,
+  meta,
+  onOpenMessage
+}: {
+  role: "user" | "agent";
+  label: string;
+  text: string;
+  meta?: string;
+  onOpenMessage: (message: { title: string; text: string; meta?: string }) => void;
+}) {
+  return (
+    <button className={`messageItem ${role} messagePreview`} type="button" onClick={() => onOpenMessage({ title: label, text, meta })}>
+      <div className="messageHeader">
+        <strong>{label}</strong>
+        {meta ? <span>{meta}</span> : null}
+      </div>
+      <div className="messageBody previewBody">
+        <MarkdownContent text={text || "无内容"} />
+      </div>
+    </button>
+  );
+}
+
+function MessageDetailDialog({ message, onClose }: { message: { title: string; text: string; meta?: string }; onClose: () => void }) {
+  return (
+    <div className="modalBackdrop" role="presentation" onClick={onClose}>
+      <section className="messageDialog" role="dialog" aria-modal="true" aria-label={`${message.title} 详情`} onClick={(event) => event.stopPropagation()}>
+        <div className="dialogHeader">
+          <div>
+            <h2>{message.title}</h2>
+            {message.meta ? <p className="muted">{message.meta}</p> : null}
+          </div>
+          <button className="ghostButton" onClick={onClose}>关闭</button>
+        </div>
+        <div className="dialogBody">
+          <MarkdownContent text={message.text || "无内容"} />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MarkdownContent({ text }: { text: string }) {
+  const blocks = parseMarkdownBlocks(text);
+  return (
+    <div className="markdownContent">
+      {blocks.map((block, index) => renderMarkdownBlock(block, index))}
+    </div>
+  );
+}
+
+function SystemItem({ text }: { text: string }) {
+  return <div className="systemItem">{text}</div>;
 }
 
 function SessionBrowser({
@@ -491,6 +706,171 @@ function SessionItem({
   );
 }
 
+
+type MarkdownBlock =
+  | { type: "heading"; level: 1 | 2 | 3; text: string }
+  | { type: "paragraph"; text: string }
+  | { type: "code"; language: string | null; text: string }
+  | { type: "quote"; text: string }
+  | { type: "list"; ordered: boolean; items: string[] };
+
+function parseMarkdownBlocks(text: string): MarkdownBlock[] {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const blocks: MarkdownBlock[] = [];
+  let paragraph: string[] = [];
+  let index = 0;
+
+  function flushParagraph() {
+    if (paragraph.length === 0) return;
+    blocks.push({ type: "paragraph", text: paragraph.join("\n") });
+    paragraph = [];
+  }
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+
+    if (trimmed.length === 0) {
+      flushParagraph();
+      index += 1;
+      continue;
+    }
+
+    const fence = trimmed.match(/^```(.*)$/);
+    if (fence) {
+      flushParagraph();
+      const language = fence[1]?.trim() || null;
+      const code: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].trim().startsWith("```")) {
+        code.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) index += 1;
+      blocks.push({ type: "code", language, text: code.join("\n") });
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      blocks.push({ type: "heading", level: heading[1].length as 1 | 2 | 3, text: heading[2] });
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith(">")) {
+      flushParagraph();
+      const quote: string[] = [];
+      while (index < lines.length && lines[index].trim().startsWith(">")) {
+        quote.push(lines[index].trim().replace(/^>\s?/, ""));
+        index += 1;
+      }
+      blocks.push({ type: "quote", text: quote.join("\n") });
+      continue;
+    }
+
+    const unordered = trimmed.match(/^[-*]\s+(.+)$/);
+    const ordered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (unordered || ordered) {
+      flushParagraph();
+      const items: string[] = [];
+      const orderedList = Boolean(ordered);
+      while (index < lines.length) {
+        const itemLine = lines[index].trim();
+        const item = orderedList ? itemLine.match(/^\d+[.)]\s+(.+)$/) : itemLine.match(/^[-*]\s+(.+)$/);
+        if (!item) break;
+        items.push(item[1]);
+        index += 1;
+      }
+      blocks.push({ type: "list", ordered: orderedList, items });
+      continue;
+    }
+
+    paragraph.push(line);
+    index += 1;
+  }
+
+  flushParagraph();
+  return blocks.length > 0 ? blocks : [{ type: "paragraph", text }];
+}
+
+function renderMarkdownBlock(block: MarkdownBlock, index: number) {
+  switch (block.type) {
+    case "heading": {
+      const Heading = (`h${block.level + 2}` as "h3" | "h4" | "h5");
+      return <Heading key={index}>{renderInlineMarkdown(block.text)}</Heading>;
+    }
+    case "code":
+      return (
+        <pre className="markdownCode" key={index}>
+          <code>{block.text}</code>
+        </pre>
+      );
+    case "quote":
+      return <blockquote key={index}>{renderInlineMarkdown(block.text)}</blockquote>;
+    case "list": {
+      const List = block.ordered ? "ol" : "ul";
+      return (
+        <List key={index}>
+          {block.items.map((item, itemIndex) => (
+            <li key={itemIndex}>{renderInlineMarkdown(item)}</li>
+          ))}
+        </List>
+      );
+    }
+    case "paragraph":
+    default:
+      return <p key={index}>{renderInlineMarkdown(block.text)}</p>;
+  }
+}
+
+function renderInlineMarkdown(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const pattern = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > cursor) nodes.push(...renderLineBreaks(text.slice(cursor, match.index), nodes.length));
+    const token = match[0];
+    nodes.push(renderInlineToken(token, nodes.length));
+    cursor = match.index + token.length;
+  }
+
+  if (cursor < text.length) nodes.push(...renderLineBreaks(text.slice(cursor), nodes.length));
+  return nodes;
+}
+
+function renderLineBreaks(text: string, startIndex: number): ReactNode[] {
+  const parts = text.split("\n");
+  return parts.flatMap((part, index) => (index === 0 ? [part] : [<br key={`br-${startIndex}-${index}`} />, part]));
+}
+
+function renderInlineToken(token: string, key: number): ReactNode {
+  const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  if (link) {
+    const href = link[2];
+    const safeHref = /^https?:\/\//.test(href) ? href : undefined;
+    return safeHref ? (
+      <a href={safeHref} key={key} target="_blank" rel="noreferrer">
+        {link[1]}
+      </a>
+    ) : (
+      <span key={key}>{link[1]}</span>
+    );
+  }
+
+  if (token.startsWith("`") && token.endsWith("`")) return <code key={key}>{token.slice(1, -1)}</code>;
+  if ((token.startsWith("**") && token.endsWith("**")) || (token.startsWith("__") && token.endsWith("__"))) {
+    return <strong key={key}>{token.slice(2, -2)}</strong>;
+  }
+  if ((token.startsWith("*") && token.endsWith("*")) || (token.startsWith("_") && token.endsWith("_"))) {
+    return <em key={key}>{token.slice(1, -1)}</em>;
+  }
+  return token;
+}
+
 function StatusBadge({ status }: { status: SessionStatus }) {
   return <span className={`statusBadge ${status}`}>{statusLabel(status)}</span>;
 }
@@ -534,6 +914,10 @@ function statusLabel(status: SessionStatus): string {
     default:
       return "历史";
   }
+}
+
+function shortId(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
 }
 
 function formatDateTime(value: string): string {

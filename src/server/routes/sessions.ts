@@ -36,6 +36,30 @@ export function registerSessionRoutes(app: FastifyInstance, sessionService: Sess
     }
   });
 
+
+  app.get("/api/sessions/:id", async (request, reply) => {
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
+    }
+
+    try {
+      const session = await sessionService.getSessionDetail(params.data.id);
+      return reply.send({ session });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Session not found") {
+        return sendError(reply, 404, "SESSION_NOT_FOUND", "会话不存在");
+      }
+
+      return sendError(
+        reply,
+        503,
+        "CODEX_APP_SERVER_UNAVAILABLE",
+        error instanceof Error ? error.message : "Codex app-server 不可用"
+      );
+    }
+  });
+
   app.patch("/api/sessions/:id/metadata", async (request, reply) => {
     const params = SessionParams.safeParse(request.params);
     if (!params.success) {

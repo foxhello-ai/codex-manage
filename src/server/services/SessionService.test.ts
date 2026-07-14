@@ -110,6 +110,93 @@ describe("SessionService", () => {
     });
   });
 
+
+  it("reads session detail from app-server thread/read", async () => {
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const service = new SessionService(
+      {
+        getSnapshot: () => ({ status: "ready" as const, pid: 1, lastError: null, initialized: true }),
+        request: async <T = unknown>(method: string, params?: unknown) => {
+          calls.push({ method, params });
+          return {
+            thread: {
+              id: "thread-1",
+              sessionId: "session-1",
+              preview: "detail preview",
+              cwd: "/workspace/app",
+              path: "/sessions/thread-1.jsonl",
+              createdAt: 1784000000,
+              updatedAt: 1784000300,
+              status: { type: "notLoaded" },
+              cliVersion: "codex-cli 0.144.3",
+              source: "cli",
+              modelProvider: "openai",
+              historyMode: "full",
+              turns: [
+                {
+                  id: "turn-1",
+                  status: "completed",
+                  error: null,
+                  startedAt: 1784000000,
+                  completedAt: 1784000010,
+                  durationMs: 10000,
+                  items: [
+                    {
+                      id: "item-user",
+                      type: "userMessage",
+                      content: [{ type: "text", text: "用户消息", text_elements: [] }]
+                    },
+                    { id: "item-agent", type: "agentMessage", text: "Codex 回复", phase: "final", memoryCitation: null },
+                    {
+                      id: "item-file",
+                      type: "fileChange",
+                      status: "completed",
+                      changes: [{ path: "src/app.ts", kind: { type: "add" }, diff: "diff --git" }]
+                    },
+                    { id: "item-compact", type: "contextCompaction" },
+                    { id: "item-new", type: "futureItem" }
+                  ]
+                }
+              ]
+            }
+          } as T;
+        }
+      },
+      metadataStore({ "thread-1": { remarkTitle: "详情备注" } })
+    );
+
+    const detail = await service.getSessionDetail("thread-1");
+
+    expect(calls).toEqual([
+      {
+        method: "thread/read",
+        params: {
+          threadId: "thread-1",
+          includeTurns: true
+        }
+      }
+    ]);
+    expect(detail).toMatchObject({
+      id: "thread-1",
+      title: "详情备注",
+      modelProvider: "openai",
+      historyMode: "full",
+      turns: [
+        {
+          id: "turn-1",
+          status: "completed",
+          items: [
+            { id: "item-user", type: "user_message", text: "用户消息" },
+            { id: "item-agent", type: "agent_message", text: "Codex 回复", phase: "final" },
+            { id: "item-file", type: "file_change", changes: [{ path: "src/app.ts", kind: "add", diff: "diff --git" }] },
+            { id: "item-compact", type: "context_compaction" },
+            { id: "item-new", type: "unknown", rawType: "futureItem" }
+          ]
+        }
+      ]
+    });
+  });
+
   it("maps active and failed statuses", async () => {
     const service = new SessionService(
       readyClient({

@@ -18,9 +18,43 @@ export type SessionSummary = {
   source: string | null;
 };
 
+export type SessionDetail = SessionSummary & {
+  path: string | null;
+  modelProvider: string | null;
+  historyMode: string | null;
+  turns: SessionTurn[];
+};
+
+export type SessionTurn = {
+  id: string;
+  status: string;
+  error: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+  items: SessionTurnItem[];
+};
+
+export type SessionTurnItem =
+  | { id: string; type: "user_message"; text: string }
+  | { id: string; type: "agent_message"; text: string; phase: string | null }
+  | { id: string; type: "file_change"; status: string | null; changes: SessionFileChange[] }
+  | { id: string; type: "context_compaction" }
+  | { id: string; type: "unknown"; rawType: string | null };
+
+export type SessionFileChange = {
+  path: string;
+  kind: string | null;
+  diff: string | null;
+};
+
 type ThreadListResponse = {
   data?: unknown[];
   nextCursor?: string | null;
+};
+
+type ThreadReadResponse = {
+  thread?: unknown;
 };
 
 type ListSessionsParams = {
@@ -37,10 +71,7 @@ export class SessionService {
   ) {}
 
   async listSessions(params: ListSessionsParams = {}): Promise<SessionSummary[]> {
-    const snapshot = this.appServer.getSnapshot();
-    if (snapshot.status !== "ready" || !snapshot.initialized) {
-      throw new Error("Codex app-server is not ready");
-    }
+    this.assertReady();
 
     const response = await this.appServer.request<ThreadListResponse>("thread/list", {
       limit: params.limit ?? 100,
@@ -61,6 +92,31 @@ export class SessionService {
     return sessions.filter((session) => matchesSearch(session, searchTerm));
   }
 
+  async getSessionDetail(sessionId: string): Promise<SessionDetail> {
+    this.assertReady();
+
+    const response = await this.appServer.request<ThreadReadResponse>("thread/read", {
+      threadId: sessionId,
+      includeTurns: true
+    });
+
+    const metadata = await this.readMetadata();
+    const summary = this.toSummary(response.thread, metadata);
+    if (!summary || (summary.id !== sessionId && summary.sessionId !== sessionId)) {
+      throw new Error("Session not found");
+    }
+
+    const thread = response.thread && typeof response.thread === "object" ? (response.thread as Record<string, unknown>) : {};
+
+    return {
+      ...summary,
+      path: readString(thread.path),
+      modelProvider: readString(thread.modelProvider),
+      historyMode: readString(thread.historyMode),
+      turns: readArray(thread.turns).map((turn, index) => toTurn(turn, index))
+    };
+  }
+
   async updateMetadata(sessionId: string, remarkTitle: string | null): Promise<SessionSummary> {
     if (!this.metadataStore) {
       throw new Error("Session metadata store is not configured");
@@ -74,6 +130,13 @@ export class SessionService {
     }
 
     return session;
+  }
+
+  private assertReady(): void {
+    const snapshot = this.appServer.getSnapshot();
+    if (snapshot.status !== "ready" || !snapshot.initialized) {
+      throw new Error("Codex app-server is not ready");
+    }
   }
 
   private async readMetadata(): Promise<Record<string, { remarkTitle: string | null }>> {
@@ -112,18 +175,103 @@ export class SessionService {
   }
 }
 
+function toTurn(value: unknown, index: number): SessionTurn {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    id: readString(source.id) ?? `turn-${index + 1}`,
+    status: readString(source.status) ?? "unknown",
+    error: readError(source.error),
+    startedAt: readUnixSeconds(source.startedAt),
+    completedAt: readNullableUnixSeconds(source.completedAt),
+    durationMs: readNumber(source.durationMs),
+    items: readArray(source.items).map((item, itemIndex) => toTurnItem(item, itemIndex))
+  };
+}
+
+function toTurnItem(value: unknown, index: number): SessionTurnItem {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const rawType = readString(source.type);
+  const id = readString(source.id) ?? `item-${index + 1}`;
+
+  switch (rawType) {
+    case "userMessage":
+      return {
+        id,
+        type: "user_message",
+        text: readTextContent(source.content)
+      };
+    case "agentMessage":
+      return {
+        id,
+        type: "agent_message",
+        text: readString(source.text) ?? "",
+        phase: readString(source.phase)
+      };
+    case "fileChange":
+      return {
+        id,
+        type: "file_change",
+        status: readString(source.status),
+        changes: readArray(source.changes).map(toFileChange)
+      };
+    case "contextCompaction":
+      return { id, type: "context_compaction" };
+    default:
+      return { id, type: "unknown", rawType };
+  }
+}
+
+function toFileChange(value: unknown): SessionFileChange {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const kind = source.kind && typeof source.kind === "object" ? readString((source.kind as Record<string, unknown>).type) : null;
+  return {
+    path: readString(source.path) ?? "未知文件",
+    kind,
+    diff: readString(source.diff)
+  };
+}
+
+function readTextContent(value: unknown): string {
+  return readArray(value)
+    .map((item) => (item && typeof item === "object" ? readString((item as Record<string, unknown>).text) : null))
+    .filter((text): text is string => text !== null)
+    .join("\n\n");
+}
+
 function matchesSearch(session: SessionSummary, searchTerm: string): boolean {
   return [session.id, session.sessionId, session.title, session.defaultTitle, session.remarkTitle, session.summary, session.workspace]
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .some((value) => value.toLocaleLowerCase().includes(searchTerm));
 }
 
+function readArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function readNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readError(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && "message" in value) {
+    return readString((value as { message?: unknown }).message);
+  }
+  return String(value);
+}
+
 function readUnixSeconds(value: unknown): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return new Date(0).toISOString();
+  return new Date(value * 1000).toISOString();
+}
+
+function readNullableUnixSeconds(value: unknown): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return new Date(value * 1000).toISOString();
 }
 
