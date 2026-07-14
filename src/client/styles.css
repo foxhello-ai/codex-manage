@@ -1878,6 +1878,17 @@ textarea {
 
   .approvalActions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .approvalActions button {
+    min-height: 36px;
+    padding: 0 6px;
+    overflow: hidden;
+    font-size: 0.82rem;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .approvalPanel,
