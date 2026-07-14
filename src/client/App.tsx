@@ -563,6 +563,7 @@ function Dashboard({
 
 
 const DEFAULT_VISIBLE_TURNS = 5;
+const DEFAULT_VISIBLE_GROUP_SESSIONS = 5;
 
 function SessionDetailPanel({
   fallbackSession,
@@ -1147,19 +1148,78 @@ function SessionList({
   onSelect: (session: SessionSummary) => void;
   onMetadataSaved: (session: SessionSummary) => void;
 }) {
+  const groups = groupSessionsByWorkspace(sessions);
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(() => new Set());
+
+  function toggleWorkspace(workspace: string) {
+    setExpandedWorkspaces((current) => {
+      const next = new Set(current);
+      if (next.has(workspace)) {
+        next.delete(workspace);
+      } else {
+        next.add(workspace);
+      }
+      return next;
+    });
+  }
+
   return (
     <div className="sessionList">
-      {sessions.map((session) => (
-        <SessionItem
-          key={session.id}
-          session={session}
-          selected={session.id === selectedSessionId}
-          onSelect={onSelect}
-          onMetadataSaved={onMetadataSaved}
-        />
-      ))}
+      {groups.map((group) => {
+        const expanded = expandedWorkspaces.has(group.workspace);
+        const visibleSessions = expanded ? group.sessions : group.sessions.slice(0, DEFAULT_VISIBLE_GROUP_SESSIONS);
+        const hiddenCount = group.sessions.length - visibleSessions.length;
+
+        return (
+          <section className="sessionWorkspaceGroup" key={group.workspace} aria-label={`${group.workspace} 的会话`}>
+            <div className="workspaceGroupHeader">
+              <div>
+                <h3>{group.workspace}</h3>
+                <p className="muted">
+                  {group.sessions.length} 个会话，默认显示最近 {Math.min(group.sessions.length, DEFAULT_VISIBLE_GROUP_SESSIONS)} 个
+                </p>
+              </div>
+            </div>
+            <div className="workspaceGroupList">
+              {visibleSessions.map((session) => (
+                <SessionItem
+                  key={session.id}
+                  session={session}
+                  selected={session.id === selectedSessionId}
+                  onSelect={onSelect}
+                  onMetadataSaved={onMetadataSaved}
+                />
+              ))}
+            </div>
+            {group.sessions.length > DEFAULT_VISIBLE_GROUP_SESSIONS ? (
+              <button className="ghostButton workspaceToggleButton" type="button" onClick={() => toggleWorkspace(group.workspace)}>
+                {expanded ? "收起" : `展开更多 ${hiddenCount} 个会话`}
+              </button>
+            ) : null}
+          </section>
+        );
+      })}
     </div>
   );
+}
+
+function groupSessionsByWorkspace(sessions: SessionSummary[]): { workspace: string; sessions: SessionSummary[] }[] {
+  const groups = new Map<string, SessionSummary[]>();
+
+  for (const session of sessions) {
+    const workspace = session.workspace.trim() || "未知工作目录";
+    const group = groups.get(workspace);
+    if (group) {
+      group.push(session);
+    } else {
+      groups.set(workspace, [session]);
+    }
+  }
+
+  return [...groups.entries()].map(([workspace, groupedSessions]) => ({
+    workspace,
+    sessions: groupedSessions
+  }));
 }
 
 function SessionItem({

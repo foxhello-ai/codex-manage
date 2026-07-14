@@ -672,7 +672,42 @@ h2 {
 
 .sessionList {
   display: grid;
+  gap: 16px;
+}
+
+.sessionWorkspaceGroup {
+  min-width: 0;
+  display: grid;
   gap: 10px;
+}
+
+.workspaceGroupHeader {
+  min-width: 0;
+  border: 1px solid #a9cfea;
+  border-left: 6px solid #1769aa;
+  border-radius: 8px;
+  padding: 11px 14px;
+  background: #eaf5ff;
+}
+
+.workspaceGroupHeader h3 {
+  margin: 0 0 4px;
+  color: #074b80;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.workspaceGroupList {
+  display: grid;
+  gap: 10px;
+  padding-left: 12px;
+}
+
+.workspaceToggleButton {
+  justify-self: start;
+  padding: 0 14px;
 }
 
 .sessionItem {
@@ -1484,6 +1519,10 @@ textarea {
 @media (max-width: 767px) {
   .runtimePanel {
     grid-template-columns: 1fr;
+  }
+
+  .workspaceGroupList {
+    padding-left: 6px;
   }
 
   .runtimePanel button {
