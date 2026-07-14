@@ -1344,3 +1344,159 @@ h2 {
     align-self: auto;
   }
 }
+
+textarea,
+select {
+  width: 100%;
+  border: 1px solid #c9d1d9;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #172026;
+  background: #ffffff;
+  font: inherit;
+}
+
+textarea {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.runtimePanel,
+.approvalPanel,
+.livePanel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.runtimePanel {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.runtimePanel h3,
+.panelHeaderCompact h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.runtimePanel button {
+  padding: 0 14px;
+}
+
+.runtimeBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.runtimeBadges span,
+.panelHeaderCompact span,
+.approvalHeader > span {
+  border: 1px solid #d9e0e7;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #5f6f7a;
+  background: #f6f7f9;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.panelHeaderCompact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.approvalList,
+.livePanel {
+  display: grid;
+  gap: 10px;
+}
+
+.approvalCard {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #f0c36a;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffdf7;
+}
+
+.approvalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.approvalHeader strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.approvalQuestions {
+  display: grid;
+  gap: 10px;
+}
+
+.approvalQuestions label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.approvalActions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.approvalActions button {
+  padding: 0 10px;
+}
+
+.taskInput {
+  position: sticky;
+  bottom: env(safe-area-inset-bottom);
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+  box-shadow: 0 -8px 24px rgb(20 35 50 / 8%);
+}
+
+.taskInput button {
+  align-self: stretch;
+  padding: 0 18px;
+}
+
+@media (max-width: 767px) {
+  .runtimePanel {
+    grid-template-columns: 1fr;
+  }
+
+  .runtimePanel button {
+    width: 100%;
+  }
+
+  .approvalActions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .taskInput {
+    grid-template-columns: 1fr;
+    margin-right: -4px;
+    margin-left: -4px;
+  }
+}

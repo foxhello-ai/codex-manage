@@ -174,6 +174,14 @@ export class CodexAppServerClient extends EventEmitter {
     this.process.stdin.write(`${JSON.stringify(message)}\n`);
   }
 
+  respondToServerRequest(id: JsonRpcId, result: unknown): void {
+    if (!this.process || !this.process.stdin.writable) {
+      throw new Error("codex app-server is not running");
+    }
+
+    this.process.stdin.write(`${JSON.stringify({ id, result })}\n`);
+  }
+
   private handleLine(line: string) {
     let message: unknown;
 

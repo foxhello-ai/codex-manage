@@ -1,6 +1,7 @@
 import type { AppConfig } from "../config";
 import { CodexAppServerClient, type CodexAppServerSnapshot } from "./CodexAppServerClient";
 import { detectCodexVersion } from "./codexVersion";
+import { RuntimeManager } from "./RuntimeManager";
 
 export type RuntimeSnapshot = {
   codexCliVersion: string | null;
@@ -10,6 +11,7 @@ export type RuntimeSnapshot = {
 
 export class AppRuntime {
   readonly appServer: CodexAppServerClient;
+  readonly runtimeManager: RuntimeManager;
   private codexCliVersion: string | null = null;
   private codexVersionError: string | null = null;
 
@@ -17,6 +19,7 @@ export class AppRuntime {
     this.appServer = new CodexAppServerClient({
       codexCliPath: config.codexCliPath
     });
+    this.runtimeManager = new RuntimeManager(this.appServer);
     this.appServer.on("error", () => {
       // Snapshot state carries the error for diagnostics; avoid an unhandled EventEmitter error.
     });

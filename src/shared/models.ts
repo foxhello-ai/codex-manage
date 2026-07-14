@@ -117,3 +117,101 @@ export type ApiErrorBody = {
     details?: unknown;
   };
 };
+
+export type RuntimeStatus = SessionStatus;
+
+export type RuntimeSnapshot = {
+  threadId: string;
+  status: RuntimeStatus;
+  activeTurnId: string | null;
+  startedAt: string;
+  updatedAt: string;
+  lastError: string | null;
+  pendingApprovalCount: number;
+  eventSeq: number;
+};
+
+export type RuntimeResponse = {
+  runtime: RuntimeSnapshot;
+};
+
+export type InputResponse = {
+  runtime: RuntimeSnapshot;
+};
+
+export type WebSessionEvent = {
+  seq: number;
+  threadId: string;
+  type:
+    | "snapshot"
+    | "session_status"
+    | "turn_started"
+    | "turn_completed"
+    | "agent_message_delta"
+    | "command_started"
+    | "command_output_delta"
+    | "command_completed"
+    | "approval_requested"
+    | "approval_resolved"
+    | "error"
+    | "warning"
+    | "raw";
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ApprovalKind =
+  | "command_execution"
+  | "file_change"
+  | "permissions"
+  | "tool_user_input"
+  | "legacy_exec"
+  | "legacy_apply_patch";
+
+export type ApprovalStatus =
+  | "pending"
+  | "approved"
+  | "approved_for_session"
+  | "declined"
+  | "cancelled"
+  | "resolved"
+  | "failed";
+
+export type ApprovalDecision = "accept" | "acceptForSession" | "decline" | "cancel";
+
+export type ApprovalSummary = {
+  id: string;
+  requestId: number;
+  threadId: string;
+  turnId: string | null;
+  itemId: string | null;
+  kind: ApprovalKind;
+  status: ApprovalStatus;
+  title: string;
+  command: string | null;
+  cwd: string | null;
+  reason: string | null;
+  questions: ApprovalQuestion[];
+  raw: Record<string, unknown>;
+  createdAt: string;
+  resolvedAt: string | null;
+};
+
+export type ApprovalQuestion = {
+  id: string;
+  header: string;
+  question: string;
+  isOther: boolean;
+  isSecret: boolean;
+  options: ApprovalQuestionOption[] | null;
+};
+
+export type ApprovalQuestionOption = {
+  label: string;
+  description: string;
+};
+
+export type ApprovalResponse = {
+  approval: ApprovalSummary;
+  runtime: RuntimeSnapshot | null;
+};

@@ -1,8 +1,29 @@
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessions, login, logout, updateSessionMetadata } from "../shared/api";
-import type { PublicConfig, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionSummary, SessionStatus, SessionTurnItem, UserSession } from "../shared/models";
+import { getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata } from "../shared/api";
+import type { ApprovalDecision, ApprovalSummary, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionSummary, SessionStatus, SessionTurnItem, UserSession, WebSessionEvent } from "../shared/models";
 
 type LoadState = "loading" | "ready" | "error";
+type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
+
+type LiveCommand = {
+  id: string;
+  turnId: string | null;
+  itemId: string | null;
+  command: string;
+  cwd: string;
+  status: string | null;
+  output: string;
+  exitCode: number | null;
+  durationMs: number | null;
+};
+
+type LiveAgentMessage = {
+  id: string;
+  turnId: string | null;
+  itemId: string | null;
+  text: string;
+};
+
 
 export function App() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -149,6 +170,14 @@ function Dashboard({
   const [loadingCommands, setLoadingCommands] = useState(false);
   const [commandsError, setCommandsError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
+  const [pendingApprovals, setPendingApprovals] = useState<ApprovalSummary[]>([]);
+  const [liveCommands, setLiveCommands] = useState<LiveCommand[]>([]);
+  const [liveMessages, setLiveMessages] = useState<LiveAgentMessage[]>([]);
+  const [wsStatus, setWsStatus] = useState<WebSocketStatus>("idle");
+  const [wsReconnectKey, setWsReconnectKey] = useState(0);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const lastEventSeqRef = useRef(0);
 
   const listenAddress = useMemo(() => {
     if (!config) return "读取中";
@@ -220,19 +249,180 @@ function Dashboard({
     }
   }
 
+  async function loadRuntime(sessionId: string) {
+    setRuntimeError(null);
+    try {
+      const response = await getSessionRuntime(sessionId);
+      setRuntime(response.runtime);
+      lastEventSeqRef.current = Math.max(lastEventSeqRef.current, response.runtime.eventSeq);
+    } catch (caught) {
+      setRuntimeError(caught instanceof Error ? caught.message : "运行状态加载失败");
+    }
+  }
+
+  function applyRealtimeEvent(event: WebSessionEvent) {
+    lastEventSeqRef.current = Math.max(lastEventSeqRef.current, event.seq);
+    const payload = event.payload as Record<string, unknown>;
+
+    if (event.type === "session_status" && isRuntimeSnapshot(payload.runtime)) {
+      setRuntime(payload.runtime);
+      return;
+    }
+
+    if (event.type === "approval_requested" && isApprovalSummary(payload.approval)) {
+      const approval = payload.approval;
+      setPendingApprovals((current) => upsertById(current, approval));
+      return;
+    }
+
+    if (event.type === "approval_resolved" && isApprovalSummary(payload.approval)) {
+      const approval = payload.approval;
+      setPendingApprovals((current) => current.filter((item) => item.id !== approval.id));
+      return;
+    }
+
+    if (event.type === "agent_message_delta") {
+      const itemId = readPayloadString(payload.itemId) ?? `${event.seq}`;
+      const turnId = readPayloadString(payload.turnId);
+      const delta = readPayloadString(payload.delta) ?? "";
+      setLiveMessages((current) => appendLiveMessage(current, { id: itemId, itemId, turnId, text: delta }));
+      return;
+    }
+
+    if (event.type === "command_started") {
+      const itemId = readPayloadString(payload.itemId) ?? `${event.seq}`;
+      const command: LiveCommand = {
+        id: itemId,
+        itemId,
+        turnId: readPayloadString(payload.turnId),
+        command: readPayloadString(payload.command) ?? "",
+        cwd: readPayloadString(payload.cwd) ?? "",
+        status: readPayloadString(payload.status) ?? "running",
+        output: readPayloadString(payload.output) ?? "",
+        exitCode: null,
+        durationMs: null
+      };
+      setLiveCommands((current) => upsertById(current, command));
+      return;
+    }
+
+    if (event.type === "command_output_delta") {
+      const itemId = readPayloadString(payload.itemId);
+      const delta = readPayloadString(payload.delta) ?? "";
+      if (!itemId) return;
+      setLiveCommands((current) => appendCommandOutput(current, itemId, delta));
+      return;
+    }
+
+    if (event.type === "command_completed") {
+      const itemId = readPayloadString(payload.itemId) ?? `${event.seq}`;
+      setLiveCommands((current) =>
+        upsertById(current, {
+          id: itemId,
+          itemId,
+          turnId: readPayloadString(payload.turnId),
+          command: readPayloadString(payload.command) ?? "",
+          cwd: readPayloadString(payload.cwd) ?? "",
+          status: readPayloadString(payload.status) ?? "completed",
+          output: readPayloadString(payload.output) ?? current.find((command) => command.id === itemId)?.output ?? "",
+          exitCode: readPayloadNumber(payload.exitCode),
+          durationMs: readPayloadNumber(payload.durationMs)
+        })
+      );
+    }
+  }
+
   function handleSelectSession(session: SessionSummary) {
     setSelectedSessionId(session.id);
     setSessionDetail(null);
     setCommands([]);
     setCommandDiagnostics(null);
+    setRuntime(null);
+    setPendingApprovals([]);
+    setLiveCommands([]);
+    setLiveMessages([]);
+    setRuntimeError(null);
+    lastEventSeqRef.current = 0;
     setDrawerOpen(false);
     loadSessionDetail(session.id);
     loadSessionCommands(session.id);
+    loadRuntime(session.id);
   }
 
   function handleMetadataSaved(updated: SessionSummary) {
     setSessions((current) => current.map((session) => (session.id === updated.id ? updated : session)));
     setSessionDetail((current) => (current && current.id === updated.id ? { ...current, ...updated } : current));
+  }
+
+  useEffect(() => {
+    if (!selectedSessionId) {
+      setWsStatus("idle");
+      return;
+    }
+
+    let closed = false;
+    let reconnectTimer: number | undefined;
+    const socket = new WebSocket(getSessionWebSocketUrl(selectedSessionId, lastEventSeqRef.current));
+    setWsStatus("connecting");
+
+    socket.addEventListener("open", () => setWsStatus("connected"));
+    socket.addEventListener("message", (message) => {
+      const event = JSON.parse(String(message.data)) as WebSessionEvent;
+      if (event.type === "snapshot") {
+        const payload = event.payload as Record<string, unknown>;
+        if (isRuntimeSnapshot(payload.runtime)) setRuntime(payload.runtime);
+        if (Array.isArray(payload.approvals)) setPendingApprovals(payload.approvals.filter(isApprovalSummary));
+        if (Array.isArray(payload.events)) payload.events.forEach((item) => applyRealtimeEvent(item as WebSessionEvent));
+        lastEventSeqRef.current = Math.max(lastEventSeqRef.current, event.seq);
+        return;
+      }
+      applyRealtimeEvent(event);
+    });
+    socket.addEventListener("close", () => {
+      if (closed) return;
+      setWsStatus("disconnected");
+      reconnectTimer = window.setTimeout(() => setWsReconnectKey((key) => key + 1), 1500);
+    });
+    socket.addEventListener("error", () => setWsStatus("disconnected"));
+
+    return () => {
+      closed = true;
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      socket.close();
+    };
+  }, [selectedSessionId, wsReconnectKey]);
+
+  async function handleResume() {
+    if (!selectedSessionId) return;
+    setRuntimeError(null);
+    try {
+      const response = await resumeSession(selectedSessionId);
+      setRuntime(response.runtime);
+    } catch (caught) {
+      setRuntimeError(caught instanceof Error ? caught.message : "恢复会话失败");
+    }
+  }
+
+  async function handleSendInput(text: string) {
+    if (!selectedSessionId) return;
+    setRuntimeError(null);
+    try {
+      const response = await sendSessionInput(selectedSessionId, text);
+      setRuntime(response.runtime);
+    } catch (caught) {
+      setRuntimeError(caught instanceof Error ? caught.message : "任务发送失败");
+    }
+  }
+
+  async function handleSubmitApproval(approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) {
+    setRuntimeError(null);
+    try {
+      const response = await submitApproval(approval.threadId, approval.id, decision, answers);
+      setPendingApprovals((current) => current.filter((item) => item.id !== approval.id));
+      if (response.runtime) setRuntime(response.runtime);
+    } catch (caught) {
+      setRuntimeError(caught instanceof Error ? caught.message : "审批处理失败");
+    }
   }
 
   function renderSessionBrowser(showHeading = true) {
@@ -264,7 +454,7 @@ function Dashboard({
       <section className="toolbar">
         <div>
           <h2>会话管理</h2>
-          <p className="muted">查看 ~/.codex/sessions 中的历史会话，后续阶段将支持详情和恢复。</p>
+          <p className="muted">查看 ~/.codex/sessions 中的历史会话，恢复会话并继续任务。</p>
         </div>
         <div className="toolbarActions">
           <button className="iconButton mobileOnly" aria-label="打开会话列表" title="会话列表" onClick={() => setDrawerOpen(true)}>
@@ -301,6 +491,15 @@ function Dashboard({
             commandDiagnostics={commandDiagnostics}
             loadingCommands={loadingCommands}
             commandsError={commandsError}
+            runtime={runtime}
+            runtimeError={runtimeError}
+            pendingApprovals={pendingApprovals}
+            liveCommands={liveCommands}
+            liveMessages={liveMessages}
+            wsStatus={wsStatus}
+            onResume={handleResume}
+            onSendInput={handleSendInput}
+            onSubmitApproval={handleSubmitApproval}
           />
         ) : null}
       </section>
@@ -340,7 +539,16 @@ function SessionDetailPanel({
   commands,
   commandDiagnostics,
   loadingCommands,
-  commandsError
+  commandsError,
+  runtime,
+  runtimeError,
+  pendingApprovals,
+  liveCommands,
+  liveMessages,
+  wsStatus,
+  onResume,
+  onSendInput,
+  onSubmitApproval
 }: {
   fallbackSession: SessionSummary;
   detail: SessionDetail | null;
@@ -350,6 +558,15 @@ function SessionDetailPanel({
   commandDiagnostics: SessionCommandDiagnostics | null;
   loadingCommands: boolean;
   commandsError: string | null;
+  runtime: RuntimeSnapshot | null;
+  runtimeError: string | null;
+  pendingApprovals: ApprovalSummary[];
+  liveCommands: LiveCommand[];
+  liveMessages: LiveAgentMessage[];
+  wsStatus: WebSocketStatus;
+  onResume: () => Promise<void>;
+  onSendInput: (text: string) => Promise<void>;
+  onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
   const session = detail ?? fallbackSession;
   const [expandedMessage, setExpandedMessage] = useState<{ title: string; text: string; meta?: string } | null>(null);
@@ -373,6 +590,10 @@ function SessionDetailPanel({
         </div>
       </div>
 
+      <RuntimePanel runtime={runtime} wsStatus={wsStatus} error={runtimeError} onResume={onResume} />
+      <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
+      <LiveOutputPanel liveMessages={liveMessages} liveCommands={liveCommands} />
+
       {loading ? <div className="emptyState">正在加载详情...</div> : null}
       {error ? <div className="errorBanner">{error}</div> : null}
       {detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
@@ -390,11 +611,221 @@ function SessionDetailPanel({
         loading={loadingCommands}
         error={commandsError}
       />
+      <TaskInput runtime={runtime} onSend={onSendInput} />
       {expandedMessage ? <MessageDetailDialog message={expandedMessage} onClose={() => setExpandedMessage(null)} /> : null}
     </div>
   );
 }
 
+
+
+function RuntimePanel({
+  runtime,
+  wsStatus,
+  error,
+  onResume
+}: {
+  runtime: RuntimeSnapshot | null;
+  wsStatus: WebSocketStatus;
+  error: string | null;
+  onResume: () => Promise<void>;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const status = runtime?.status ?? "history";
+
+  async function handleResume() {
+    setSubmitting(true);
+    try {
+      await onResume();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="runtimePanel" aria-label="运行状态">
+      <div>
+        <h3>运行状态</h3>
+        <div className="runtimeBadges">
+          <StatusBadge status={status} />
+          <span>{wsStatusLabel(wsStatus)}</span>
+          {runtime?.pendingApprovalCount ? <span>待审批 {runtime.pendingApprovalCount}</span> : null}
+        </div>
+        {runtime?.lastError ? <p className="errorText">{runtime.lastError}</p> : null}
+        {error ? <p className="errorText">{error}</p> : null}
+      </div>
+      <button className="ghostButton" type="button" onClick={handleResume} disabled={submitting || status === "starting" || status === "running" || status === "waiting_input" || status === "waiting_approval"}>
+        {submitting ? "恢复中" : status === "history" || status === "failed" || status === "exited" ? "恢复会话" : "已恢复"}
+      </button>
+    </section>
+  );
+}
+
+function ApprovalPanel({
+  approvals,
+  onSubmitApproval
+}: {
+  approvals: ApprovalSummary[];
+  onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
+}) {
+  if (approvals.length === 0) return null;
+
+  return (
+    <section className="approvalPanel" aria-label="审批请求">
+      <div className="panelHeaderCompact">
+        <h3>待审批</h3>
+        <span>{approvals.length}</span>
+      </div>
+      <div className="approvalList">
+        {approvals.map((approval) => (
+          <ApprovalCard approval={approval} key={approval.id} onSubmitApproval={onSubmitApproval} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ApprovalCard({
+  approval,
+  onSubmitApproval
+}: {
+  approval: ApprovalSummary;
+  onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
+}) {
+  const [submitting, setSubmitting] = useState<ApprovalDecision | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  async function submit(decision: ApprovalDecision) {
+    setSubmitting(decision);
+    try {
+      const answerPayload = Object.fromEntries(Object.entries(answers).map(([key, value]) => [key, value.trim() ? [value.trim()] : []]));
+      await onSubmitApproval(approval, decision, answerPayload);
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  return (
+    <article className="approvalCard">
+      <div className="approvalHeader">
+        <div>
+          <strong>{approval.title}</strong>
+          {approval.reason ? <p className="muted">{approval.reason}</p> : null}
+        </div>
+        <span>{approval.kind}</span>
+      </div>
+      {approval.command ? <pre className="commandText">{approval.command}</pre> : null}
+      {approval.cwd ? <p className="muted">{approval.cwd}</p> : null}
+      {approval.questions.length > 0 ? (
+        <div className="approvalQuestions">
+          {approval.questions.map((question) => (
+            <label key={question.id}>
+              <span>{question.header}: {question.question}</span>
+              {question.options && question.options.length > 0 ? (
+                <select value={answers[question.id] ?? ""} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}>
+                  <option value="">请选择</option>
+                  {question.options.map((option) => (
+                    <option key={option.label} value={option.label}>{option.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={question.isSecret ? "password" : "text"}
+                  value={answers[question.id] ?? ""}
+                  onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}
+                />
+              )}
+            </label>
+          ))}
+        </div>
+      ) : null}
+      <div className="approvalActions">
+        <button type="button" onClick={() => submit("accept")} disabled={submitting !== null}>{submitting === "accept" ? "处理中" : "允许"}</button>
+        <button type="button" onClick={() => submit("acceptForSession")} disabled={submitting !== null}>允许本会话</button>
+        <button className="ghostButton" type="button" onClick={() => submit("decline")} disabled={submitting !== null}>拒绝</button>
+        <button className="ghostButton" type="button" onClick={() => submit("cancel")} disabled={submitting !== null}>取消</button>
+      </div>
+    </article>
+  );
+}
+
+function LiveOutputPanel({ liveMessages, liveCommands }: { liveMessages: LiveAgentMessage[]; liveCommands: LiveCommand[] }) {
+  if (liveMessages.length === 0 && liveCommands.length === 0) return null;
+
+  return (
+    <section className="livePanel" aria-label="实时输出">
+      <div className="panelHeaderCompact">
+        <h3>实时输出</h3>
+        <span>{liveMessages.length + liveCommands.length}</span>
+      </div>
+      {liveMessages.map((message) => (
+        <article className="messageItem agent" key={message.id}>
+          <div className="messageHeader"><strong>Codex</strong><span>实时</span></div>
+          <div className="messageBody"><MarkdownContent text={message.text || "..."} /></div>
+        </article>
+      ))}
+      {liveCommands.map((command) => (
+        <LiveCommandCard command={command} key={command.id} />
+      ))}
+    </section>
+  );
+}
+
+function LiveCommandCard({ command }: { command: LiveCommand }) {
+  const completed = command.status === "completed" || command.status === "succeeded" || command.exitCode !== null;
+  return (
+    <article className={`commandCard ${completed ? "completed" : "running"}`}>
+      <div className="commandHeader">
+        <div>
+          <strong>{completed ? "已完成" : "运行中"}</strong>
+          <p className="muted">{command.cwd || "未知工作目录"}</p>
+        </div>
+        <button className="ghostButton" type="button" onClick={() => navigator.clipboard?.writeText(command.command)}>复制</button>
+      </div>
+      <pre className="commandText">{command.command}</pre>
+      {completed ? (
+        <details className="commandOutputDetails">
+          <summary>查看输出（{command.output.length} 字符）</summary>
+          <pre className="commandOutput completed">{command.output || "无输出"}</pre>
+        </details>
+      ) : (
+        <pre className="commandOutput running">{command.output || "等待输出..."}</pre>
+      )}
+    </article>
+  );
+}
+
+function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void> }) {
+  const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const disabled = submitting || runtime?.status === "waiting_approval" || runtime?.status === "starting";
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextText = text.trim();
+    if (!nextText) return;
+    setSubmitting(true);
+    try {
+      await onSend(nextText);
+      setText("");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="taskInput" onSubmit={handleSubmit}>
+      <textarea
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        placeholder={runtime?.status === "waiting_approval" ? "请先处理审批" : "输入继续任务内容"}
+        disabled={disabled}
+        rows={3}
+      />
+      <button type="submit" disabled={disabled || text.trim().length === 0}>{submitting ? "发送中" : "发送"}</button>
+    </form>
+  );
+}
 
 function SessionCommandsPanel({
   commands,
@@ -1012,6 +1443,62 @@ function InfoItem({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+
+function wsStatusLabel(status: WebSocketStatus): string {
+  switch (status) {
+    case "connected":
+      return "实时已连接";
+    case "connecting":
+      return "实时连接中";
+    case "disconnected":
+      return "实时已断开";
+    case "idle":
+    default:
+      return "实时未连接";
+  }
+}
+
+function isRuntimeSnapshot(value: unknown): value is RuntimeSnapshot {
+  return Boolean(value && typeof value === "object" && typeof (value as RuntimeSnapshot).threadId === "string");
+}
+
+function isApprovalSummary(value: unknown): value is ApprovalSummary {
+  return Boolean(value && typeof value === "object" && typeof (value as ApprovalSummary).id === "string");
+}
+
+function readPayloadString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function readPayloadNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function upsertById<T extends { id: string }>(items: T[], item: T): T[] {
+  const index = items.findIndex((current) => current.id === item.id);
+  if (index === -1) return [...items, item];
+  const next = [...items];
+  next[index] = { ...next[index], ...item };
+  return next;
+}
+
+function appendLiveMessage(messages: LiveAgentMessage[], nextMessage: LiveAgentMessage): LiveAgentMessage[] {
+  const current = messages.find((message) => message.id === nextMessage.id);
+  if (!current) return [...messages, nextMessage];
+  return messages.map((message) => (message.id === nextMessage.id ? { ...message, text: `${message.text}${nextMessage.text}` } : message));
+}
+
+function appendCommandOutput(commands: LiveCommand[], itemId: string, delta: string): LiveCommand[] {
+  const current = commands.find((command) => command.id === itemId);
+  if (!current) {
+    return [
+      ...commands,
+      { id: itemId, itemId, turnId: null, command: "", cwd: "", status: "running", output: delta, exitCode: null, durationMs: null }
+    ];
+  }
+  return commands.map((command) => (command.id === itemId ? { ...command, output: `${command.output}${delta}` } : command));
 }
 
 function statusLabel(status: SessionStatus): string {

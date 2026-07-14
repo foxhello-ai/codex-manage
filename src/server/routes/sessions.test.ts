@@ -3,13 +3,15 @@ import { describe, expect, it } from "vitest";
 import { registerSessionRoutes } from "./sessions";
 import type { SessionService } from "../services/SessionService";
 import type { JsonlSessionParser } from "../services/JsonlSessionParser";
+import type { RuntimeManager } from "../services/RuntimeManager";
 
 function buildApp(
   service: Pick<SessionService, "listSessions" | "getSessionDetail" | "updateMetadata">,
-  parser?: Pick<JsonlSessionParser, "listCommands">
+  parser?: Pick<JsonlSessionParser, "listCommands">,
+  runtime?: Pick<RuntimeManager, "getRuntime" | "resumeThread" | "sendInput" | "submitApproval" | "eventHub" | "approvalService">
 ) {
   const app = Fastify();
-  registerSessionRoutes(app, service as SessionService, parser as JsonlSessionParser | undefined);
+  registerSessionRoutes(app, service as SessionService, parser as JsonlSessionParser | undefined, runtime as RuntimeManager | undefined);
   return app;
 }
 
@@ -117,6 +119,93 @@ describe("session routes", () => {
       commands: [{ callId: "call-1", cmd: "npm test", output: "passed" }],
       diagnostics: { matchedSessionFile: true }
     });
+  });
+
+
+  it("resumes a session", async () => {
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => {
+          throw new Error("not used");
+        },
+        getSessionDetail: async () => {
+          throw new Error("not used");
+        }
+      },
+      undefined,
+      {
+        getRuntime: (() => {
+          throw new Error("not used");
+        }) as any,
+        resumeThread: async (threadId: string) => ({
+          threadId,
+          status: "waiting_input",
+          activeTurnId: null,
+          startedAt: "2026-07-14T00:00:00.000Z",
+          updatedAt: "2026-07-14T00:00:00.000Z",
+          lastError: null,
+          pendingApprovalCount: 0,
+          eventSeq: 1
+        }),
+        sendInput: (() => {
+          throw new Error("not used");
+        }) as any,
+        submitApproval: (() => {
+          throw new Error("not used");
+        }) as any,
+        eventHub: {} as any,
+        approvalService: {} as any
+      }
+    );
+
+    const response = await app.inject({ method: "POST", url: "/api/sessions/thread-1/resume", payload: {} });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ runtime: { threadId: "thread-1", status: "waiting_input" } });
+  });
+
+  it("submits input", async () => {
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => {
+          throw new Error("not used");
+        },
+        getSessionDetail: async () => {
+          throw new Error("not used");
+        }
+      },
+      undefined,
+      {
+        getRuntime: (() => {
+          throw new Error("not used");
+        }) as any,
+        resumeThread: (() => {
+          throw new Error("not used");
+        }) as any,
+        sendInput: async (threadId: string, body: { text: string }) => ({
+          threadId,
+          status: body.text === "继续" ? "running" : "failed",
+          activeTurnId: "turn-1",
+          startedAt: "2026-07-14T00:00:00.000Z",
+          updatedAt: "2026-07-14T00:00:00.000Z",
+          lastError: null,
+          pendingApprovalCount: 0,
+          eventSeq: 1
+        }),
+        submitApproval: (() => {
+          throw new Error("not used");
+        }) as any,
+        eventHub: {} as any,
+        approvalService: {} as any
+      }
+    );
+
+    const response = await app.inject({ method: "POST", url: "/api/sessions/thread-1/input", payload: { text: "继续" } });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ runtime: { threadId: "thread-1", status: "running" } });
   });
 
 });

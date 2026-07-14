@@ -1,4 +1,5 @@
 import cookie from "@fastify/cookie";
+import websocket from "@fastify/websocket";
 import Fastify from "fastify";
 import { loadConfig } from "./config";
 import { registerAuthHook } from "./auth/hooks";
@@ -23,11 +24,12 @@ const jsonlSessionParser = new JsonlSessionParser(config.sessionsDir);
 await app.register(cookie, {
   secret: config.sessionSecret
 });
+await app.register(websocket);
 
 registerAuthHook(app);
 registerAuthRoutes(app, config);
 registerConfigRoutes(app, config, () => runtime.getSnapshot());
-registerSessionRoutes(app, sessionService, jsonlSessionParser);
+registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager);
 
 try {
   try {
