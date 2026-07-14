@@ -178,6 +178,7 @@ function Dashboard({
   const [wsReconnectKey, setWsReconnectKey] = useState(0);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const lastEventSeqRef = useRef(0);
+  const selectedSessionIdRef = useRef<string | null>(null);
 
   const listenAddress = useMemo(() => {
     if (!config) return "读取中";
@@ -212,51 +213,71 @@ function Dashboard({
     loadSessions("");
   }, []);
 
+  useEffect(() => {
+    selectedSessionIdRef.current = selectedSessionId;
+  }, [selectedSessionId]);
+
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     loadSessions(search);
   }
 
-  async function loadSessionDetail(sessionId: string) {
-    setLoadingDetail(true);
+  async function loadSessionDetail(sessionId: string, options: { silent?: boolean } = {}) {
+    if (!options.silent) setLoadingDetail(true);
     setDetailError(null);
 
     try {
       const response = await getSessionDetail(sessionId);
       setSessionDetail(response.session);
     } catch (caught) {
-      setSessionDetail(null);
+      if (!options.silent) setSessionDetail(null);
       setDetailError(caught instanceof Error ? caught.message : "会话详情加载失败");
     } finally {
-      setLoadingDetail(false);
+      if (!options.silent) setLoadingDetail(false);
     }
   }
 
-  async function loadSessionCommands(sessionId: string) {
-    setLoadingCommands(true);
+  async function loadSessionCommands(sessionId: string, options: { silent?: boolean } = {}) {
+    if (!options.silent) setLoadingCommands(true);
     setCommandsError(null);
-    setCommandDiagnostics(null);
+    if (!options.silent) setCommandDiagnostics(null);
 
     try {
       const response = await getSessionCommands(sessionId);
       setCommands(response.commands);
       setCommandDiagnostics(response.diagnostics);
     } catch (caught) {
-      setCommands([]);
+      if (!options.silent) setCommands([]);
       setCommandsError(caught instanceof Error ? caught.message : "历史命令加载失败");
     } finally {
-      setLoadingCommands(false);
+      if (!options.silent) setLoadingCommands(false);
     }
   }
 
-  async function loadRuntime(sessionId: string) {
-    setRuntimeError(null);
+  async function loadRuntime(sessionId: string, options: { silent?: boolean } = {}) {
+    if (!options.silent) setRuntimeError(null);
     try {
       const response = await getSessionRuntime(sessionId);
       setRuntime(response.runtime);
       lastEventSeqRef.current = Math.max(lastEventSeqRef.current, response.runtime.eventSeq);
     } catch (caught) {
-      setRuntimeError(caught instanceof Error ? caught.message : "运行状态加载失败");
+      if (!options.silent) setRuntimeError(caught instanceof Error ? caught.message : "运行状态加载失败");
+    }
+  }
+
+  async function refreshCurrentSession(sessionId: string, options: { silent?: boolean } = {}) {
+    await Promise.all([
+      loadSessionDetail(sessionId, options),
+      loadSessionCommands(sessionId, options),
+      loadRuntime(sessionId, options)
+    ]);
+  }
+
+  async function pollCurrentSessionAfterInput(sessionId: string) {
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      await delay(attempt === 0 ? 800 : 2000);
+      if (selectedSessionIdRef.current !== sessionId) return;
+      await refreshCurrentSession(sessionId, { silent: true });
     }
   }
 
@@ -266,6 +287,11 @@ function Dashboard({
 
     if (event.type === "session_status" && isRuntimeSnapshot(payload.runtime)) {
       setRuntime(payload.runtime);
+      return;
+    }
+
+    if (event.type === "turn_completed") {
+      void refreshCurrentSession(event.threadId, { silent: true });
       return;
     }
 
@@ -344,9 +370,7 @@ function Dashboard({
     setRuntimeError(null);
     lastEventSeqRef.current = 0;
     setDrawerOpen(false);
-    loadSessionDetail(session.id);
-    loadSessionCommands(session.id);
-    loadRuntime(session.id);
+    refreshCurrentSession(session.id);
   }
 
   function handleMetadataSaved(updated: SessionSummary) {
@@ -405,10 +429,12 @@ function Dashboard({
 
   async function handleSendInput(text: string) {
     if (!selectedSessionId) return;
+    const sessionId = selectedSessionId;
     setRuntimeError(null);
     try {
-      const response = await sendSessionInput(selectedSessionId, text);
+      const response = await sendSessionInput(sessionId, text);
       setRuntime(response.runtime);
+      void pollCurrentSessionAfterInput(sessionId);
     } catch (caught) {
       setRuntimeError(caught instanceof Error ? caught.message : "任务发送失败");
     }
@@ -422,6 +448,13 @@ function Dashboard({
       if (response.runtime) setRuntime(response.runtime);
     } catch (caught) {
       setRuntimeError(caught instanceof Error ? caught.message : "审批处理失败");
+    }
+  }
+
+  async function handleRefresh() {
+    await loadSessions(search);
+    if (selectedSessionIdRef.current) {
+      await refreshCurrentSession(selectedSessionIdRef.current);
     }
   }
 
@@ -460,8 +493,8 @@ function Dashboard({
           <button className="iconButton mobileOnly" aria-label="打开会话列表" title="会话列表" onClick={() => setDrawerOpen(true)}>
             <span aria-hidden="true">☰</span>
           </button>
-          <button className="ghostButton" onClick={() => loadSessions(search)} disabled={loadingSessions}>
-            {loadingSessions ? "刷新中" : "刷新"}
+          <button className="ghostButton" onClick={handleRefresh} disabled={loadingSessions || loadingDetail || loadingCommands}>
+            {loadingSessions || loadingDetail || loadingCommands ? "刷新中" : "刷新"}
           </button>
         </div>
       </section>
@@ -1445,6 +1478,10 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 function wsStatusLabel(status: WebSocketStatus): string {
   switch (status) {
