@@ -385,7 +385,7 @@ h2 {
 }
 
 .commandOutput.running {
-  max-height: none;
+  max-height: 320px;
 }
 
 .timeline {
@@ -1101,7 +1101,7 @@ h2 {
 }
 
 .commandOutput.running {
-  max-height: none;
+  max-height: 320px;
 }
 
 .timeline {
@@ -1408,9 +1408,127 @@ textarea {
   background: #ffffff;
 }
 
+.approvalPanel {
+  border-color: #f0b429;
+  border-left: 6px solid #d97706;
+  background: #fff8e5;
+  box-shadow: 0 8px 22px rgb(217 119 6 / 10%);
+}
+
+.livePanel {
+  border-color: #8ec5ff;
+  border-left: 6px solid #1769aa;
+  background: #eaf5ff;
+  box-shadow: 0 8px 22px rgb(23 105 170 / 10%);
+}
+
 .runtimePanel {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+}
+
+.floatingRuntimeStatus {
+  position: fixed;
+  z-index: 30;
+  width: 280px;
+  min-width: 240px;
+  overflow: hidden;
+  border: 1px solid #8ec5ff;
+  border-radius: 8px;
+  color: #172026;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgb(20 35 50 / 20%);
+}
+
+.floatingRuntimeDragHandle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  color: #ffffff;
+  background: #1769aa;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+.floatingRuntimeDragHandle span {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.floatingRuntimeDragHandle strong {
+  font-size: 1.02rem;
+}
+
+.floatingRuntimeBody {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+
+.floatingRuntimeBody > span {
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.floatingRuntimeBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.floatingRuntimeBadges span {
+  border: 1px solid #c9d1d9;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #384650;
+  background: #f6f7f9;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.floatingRuntimeStatus.running {
+  border-color: #1769aa;
+}
+
+.floatingRuntimeStatus.running .floatingRuntimeDragHandle {
+  background: #1769aa;
+}
+
+.floatingRuntimeStatus.waiting_input {
+  border-color: #0f8f5f;
+}
+
+.floatingRuntimeStatus.waiting_input .floatingRuntimeDragHandle {
+  background: #0f8f5f;
+}
+
+.floatingRuntimeStatus.waiting_approval {
+  border-color: #d97706;
+}
+
+.floatingRuntimeStatus.waiting_approval .floatingRuntimeDragHandle {
+  background: #d97706;
+}
+
+.floatingRuntimeStatus.failed {
+  border-color: #b42318;
+}
+
+.floatingRuntimeStatus.failed .floatingRuntimeDragHandle {
+  background: #b42318;
+}
+
+.floatingRuntimeBadges .approvalCount {
+  border-color: #f0b429;
+  color: #6f3d00;
+  background: #fff1c2;
 }
 
 .runtimePanel h3,
@@ -1439,6 +1557,50 @@ textarea {
   color: #5f6f7a;
   background: #f6f7f9;
   font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.approvalPanel .panelHeaderCompact h3 {
+  color: #8a4b00;
+}
+
+.approvalPanel .panelHeaderCompact span {
+  border-color: #f0b429;
+  color: #6f3d00;
+  background: #fff1c2;
+}
+
+.livePanel .panelHeaderCompact h3 {
+  color: #074b80;
+}
+
+.livePanel .panelHeaderCompact span {
+  border-color: #8ec5ff;
+  color: #074b80;
+  background: #d8ecff;
+}
+
+.livePanel .messageItem,
+.livePanel .commandCard {
+  background: #ffffff;
+}
+
+.liveOutputBody {
+  max-height: 520px;
+  display: grid;
+  gap: 10px;
+  overflow: auto;
+  padding-right: 4px;
+  scroll-behavior: smooth;
+}
+
+.liveHiddenNotice {
+  border: 1px dashed #8ec5ff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #074b80;
+  background: #f7fbff;
+  font-size: 0.86rem;
   font-weight: 700;
 }
 
@@ -1519,6 +1681,10 @@ textarea {
 @media (max-width: 767px) {
   .runtimePanel {
     grid-template-columns: 1fr;
+  }
+
+  .floatingRuntimeStatus {
+    width: min(280px, calc(100vw - 24px));
   }
 
   .workspaceGroupList {

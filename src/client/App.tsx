@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionSummary, SessionStatus, SessionTurnItem, UserSession, WebSessionEvent } from "../shared/models";
 
@@ -557,6 +557,15 @@ function Dashboard({
           </aside>
         </div>
       ) : null}
+
+      {selectedSession ? (
+        <FloatingRuntimeStatus
+          sessionTitle={selectedSession.title}
+          runtime={runtime}
+          wsStatus={wsStatus}
+          pendingApprovalCount={pendingApprovals.length}
+        />
+      ) : null}
     </Shell>
   );
 }
@@ -564,6 +573,129 @@ function Dashboard({
 
 const DEFAULT_VISIBLE_TURNS = 5;
 const DEFAULT_VISIBLE_GROUP_SESSIONS = 5;
+const MAX_VISIBLE_LIVE_MESSAGES = 20;
+const MAX_VISIBLE_LIVE_COMMANDS = 20;
+const MAX_LIVE_COMMAND_OUTPUT_CHARS = 12000;
+const FLOATING_RUNTIME_POSITION_KEY = "codex-manage-floating-runtime-position";
+
+type FloatingPosition = {
+  x: number;
+  y: number;
+};
+
+function FloatingRuntimeStatus({
+  sessionTitle,
+  runtime,
+  wsStatus,
+  pendingApprovalCount
+}: {
+  sessionTitle: string;
+  runtime: RuntimeSnapshot | null;
+  wsStatus: WebSocketStatus;
+  pendingApprovalCount: number;
+}) {
+  const status = runtime?.status ?? "history";
+  const [position, setPosition] = useState<FloatingPosition>(() => readFloatingRuntimePosition());
+  const positionRef = useRef(position);
+  const dragOffsetRef = useRef<FloatingPosition | null>(null);
+
+  useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
+
+  useEffect(() => {
+    function handleResize() {
+      setPosition((current) => clampFloatingRuntimePosition(current));
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  function beginDrag(event: PointerEvent<HTMLElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragOffsetRef.current = {
+      x: event.clientX - position.x,
+      y: event.clientY - position.y
+    };
+  }
+
+  function drag(event: PointerEvent<HTMLElement>) {
+    const offset = dragOffsetRef.current;
+    if (!offset) return;
+    const nextPosition = clampFloatingRuntimePosition({
+      x: event.clientX - offset.x,
+      y: event.clientY - offset.y
+    });
+    positionRef.current = nextPosition;
+    setPosition(nextPosition);
+  }
+
+  function endDrag() {
+    dragOffsetRef.current = null;
+    saveFloatingRuntimePosition(positionRef.current);
+  }
+
+  return (
+    <aside
+      className={`floatingRuntimeStatus ${status}`}
+      aria-label="浮动运行状态"
+      style={{ left: position.x, top: position.y }}
+    >
+      <div
+        className="floatingRuntimeDragHandle"
+        title="拖拽调整位置"
+        onPointerDown={beginDrag}
+        onPointerMove={drag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
+        <span>运行状态</span>
+        <strong>{statusLabel(status)}</strong>
+      </div>
+      <div className="floatingRuntimeBody">
+        <span title={sessionTitle}>{sessionTitle}</span>
+        <div className="floatingRuntimeBadges">
+          <span>{wsStatusLabel(wsStatus)}</span>
+          {pendingApprovalCount > 0 ? <span className="approvalCount">待审批 {pendingApprovalCount}</span> : null}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function readFloatingRuntimePosition(): FloatingPosition {
+  try {
+    const raw = window.localStorage.getItem(FLOATING_RUNTIME_POSITION_KEY);
+    if (!raw) return defaultFloatingRuntimePosition();
+    const parsed = JSON.parse(raw) as Partial<FloatingPosition>;
+    if (typeof parsed.x !== "number" || typeof parsed.y !== "number") return defaultFloatingRuntimePosition();
+    return clampFloatingRuntimePosition({ x: parsed.x, y: parsed.y });
+  } catch {
+    return defaultFloatingRuntimePosition();
+  }
+}
+
+function saveFloatingRuntimePosition(position: FloatingPosition) {
+  window.localStorage.setItem(FLOATING_RUNTIME_POSITION_KEY, JSON.stringify(position));
+}
+
+function defaultFloatingRuntimePosition(): FloatingPosition {
+  return clampFloatingRuntimePosition({
+    x: window.innerWidth - 304,
+    y: 88
+  });
+}
+
+function clampFloatingRuntimePosition(position: FloatingPosition): FloatingPosition {
+  const width = 280;
+  const height = 126;
+  const margin = 12;
+  return {
+    x: Math.min(Math.max(position.x, margin), Math.max(margin, window.innerWidth - width - margin)),
+    y: Math.min(Math.max(position.y, margin), Math.max(margin, window.innerHeight - height - margin))
+  };
+}
 
 function SessionDetailPanel({
   fallbackSession,
@@ -612,6 +744,9 @@ function SessionDetailPanel({
 
   return (
     <div className="detailStack">
+      <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
+      <LiveOutputPanel liveMessages={liveMessages} liveCommands={liveCommands} />
+
       <div className="sessionHero">
         <div>
           <p className="eyebrow">{session.remarkTitle ? "会话备注" : "会话名称"}</p>
@@ -625,8 +760,6 @@ function SessionDetailPanel({
       </div>
 
       <RuntimePanel runtime={runtime} wsStatus={wsStatus} error={runtimeError} onResume={onResume} />
-      <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
-      <LiveOutputPanel liveMessages={liveMessages} liveCommands={liveCommands} />
 
       {loading ? <div className="emptyState">正在加载详情...</div> : null}
       {error ? <div className="errorBanner">{error}</div> : null}
@@ -784,29 +917,46 @@ function ApprovalCard({
 }
 
 function LiveOutputPanel({ liveMessages, liveCommands }: { liveMessages: LiveAgentMessage[]; liveCommands: LiveCommand[] }) {
-  if (liveMessages.length === 0 && liveCommands.length === 0) return null;
+  const outputBodyRef = useRef<HTMLDivElement | null>(null);
+  const runningCommands = liveCommands.filter((command) => !isLiveCommandCompleted(command));
+  const visibleMessages = liveMessages.slice(-MAX_VISIBLE_LIVE_MESSAGES);
+  const visibleCommands = runningCommands.slice(-MAX_VISIBLE_LIVE_COMMANDS);
+  const hiddenCount = liveMessages.length + runningCommands.length - visibleMessages.length - visibleCommands.length;
+  const visibleCount = liveMessages.length + runningCommands.length;
+
+  useEffect(() => {
+    const outputBody = outputBodyRef.current;
+    if (!outputBody) return;
+    outputBody.scrollTop = outputBody.scrollHeight;
+  }, [visibleMessages, visibleCommands]);
+
+  if (visibleCount === 0) return null;
 
   return (
     <section className="livePanel" aria-label="实时输出">
       <div className="panelHeaderCompact">
         <h3>实时输出</h3>
-        <span>{liveMessages.length + liveCommands.length}</span>
+        <span>{visibleCount}</span>
       </div>
-      {liveMessages.map((message) => (
-        <article className="messageItem agent" key={message.id}>
-          <div className="messageHeader"><strong>Codex</strong><span>实时</span></div>
-          <div className="messageBody"><MarkdownContent text={message.text || "..."} /></div>
-        </article>
-      ))}
-      {liveCommands.map((command) => (
-        <LiveCommandCard command={command} key={command.id} />
-      ))}
+      <div className="liveOutputBody" ref={outputBodyRef}>
+        {hiddenCount > 0 ? <div className="liveHiddenNotice">已隐藏较早的 {hiddenCount} 条实时输出</div> : null}
+        {visibleMessages.map((message) => (
+          <article className="messageItem agent" key={message.id}>
+            <div className="messageHeader"><strong>Codex</strong><span>实时</span></div>
+            <div className="messageBody"><MarkdownContent text={message.text || "..."} /></div>
+          </article>
+        ))}
+        {visibleCommands.map((command) => (
+          <LiveCommandCard command={command} key={command.id} />
+        ))}
+      </div>
     </section>
   );
 }
 
 function LiveCommandCard({ command }: { command: LiveCommand }) {
-  const completed = command.status === "completed" || command.status === "succeeded" || command.exitCode !== null;
+  const completed = isLiveCommandCompleted(command);
+  const runningOutput = completed ? command.output : tailText(command.output, MAX_LIVE_COMMAND_OUTPUT_CHARS);
   return (
     <article className={`commandCard ${completed ? "completed" : "running"}`}>
       <div className="commandHeader">
@@ -823,10 +973,20 @@ function LiveCommandCard({ command }: { command: LiveCommand }) {
           <pre className="commandOutput completed">{command.output || "无输出"}</pre>
         </details>
       ) : (
-        <pre className="commandOutput running">{command.output || "等待输出..."}</pre>
+        <pre className="commandOutput running">{runningOutput || "等待输出..."}</pre>
       )}
     </article>
   );
+}
+
+function isLiveCommandCompleted(command: LiveCommand): boolean {
+  return command.status === "completed" || command.status === "succeeded" || command.exitCode !== null;
+}
+
+function tailText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const hiddenChars = text.length - maxChars;
+  return `已隐藏前 ${hiddenChars} 字符，仅展示最新输出\n\n${text.slice(-maxChars)}`;
 }
 
 function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void> }) {
