@@ -1,6 +1,7 @@
 import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UserSession, WebSessionEvent } from "../shared/models";
+import { isTaskSendShortcut, shouldAutoFollowLiveOutput } from "./sessionInteractions";
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
@@ -18,11 +19,13 @@ type LiveCommand = {
   durationMs: number | null;
 };
 
-type LiveAgentMessage = {
+type LiveMessage = {
   id: string;
+  role: "user" | "agent";
   turnId: string | null;
   itemId: string | null;
   text: string;
+  deliveryStatus: "sending" | "sent" | "failed" | null;
 };
 
 
@@ -175,7 +178,7 @@ function Dashboard({
   const [permissionMode, setPermissionMode] = useState<SessionPermissionMode>("default");
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalSummary[]>([]);
   const [liveCommands, setLiveCommands] = useState<LiveCommand[]>([]);
-  const [liveMessages, setLiveMessages] = useState<LiveAgentMessage[]>([]);
+  const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
   const [wsStatus, setWsStatus] = useState<WebSocketStatus>("idle");
   const [wsReconnectKey, setWsReconnectKey] = useState(0);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -321,7 +324,14 @@ function Dashboard({
       const itemId = readPayloadString(payload.itemId) ?? `${event.seq}`;
       const turnId = readPayloadString(payload.turnId);
       const delta = readPayloadString(payload.delta) ?? "";
-      setLiveMessages((current) => appendLiveMessage(current, { id: itemId, itemId, turnId, text: delta }));
+      setLiveMessages((current) => appendLiveMessage(current, {
+        id: itemId,
+        role: "agent",
+        itemId,
+        turnId,
+        text: delta,
+        deliveryStatus: null
+      }));
       return;
     }
 
@@ -441,13 +451,30 @@ function Dashboard({
   async function handleSendInput(text: string) {
     if (!selectedSessionId) return;
     const sessionId = selectedSessionId;
+    const messageId = createLocalMessageId();
     setRuntimeError(null);
+    setLiveMessages((current) => [
+      ...current,
+      {
+        id: messageId,
+        role: "user",
+        turnId: null,
+        itemId: null,
+        text,
+        deliveryStatus: "sending"
+      }
+    ]);
     try {
       const response = await sendSessionInput(sessionId, text, permissionMode);
+      if (selectedSessionIdRef.current !== sessionId) return;
+      setLiveMessages((current) => updateLiveMessageDeliveryStatus(current, messageId, "sent"));
       syncRuntimeSnapshot(response.runtime);
       void pollCurrentSessionAfterInput(sessionId);
     } catch (caught) {
+      if (selectedSessionIdRef.current !== sessionId) throw caught;
+      setLiveMessages((current) => updateLiveMessageDeliveryStatus(current, messageId, "failed"));
       setRuntimeError(caught instanceof Error ? caught.message : "任务发送失败");
+      throw caught;
     }
   }
 
@@ -768,7 +795,7 @@ function SessionDetailPanel({
   runtimeError: string | null;
   pendingApprovals: ApprovalSummary[];
   liveCommands: LiveCommand[];
-  liveMessages: LiveAgentMessage[];
+  liveMessages: LiveMessage[];
   wsStatus: WebSocketStatus;
   onResume: () => Promise<void>;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
@@ -803,6 +830,7 @@ function SessionDetailPanel({
         <LiveOutputPanel
           liveMessages={liveMessages}
           liveCommands={liveCommands}
+          runtimeStatus={runtime?.status ?? "history"}
           onShowHistory={() => setShowHistoryDuringLive(true)}
         />
       ) : null}
@@ -1101,24 +1129,27 @@ function ApprovalCard({
 function LiveOutputPanel({
   liveMessages,
   liveCommands,
+  runtimeStatus,
   onShowHistory
 }: {
-  liveMessages: LiveAgentMessage[];
+  liveMessages: LiveMessage[];
   liveCommands: LiveCommand[];
+  runtimeStatus: SessionStatus;
   onShowHistory: () => void;
 }) {
   const outputBodyRef = useRef<HTMLDivElement | null>(null);
-  const runningCommands = liveCommands.filter((command) => !isLiveCommandCompleted(command));
-  const visibleMessages = liveMessages.slice(-MAX_VISIBLE_LIVE_MESSAGES);
-  const visibleCommands = runningCommands.slice(-MAX_VISIBLE_LIVE_COMMANDS);
+  const runningCommands = useMemo(() => liveCommands.filter((command) => !isLiveCommandCompleted(command)), [liveCommands]);
+  const visibleMessages = useMemo(() => liveMessages.slice(-MAX_VISIBLE_LIVE_MESSAGES), [liveMessages]);
+  const visibleCommands = useMemo(() => runningCommands.slice(-MAX_VISIBLE_LIVE_COMMANDS), [runningCommands]);
   const hiddenCount = liveMessages.length + runningCommands.length - visibleMessages.length - visibleCommands.length;
   const visibleCount = liveMessages.length + runningCommands.length;
 
   useEffect(() => {
+    if (!shouldAutoFollowLiveOutput(runtimeStatus)) return;
     const outputBody = outputBodyRef.current;
     if (!outputBody) return;
     outputBody.scrollTop = outputBody.scrollHeight;
-  }, [visibleMessages, visibleCommands]);
+  }, [runtimeStatus, visibleMessages, visibleCommands]);
 
   if (visibleCount === 0) return null;
 
@@ -1136,8 +1167,13 @@ function LiveOutputPanel({
       <div className="liveOutputBody" ref={outputBodyRef}>
         {hiddenCount > 0 ? <div className="liveHiddenNotice">已隐藏较早的 {hiddenCount} 条实时输出</div> : null}
         {visibleMessages.map((message) => (
-          <article className="messageItem agent" key={message.id}>
-            <div className="messageHeader"><strong>Codex</strong><span>实时</span></div>
+          <article className={`messageItem ${message.role} liveMessage${message.deliveryStatus ? ` ${message.deliveryStatus}` : ""}`} key={message.id}>
+            <div className="messageHeader">
+              <strong>{message.role === "user" ? "用户" : "Codex"}</strong>
+              <span className={message.deliveryStatus ? `deliveryStatus ${message.deliveryStatus}` : undefined}>
+                {message.deliveryStatus ? deliveryStatusLabel(message.deliveryStatus) : "实时"}
+              </span>
+            </div>
             <div className="messageBody"><MarkdownContent text={message.text || "..."} /></div>
           </article>
         ))}
@@ -1187,19 +1223,31 @@ function tailText(text: string, maxChars: number): string {
 function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void> }) {
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const disabled = submitting || runtime?.status === "waiting_approval" || runtime?.status === "starting";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextText = text.trim();
-    if (!nextText) return;
+    if (!nextText || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await onSend(nextText);
       setText("");
+    } catch {
+      return;
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (!isTaskSendShortcut(event)) return;
+    event.preventDefault();
+    if (disabled || submittingRef.current || text.trim().length === 0) return;
+    event.currentTarget.form?.requestSubmit();
   }
 
   return (
@@ -1207,8 +1255,10 @@ function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSen
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder={runtime?.status === "waiting_approval" ? "请先处理审批" : "输入继续任务内容"}
         disabled={disabled}
+        aria-keyshortcuts="Control+Enter Meta+Enter"
         rows={3}
       />
       <button type="submit" disabled={disabled || text.trim().length === 0}>{submitting ? "发送中" : "发送"}</button>
@@ -1938,10 +1988,36 @@ function upsertById<T extends { id: string }>(items: T[], item: T): T[] {
   return next;
 }
 
-function appendLiveMessage(messages: LiveAgentMessage[], nextMessage: LiveAgentMessage): LiveAgentMessage[] {
+function appendLiveMessage(messages: LiveMessage[], nextMessage: LiveMessage): LiveMessage[] {
   const current = messages.find((message) => message.id === nextMessage.id);
   if (!current) return [...messages, nextMessage];
   return messages.map((message) => (message.id === nextMessage.id ? { ...message, text: `${message.text}${nextMessage.text}` } : message));
+}
+
+function updateLiveMessageDeliveryStatus(
+  messages: LiveMessage[],
+  messageId: string,
+  deliveryStatus: Exclude<LiveMessage["deliveryStatus"], null>
+): LiveMessage[] {
+  return messages.map((message) => (message.id === messageId ? { ...message, deliveryStatus } : message));
+}
+
+function deliveryStatusLabel(status: Exclude<LiveMessage["deliveryStatus"], null>): string {
+  switch (status) {
+    case "sending":
+      return "发送中";
+    case "sent":
+      return "已发送";
+    case "failed":
+      return "发送失败";
+  }
+}
+
+function createLocalMessageId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `user-${crypto.randomUUID()}`;
+  }
+  return `user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function appendCommandOutput(commands: LiveCommand[], itemId: string, delta: string): LiveCommand[] {
