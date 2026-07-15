@@ -167,6 +167,7 @@ function Dashboard({
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loadingDiagnostics, setLoadingDiagnostics] = useState(initialRoute.kind === "settings");
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [search, setSearch] = useState("");
   const [loadingSessions, setLoadingSessions] = useState(true);
@@ -234,6 +235,10 @@ function Dashboard({
   }
 
   useEffect(() => {
+    if (config) setCurrentConfig(config);
+  }, [config]);
+
+  useEffect(() => {
     void loadSessions("");
     if (initialRoute.kind === "detail") {
       void refreshCurrentSession(initialRoute.sessionId);
@@ -255,6 +260,22 @@ function Dashboard({
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") setDrawerOpen(false);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [drawerOpen]);
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -441,6 +462,7 @@ function Dashboard({
     }
 
     if (route.kind === "settings") {
+      setDrawerOpen(false);
       setRouteError(null);
       setViewMode("settings");
       void loadDiagnostics();
@@ -448,6 +470,7 @@ function Dashboard({
     }
 
     if (route.kind === "invalid") {
+      setDrawerOpen(false);
       resetSessionDetailState(null);
       setRouteError(route.message);
       setViewMode("invalid");
@@ -455,6 +478,7 @@ function Dashboard({
     }
 
     resetSessionDetailState(route.sessionId);
+    setDrawerOpen(false);
     setRouteError(null);
     setViewMode("detail");
     void refreshCurrentSession(route.sessionId);
@@ -591,6 +615,7 @@ function Dashboard({
   function handleBackToList() {
     if (window.location.pathname !== "/") window.history.pushState(null, "", "/");
     setRouteError(null);
+    setDrawerOpen(false);
     setViewMode("list");
   }
 
@@ -620,6 +645,7 @@ function Dashboard({
   return (
     <Shell
       title="Codex Manage"
+      reserveFloatingStatus={viewMode === "detail" && Boolean(selectedSession)}
       action={(
         <div className="topbarActions">
           <button
@@ -650,6 +676,15 @@ function Dashboard({
               <p className="muted">查看 ~/.codex/sessions 中的历史会话，恢复会话并继续任务。</p>
             </div>
             <div className="toolbarActions">
+              <button
+                className="iconButton mobileOnly"
+                type="button"
+                aria-label="打开会话列表"
+                title="会话列表"
+                onClick={() => setDrawerOpen(true)}
+              >
+                <span aria-hidden="true">☰</span>
+              </button>
               <button className="ghostButton" onClick={() => loadSessions(search)} disabled={loadingSessions}>
                 {loadingSessions ? "刷新中" : "刷新"}
               </button>
@@ -662,7 +697,7 @@ function Dashboard({
             <InfoItem label="App Server" value={appServerStatus} />
           </section>
 
-          <section className="sessionSection" aria-label="会话列表">
+          <section className="sessionSection desktopSessionPanel" aria-label="会话列表">
             {renderSessionBrowser()}
           </section>
         </>
@@ -686,6 +721,15 @@ function Dashboard({
               </button>
             </div>
           </section>
+
+          {selectedSession ? (
+            <MobileRuntimeStatus
+              sessionTitle={selectedSession.title}
+              runtime={runtime}
+              wsStatus={wsStatus}
+              pendingApprovalCount={pendingApprovals.length}
+            />
+          ) : null}
 
           <section className="sessionDetail" aria-labelledby="session-detail-title">
             <h2 id="session-detail-title" className="srOnly">当前会话详情</h2>
@@ -751,6 +795,29 @@ function Dashboard({
           </section>
         </>
       )}
+
+      {viewMode === "list" && drawerOpen ? (
+        <div className="drawerBackdrop" role="presentation" onClick={() => setDrawerOpen(false)}>
+          <aside
+            className="sessionDrawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="会话列表"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="drawerHeader">
+              <div>
+                <h2>会话列表</h2>
+                <p className="muted">共 {sessions.length} 个会话</p>
+              </div>
+              <button className="iconButton" type="button" aria-label="关闭会话列表" title="关闭" onClick={() => setDrawerOpen(false)}>
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+            {renderSessionBrowser(false)}
+          </aside>
+        </div>
+      ) : null}
 
       {viewMode === "detail" && selectedSession ? (
         <FloatingRuntimeStatus
@@ -868,6 +935,53 @@ type FloatingPosition = {
   x: number;
   y: number;
 };
+
+function MobileRuntimeStatus({
+  sessionTitle,
+  runtime,
+  wsStatus,
+  pendingApprovalCount
+}: {
+  sessionTitle: string;
+  runtime: RuntimeSnapshot | null;
+  wsStatus: WebSocketStatus;
+  pendingApprovalCount: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const status = runtime?.status ?? "history";
+
+  return (
+    <section className={`mobileRuntimeStatus ${status}${expanded ? " expanded" : ""}`} aria-label="移动运行状态">
+      <button
+        className="mobileRuntimeSummary"
+        type="button"
+        aria-expanded={expanded}
+        aria-label={expanded ? "收起运行状态" : "展开运行状态"}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <span className="mobileRuntimePrimary">
+          <strong>{statusLabel(status)}</strong>
+          <small>{wsStatusLabel(wsStatus)}</small>
+        </span>
+        <span className="mobileRuntimeIndicators">
+          {runtime?.permissionMode === "full_access" ? <small className="fullAccessBadge">完全权限</small> : null}
+          {pendingApprovalCount > 0 ? <small className="approvalCount">待审批 {pendingApprovalCount}</small> : null}
+          <span aria-hidden="true">{expanded ? "⌃" : "⌄"}</span>
+        </span>
+      </button>
+      {expanded ? (
+        <div className="mobileRuntimeDetails">
+          <strong title={sessionTitle}>{sessionTitle}</strong>
+          <div>
+            <span>权限：{runtime?.permissionMode === "full_access" ? "完全权限" : "需审批"}</span>
+            <span>事件：{runtime?.eventSeq ?? 0}</span>
+          </div>
+          {runtime?.lastError ? <p className="errorText">{runtime.lastError}</p> : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
 
 function FloatingRuntimeStatus({
   sessionTitle,
@@ -1045,74 +1159,76 @@ function SessionDetailPanel({
 
   return (
     <div className="detailStack">
-      {runtime?.permissionMode === "full_access" ? (
-        pendingApprovals.length > 0 ? <div className="errorBanner">完全权限模式收到未预期的审批请求，系统未自动处理。</div> : null
-      ) : (
-        <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
-      )}
-      {!showHistoryDuringLive ? (
-        <LiveOutputPanel
-          liveMessages={liveMessages}
-          liveCommands={liveCommands}
-          runtimeStatus={runtime?.status ?? "history"}
-          onShowHistory={() => setShowHistoryDuringLive(true)}
-        />
-      ) : null}
-
-      <div className="sessionHero">
-        <div>
-          <p className="eyebrow">{session.remarkTitle ? "会话备注" : "会话名称"}</p>
-          <h3>{session.title}</h3>
-          {session.remarkTitle ? <p className="muted">默认标题：{session.defaultTitle}</p> : null}
-        </div>
-        <div className="sessionHeroMeta">
-          <span>{formatDateTime(session.updatedAt)}</span>
-          <span title={session.id}>{shortId(session.id)}</span>
-        </div>
-      </div>
-
-      <RuntimePanel
-        runtime={runtime}
-        permissionMode={permissionMode}
-        wsStatus={wsStatus}
-        error={runtimeError}
-        onResume={onResume}
-        onPermissionModeChange={onPermissionModeChange}
-      />
-
-      {hasLiveOutput && !showHistory ? <div className="historyHiddenNotice">实时输出进行中，历史会话内容已隐藏。</div> : null}
-      {showHistory ? (
-        <div className="historyContent">
-          {hasLiveOutput ? (
-            <div className="historyHeader">
-              <div>
-                <h3>历史会话内容</h3>
-                <p className="muted">实时输出已隐藏。</p>
-              </div>
-              <button className="ghostButton" type="button" onClick={() => setShowHistoryDuringLive(false)}>
-                返回实时输出
-              </button>
-            </div>
-          ) : null}
-          {loading ? <div className="emptyState">正在加载详情...</div> : null}
-          {error ? <div className="errorBanner">{error}</div> : null}
-          {detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
-          {detail && detail.turns.length > 0 ? (
-            <SessionTimeline
-              detail={detail}
-              visibleTurnCount={visibleTurnCount}
-              onLoadMore={() => setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS)}
-              onOpenMessage={setExpandedMessage}
-            />
-          ) : null}
-          <SessionCommandsPanel
-            commands={commands}
-            diagnostics={commandDiagnostics}
-            loading={loadingCommands}
-            error={commandsError}
+      <div className="detailScrollContent">
+        {runtime?.permissionMode === "full_access" ? (
+          pendingApprovals.length > 0 ? <div className="errorBanner">完全权限模式收到未预期的审批请求，系统未自动处理。</div> : null
+        ) : (
+          <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
+        )}
+        {!showHistoryDuringLive ? (
+          <LiveOutputPanel
+            liveMessages={liveMessages}
+            liveCommands={liveCommands}
+            runtimeStatus={runtime?.status ?? "history"}
+            onShowHistory={() => setShowHistoryDuringLive(true)}
           />
+        ) : null}
+
+        <div className="sessionHero">
+          <div>
+            <p className="eyebrow">{session.remarkTitle ? "会话备注" : "会话名称"}</p>
+            <h3>{session.title}</h3>
+            {session.remarkTitle ? <p className="muted">默认标题：{session.defaultTitle}</p> : null}
+          </div>
+          <div className="sessionHeroMeta">
+            <span>{formatDateTime(session.updatedAt)}</span>
+            <span title={session.id}>{shortId(session.id)}</span>
+          </div>
         </div>
-      ) : null}
+
+        <RuntimePanel
+          runtime={runtime}
+          permissionMode={permissionMode}
+          wsStatus={wsStatus}
+          error={runtimeError}
+          onResume={onResume}
+          onPermissionModeChange={onPermissionModeChange}
+        />
+
+        {hasLiveOutput && !showHistory ? <div className="historyHiddenNotice">实时输出进行中，历史会话内容已隐藏。</div> : null}
+        {showHistory ? (
+          <div className="historyContent">
+            {hasLiveOutput ? (
+              <div className="historyHeader">
+                <div>
+                  <h3>历史会话内容</h3>
+                  <p className="muted">实时输出已隐藏。</p>
+                </div>
+                <button className="ghostButton" type="button" onClick={() => setShowHistoryDuringLive(false)}>
+                  返回实时输出
+                </button>
+              </div>
+            ) : null}
+            {loading ? <div className="emptyState">正在加载详情...</div> : null}
+            {error ? <div className="errorBanner">{error}</div> : null}
+            {detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
+            {detail && detail.turns.length > 0 ? (
+              <SessionTimeline
+                detail={detail}
+                visibleTurnCount={visibleTurnCount}
+                onLoadMore={() => setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS)}
+                onOpenMessage={setExpandedMessage}
+              />
+            ) : null}
+            <SessionCommandsPanel
+              commands={commands}
+              diagnostics={commandDiagnostics}
+              loading={loadingCommands}
+              error={commandsError}
+            />
+          </div>
+        ) : null}
+      </div>
       <TaskInput runtime={runtime} onSend={handleSendInput} />
       {expandedMessage ? <MessageDetailDialog message={expandedMessage} onClose={() => setExpandedMessage(null)} /> : null}
     </div>
@@ -2146,9 +2262,19 @@ function StatusBadge({ status }: { status: SessionStatus }) {
   return <span className={`statusBadge ${status}`}>{statusLabel(status)}</span>;
 }
 
-function Shell({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Shell({
+  title,
+  action,
+  children,
+  reserveFloatingStatus = false
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  reserveFloatingStatus?: boolean;
+}) {
   return (
-    <main className="appShell">
+    <main className={`appShell${reserveFloatingStatus ? " reserveFloatingStatus" : ""}`}>
       <header className="topbar">
         <h1>{title}</h1>
         {action}

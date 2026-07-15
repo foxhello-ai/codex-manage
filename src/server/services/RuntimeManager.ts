@@ -160,7 +160,10 @@ export class RuntimeManager {
         this.handleItemEvent(threadId, "command_completed", params);
         break;
       case "error":
-        this.setRuntime(threadId, { status: "failed", lastError: readError(params.error) ?? "Codex 执行失败" });
+        this.setRuntime(threadId, {
+          status: params.willRetry === true ? "running" : "failed",
+          lastError: readError(params.error) ?? "Codex 执行失败"
+        });
         this.eventHub.publish(threadId, "error", params);
         break;
       case "warning":
@@ -267,6 +270,7 @@ function mapRuntimeStatus(value: Record<string, unknown>): RuntimeStatus {
       return "running";
     case "waitingInput":
     case "waiting_input":
+    case "idle":
       return "waiting_input";
     case "waitingApproval":
     case "waiting_approval":

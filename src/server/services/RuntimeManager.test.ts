@@ -98,6 +98,53 @@ describe("RuntimeManager", () => {
     });
   });
 
+  it("maps an app-server idle thread to waiting for user input", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    await manager.resumeThread("thread-1");
+    appServer.emit("notification", {
+      method: "thread/status/changed",
+      params: { threadId: "thread-1", status: { type: "idle" } }
+    });
+
+    expect(manager.getRuntime("thread-1").status).toBe("waiting_input");
+  });
+
+  it("keeps a retrying turn running and only fails on the terminal error", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    await manager.sendInput("thread-1", { text: "继续" });
+    appServer.emit("notification", {
+      method: "error",
+      params: {
+        threadId: "thread-1",
+        willRetry: true,
+        error: { message: "Reconnecting... 1/5" }
+      }
+    });
+
+    expect(manager.getRuntime("thread-1")).toMatchObject({
+      status: "running",
+      lastError: "Reconnecting... 1/5"
+    });
+
+    appServer.emit("notification", {
+      method: "error",
+      params: {
+        threadId: "thread-1",
+        willRetry: false,
+        error: { message: "upstream unavailable" }
+      }
+    });
+
+    expect(manager.getRuntime("thread-1")).toMatchObject({
+      status: "failed",
+      lastError: "upstream unavailable"
+    });
+  });
+
   it("publishes and resolves command approvals", () => {
     const appServer = new FakeAppServer();
     const manager = new RuntimeManager(appServer as any);

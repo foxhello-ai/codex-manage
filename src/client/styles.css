@@ -326,6 +326,12 @@ h2 {
   gap: 14px;
 }
 
+.detailScrollContent {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
 
 .commandsPanel {
   border-top: 1px solid #d9e0e7;
@@ -1073,6 +1079,24 @@ h2 {
 
 .drawerHeader h2 {
   margin: 0 0 6px;
+}
+
+@media (min-width: 1280px) {
+  .appShell.reserveFloatingStatus .content {
+    width: min(1120px, calc(100% - 336px));
+    margin-right: auto;
+    margin-left: 24px;
+  }
+}
+
+@media (max-width: 1279px) {
+  .floatingRuntimeStatus {
+    display: none;
+  }
+}
+
+.mobileRuntimeStatus {
+  display: none;
 }
 
 @media (max-width: 767px) {
@@ -2156,9 +2180,7 @@ textarea {
 }
 
 .taskInput {
-  position: sticky;
-  bottom: env(safe-area-inset-bottom);
-  z-index: 10;
+  position: static;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
@@ -2175,6 +2197,149 @@ textarea {
 }
 
 @media (max-width: 767px) {
+  .mobileRuntimeStatus {
+    min-width: 0;
+    display: grid;
+    overflow: hidden;
+    border: 1px solid #8ec5ff;
+    border-left: 5px solid #1769aa;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgb(20 35 50 / 9%);
+  }
+
+  .mobileRuntimeStatus.waiting_input {
+    border-color: #9ccbb2;
+    border-left-color: #0f8f5f;
+  }
+
+  .mobileRuntimeStatus.waiting_approval {
+    border-color: #f0c36a;
+    border-left-color: #d97706;
+  }
+
+  .mobileRuntimeStatus.failed {
+    border-color: #f2b8b5;
+    border-left-color: #b42318;
+  }
+
+  .mobileRuntimeSummary {
+    min-width: 0;
+    min-height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-radius: 0;
+    padding: 8px 12px;
+    color: #172026;
+    background: #ffffff;
+    text-align: left;
+  }
+
+  .mobileRuntimePrimary {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .mobileRuntimePrimary strong {
+    overflow: hidden;
+    font-size: 0.95rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileRuntimePrimary small {
+    color: #5f6f7a;
+    font-size: 0.72rem;
+  }
+
+  .mobileRuntimeIndicators {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .mobileRuntimeIndicators small {
+    border: 1px solid #c9d1d9;
+    border-radius: 999px;
+    padding: 2px 6px;
+    color: #384650;
+    background: #f6f7f9;
+    font-size: 0.66rem;
+    font-weight: 700;
+  }
+
+  .mobileRuntimeIndicators .fullAccessBadge {
+    border-color: #e08787;
+    color: #8f1d1d;
+    background: #fff1f1;
+  }
+
+  .mobileRuntimeIndicators .approvalCount {
+    border-color: #f0b429;
+    color: #6f3d00;
+    background: #fff1c2;
+  }
+
+  .mobileRuntimeDetails {
+    min-width: 0;
+    display: grid;
+    gap: 7px;
+    border-top: 1px solid #e3e8ed;
+    padding: 9px 12px 11px;
+    background: #f8fafb;
+  }
+
+  .mobileRuntimeDetails > strong {
+    overflow: hidden;
+    font-size: 0.86rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileRuntimeDetails > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    color: #5f6f7a;
+    font-size: 0.74rem;
+  }
+
+  .mobileRuntimeDetails p {
+    max-height: 48px;
+    margin: 0;
+    overflow: auto;
+    font-size: 0.74rem;
+  }
+
+  .appShell.reserveFloatingStatus .sessionDetail {
+    height: calc(100dvh - 224px);
+    min-height: 420px;
+    overflow: hidden;
+    padding: 12px;
+  }
+
+  .mobileRuntimeStatus.expanded + .sessionDetail {
+    height: calc(100dvh - 304px);
+    min-height: 340px;
+  }
+
+  .appShell.reserveFloatingStatus .detailStack {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .appShell.reserveFloatingStatus .detailScrollContent {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+  }
+
   .runtimePanel {
     grid-template-columns: 1fr;
   }
