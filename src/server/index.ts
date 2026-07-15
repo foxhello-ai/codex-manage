@@ -10,6 +10,7 @@ import { AppRuntime } from "./services/AppRuntime";
 import { SessionService } from "./services/SessionService";
 import { SessionMetadataStore } from "./services/SessionMetadataStore";
 import { JsonlSessionParser } from "./services/JsonlSessionParser";
+import { registerStaticClient } from "./staticClient";
 
 const config = loadConfig();
 
@@ -30,6 +31,10 @@ registerAuthHook(app);
 registerAuthRoutes(app, config);
 registerConfigRoutes(app, config, () => runtime.getSnapshot());
 registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager);
+
+if (process.env.NODE_ENV === "production") {
+  await registerStaticClient(app, config.clientDir);
+}
 
 try {
   try {

@@ -14,7 +14,8 @@ function testConfig(): AppConfig {
     sessionSecret: "test-secret-at-least-thirty-two-chars",
     codexCliPath: "codex",
     sessionsDir: "/tmp/sessions",
-    metadataFile: "/tmp/codex-manage-test-session-metadata.json"
+    metadataFile: "/tmp/codex-manage-test-session-metadata.json",
+    clientDir: "/tmp/codex-manage-test-client"
   };
 }
 
