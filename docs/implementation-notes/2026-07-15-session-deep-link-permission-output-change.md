@@ -4,7 +4,7 @@
 
 - 日期：2026-07-15
 - 依据：[技术调研记录](./2026-07-15-session-deep-link-permission-output-research.md)
-- 状态：实施中，权限交互与实时发送体验已完成，深链接和生产 SPA 回退待实现
+- 状态：已完成
 
 ## 变更目标
 
@@ -115,16 +115,47 @@ appServer.request("thread/resume", {
 - 支持 `Ctrl+Enter` 和 `Meta+Enter` 发送，普通 Enter 保持换行；连续触发不会并发提交。
 - 切换会话后，旧会话尚未完成的输入请求不会覆盖新会话运行态或消息状态。
 
-### 待实现
+### 已完成：会话深链接
 
-- 会话详情 URL 深链接与浏览器前进、后退。
-- 生产部署 SPA 回退说明与对应验收。
+- 列表页使用 `/`，详情页使用 URL 编码后的 `/<sessionId>`。
+- 从列表进入详情、返回列表时使用 `history.pushState` 更新地址。
+- 应用初始化和浏览器 `popstate` 均按当前路径恢复列表或详情状态。
+- 无效路径、无效编码和不存在的会话显示明确错误及返回列表操作。
+- 搜索结果不包含当前会话时，不再清空详情或静默跳回列表。
+- 快速切换会话时忽略旧详情请求和旧实时事件，避免覆盖当前会话。
+
+### 已完成：生产构建与 SPA 回退
+
+- `npm run build` 依次执行类型检查、Vite 前端构建和 esbuild 服务端构建。
+- 前端产物写入 `dist/client`，服务端 ESM 产物写入 `dist/server/index.js`。
+- `npm start` 以生产模式启动 Fastify，并从 `dist/client` 提供静态资源。
+- 可通过 `CODEX_WEB_CLIENT_DIR` 覆盖前端产物目录。
+- HTML 导航到会话详情路径时回退到 `index.html`，并返回 `Cache-Control: no-cache`。
+- `/api/*`、`/assets/*` 和带文件扩展名的缺失资源不执行 SPA 回退。
+- 现有 API 路由优先于静态资源和 SPA 回退。
+
+### 生产运行
+
+```bash
+npm run build
+npm start
+```
+
+生产启动继续使用 `CODEX_WEB_HOST`、`CODEX_WEB_PORT`、`CODEX_WEB_PASSWORD`、`CODEX_CLI_PATH` 和 `CODEX_SESSIONS_DIR` 等现有环境变量。
 
 ### 验证
 
 - `npm run typecheck`：通过。
-- `npm test`：9 个测试文件、28 项测试通过。
-- `npm run build`：通过。
+- `npm test`：11 个测试文件、36 项测试通过。
+- `npm run build`：通过，生成前端和服务端产物。
+- 生产启动验收：`127.0.0.1:3012` 临时端口启动成功，详情深链接返回 SPA 入口，`GET /api/me` 返回 JSON，缺失静态资源返回 JSON 404。
+
+验收时相关命令版本：
+
+- Node.js：`v22.23.1`
+- npm：`10.9.8`
+- Vite：`7.3.6`
+- esbuild：`0.28.1`
 
 ## 验收标准
 
