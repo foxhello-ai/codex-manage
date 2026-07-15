@@ -1642,6 +1642,139 @@ textarea {
   font-weight: 700;
 }
 
+.runtimeBadges .permissionBadge.fullAccess,
+.floatingRuntimeBadges .fullAccessBadge {
+  border-color: #e08787;
+  color: #8f1d1d;
+  background: #fff1f1;
+}
+
+.permissionControl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  border-top: 1px solid #e3e8ed;
+  padding-top: 12px;
+}
+
+.permissionControlLabel {
+  color: #384650;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.permissionToggle {
+  position: relative;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+}
+
+.permissionToggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.permissionToggleTrack {
+  width: 44px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  border: 1px solid #aab5bf;
+  border-radius: 999px;
+  padding: 2px;
+  background: #dce2e7;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.permissionToggleThumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(20 35 50 / 28%);
+  transition: transform 160ms ease;
+}
+
+.permissionToggle.enabled .permissionToggleTrack {
+  border-color: #b42318;
+  background: #b42318;
+}
+
+.permissionToggle.enabled .permissionToggleThumb {
+  transform: translateX(20px);
+}
+
+.permissionToggle input:focus-visible + .permissionToggleTrack {
+  outline: 3px solid rgb(23 105 170 / 25%);
+  outline-offset: 2px;
+}
+
+.permissionToggle:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.permissionToggle strong {
+  color: #384650;
+  font-size: 0.86rem;
+}
+
+.permissionUnavailable {
+  margin: 6px 0 0;
+  color: #5f6f7a;
+  font-size: 0.8rem;
+}
+
+.fullAccessDialog {
+  width: min(520px, 100%);
+  grid-template-rows: auto auto;
+}
+
+.fullAccessDialogBody {
+  display: grid;
+  gap: 18px;
+}
+
+.fullAccessWarning {
+  border: 1px solid #e08787;
+  border-left: 6px solid #b42318;
+  border-radius: 8px;
+  padding: 14px;
+  color: #661414;
+  background: #fff1f1;
+}
+
+.fullAccessWarning p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dialogActions button {
+  min-width: 110px;
+  padding: 0 16px;
+}
+
+.dangerButton {
+  background: #b42318;
+}
+
 .approvalPanel .panelHeaderCompact h3 {
   color: #8a4b00;
 }
@@ -1797,14 +1930,47 @@ textarea {
 
 .approvalActions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 10px;
+  border-top: 1px solid #edcf91;
+  padding-top: 12px;
+}
+
+.approvalAllowActions,
+.approvalDismissActions {
+  display: grid;
   gap: 8px;
+}
+
+.approvalAllowActions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.approvalDismissActions {
+  grid-template-columns: repeat(2, minmax(88px, auto));
 }
 
 .approvalActions button {
   min-width: 0;
-  padding: 0 10px;
-  overflow-wrap: anywhere;
+  min-height: 44px;
+  padding: 0 14px;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.approvalSessionButton {
+  background: #147d58;
+}
+
+.approvalDeclineButton {
+  border: 1px solid #d55b52;
+  color: #9f2018;
+  background: #fff7f6;
+}
+
+.approvalActions button[aria-busy="true"] {
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 45%);
 }
 
 .taskInput {
@@ -1876,19 +2042,44 @@ textarea {
     width: 100%;
   }
 
-  .approvalActions {
+  .permissionControl {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .permissionToggle {
+    width: 100%;
+  }
+
+  .fullAccessDialog {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .dialogActions {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
+  }
+
+  .dialogActions button {
+    min-width: 0;
+  }
+
+  .approvalActions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .approvalAllowActions,
+  .approvalDismissActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .approvalActions button {
-    min-height: 36px;
-    padding: 0 6px;
-    overflow: hidden;
-    font-size: 0.82rem;
-    line-height: 1.1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 0.86rem;
   }
 
   .approvalPanel,

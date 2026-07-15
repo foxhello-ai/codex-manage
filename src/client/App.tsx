@@ -1,6 +1,6 @@
 import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata } from "../shared/api";
-import type { ApprovalDecision, ApprovalSummary, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionSummary, SessionStatus, SessionTurnItem, UserSession, WebSessionEvent } from "../shared/models";
+import type { ApprovalDecision, ApprovalSummary, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UserSession, WebSessionEvent } from "../shared/models";
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
@@ -172,6 +172,7 @@ function Dashboard({
   const [commandsError, setCommandsError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DashboardView>("list");
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
+  const [permissionMode, setPermissionMode] = useState<SessionPermissionMode>("default");
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalSummary[]>([]);
   const [liveCommands, setLiveCommands] = useState<LiveCommand[]>([]);
   const [liveMessages, setLiveMessages] = useState<LiveAgentMessage[]>([]);
@@ -256,11 +257,18 @@ function Dashboard({
     }
   }
 
+  function syncRuntimeSnapshot(nextRuntime: RuntimeSnapshot) {
+    setRuntime(nextRuntime);
+    if (nextRuntime.status !== "history") {
+      setPermissionMode(nextRuntime.permissionMode);
+    }
+  }
+
   async function loadRuntime(sessionId: string, options: { silent?: boolean } = {}) {
     if (!options.silent) setRuntimeError(null);
     try {
       const response = await getSessionRuntime(sessionId);
-      setRuntime(response.runtime);
+      syncRuntimeSnapshot(response.runtime);
       lastEventSeqRef.current = Math.max(lastEventSeqRef.current, response.runtime.eventSeq);
     } catch (caught) {
       if (!options.silent) setRuntimeError(caught instanceof Error ? caught.message : "运行状态加载失败");
@@ -288,7 +296,7 @@ function Dashboard({
     const payload = event.payload as Record<string, unknown>;
 
     if (event.type === "session_status" && isRuntimeSnapshot(payload.runtime)) {
-      setRuntime(payload.runtime);
+      syncRuntimeSnapshot(payload.runtime);
       return;
     }
 
@@ -366,6 +374,7 @@ function Dashboard({
     setCommands([]);
     setCommandDiagnostics(null);
     setRuntime(null);
+    setPermissionMode("default");
     setPendingApprovals([]);
     setLiveCommands([]);
     setLiveMessages([]);
@@ -396,7 +405,7 @@ function Dashboard({
       const event = JSON.parse(String(message.data)) as WebSessionEvent;
       if (event.type === "snapshot") {
         const payload = event.payload as Record<string, unknown>;
-        if (isRuntimeSnapshot(payload.runtime)) setRuntime(payload.runtime);
+        if (isRuntimeSnapshot(payload.runtime)) syncRuntimeSnapshot(payload.runtime);
         if (Array.isArray(payload.approvals)) setPendingApprovals(payload.approvals.filter(isApprovalSummary));
         if (Array.isArray(payload.events)) payload.events.forEach((item) => applyRealtimeEvent(item as WebSessionEvent));
         lastEventSeqRef.current = Math.max(lastEventSeqRef.current, event.seq);
@@ -422,8 +431,8 @@ function Dashboard({
     if (!selectedSessionId) return;
     setRuntimeError(null);
     try {
-      const response = await resumeSession(selectedSessionId);
-      setRuntime(response.runtime);
+      const response = await resumeSession(selectedSessionId, permissionMode);
+      syncRuntimeSnapshot(response.runtime);
     } catch (caught) {
       setRuntimeError(caught instanceof Error ? caught.message : "恢复会话失败");
     }
@@ -434,20 +443,40 @@ function Dashboard({
     const sessionId = selectedSessionId;
     setRuntimeError(null);
     try {
-      const response = await sendSessionInput(sessionId, text);
-      setRuntime(response.runtime);
+      const response = await sendSessionInput(sessionId, text, permissionMode);
+      syncRuntimeSnapshot(response.runtime);
       void pollCurrentSessionAfterInput(sessionId);
     } catch (caught) {
       setRuntimeError(caught instanceof Error ? caught.message : "任务发送失败");
     }
   }
 
+  async function handlePermissionModeChange(nextMode: SessionPermissionMode) {
+    if (!selectedSessionId) return;
+    const status = runtime?.status ?? "history";
+    setRuntimeError(null);
+
+    if (status !== "waiting_input") {
+      setPermissionMode(nextMode);
+      return;
+    }
+
+    try {
+      const response = await resumeSession(selectedSessionId, nextMode);
+      syncRuntimeSnapshot(response.runtime);
+    } catch (caught) {
+      setRuntimeError(caught instanceof Error ? caught.message : "权限模式切换失败");
+      throw caught;
+    }
+  }
+
+
   async function handleSubmitApproval(approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) {
     setRuntimeError(null);
     try {
       const response = await submitApproval(approval.threadId, approval.id, decision, answers);
       setPendingApprovals((current) => current.filter((item) => item.id !== approval.id));
-      if (response.runtime) setRuntime(response.runtime);
+      if (response.runtime) syncRuntimeSnapshot(response.runtime);
     } catch (caught) {
       setRuntimeError(caught instanceof Error ? caught.message : "审批处理失败");
     }
@@ -546,12 +575,14 @@ function Dashboard({
                 loadingCommands={loadingCommands}
                 commandsError={commandsError}
                 runtime={runtime}
+                permissionMode={permissionMode}
                 runtimeError={runtimeError}
                 pendingApprovals={pendingApprovals}
                 liveCommands={liveCommands}
                 liveMessages={liveMessages}
                 wsStatus={wsStatus}
                 onResume={handleResume}
+                onPermissionModeChange={handlePermissionModeChange}
                 onSendInput={handleSendInput}
                 onSubmitApproval={handleSubmitApproval}
               />
@@ -661,6 +692,7 @@ function FloatingRuntimeStatus({
         <span title={sessionTitle}>{sessionTitle}</span>
         <div className="floatingRuntimeBadges">
           <span>{wsStatusLabel(wsStatus)}</span>
+          {runtime?.permissionMode === "full_access" ? <span className="fullAccessBadge">完全权限</span> : null}
           {pendingApprovalCount > 0 ? <span className="approvalCount">待审批 {pendingApprovalCount}</span> : null}
         </div>
       </div>
@@ -712,12 +744,14 @@ function SessionDetailPanel({
   loadingCommands,
   commandsError,
   runtime,
+  permissionMode,
   runtimeError,
   pendingApprovals,
   liveCommands,
   liveMessages,
   wsStatus,
   onResume,
+  onPermissionModeChange,
   onSendInput,
   onSubmitApproval
 }: {
@@ -730,12 +764,14 @@ function SessionDetailPanel({
   loadingCommands: boolean;
   commandsError: string | null;
   runtime: RuntimeSnapshot | null;
+  permissionMode: SessionPermissionMode;
   runtimeError: string | null;
   pendingApprovals: ApprovalSummary[];
   liveCommands: LiveCommand[];
   liveMessages: LiveAgentMessage[];
   wsStatus: WebSocketStatus;
   onResume: () => Promise<void>;
+  onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
   onSendInput: (text: string) => Promise<void>;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
@@ -758,7 +794,11 @@ function SessionDetailPanel({
 
   return (
     <div className="detailStack">
-      <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
+      {runtime?.permissionMode === "full_access" ? (
+        pendingApprovals.length > 0 ? <div className="errorBanner">完全权限模式收到未预期的审批请求，系统未自动处理。</div> : null
+      ) : (
+        <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
+      )}
       {!showHistoryDuringLive ? (
         <LiveOutputPanel
           liveMessages={liveMessages}
@@ -779,7 +819,14 @@ function SessionDetailPanel({
         </div>
       </div>
 
-      <RuntimePanel runtime={runtime} wsStatus={wsStatus} error={runtimeError} onResume={onResume} />
+      <RuntimePanel
+        runtime={runtime}
+        permissionMode={permissionMode}
+        wsStatus={wsStatus}
+        error={runtimeError}
+        onResume={onResume}
+        onPermissionModeChange={onPermissionModeChange}
+      />
 
       {hasLiveOutput && !showHistory ? <div className="historyHiddenNotice">实时输出进行中，历史会话内容已隐藏。</div> : null}
       {showHistory ? (
@@ -823,17 +870,24 @@ function SessionDetailPanel({
 
 function RuntimePanel({
   runtime,
+  permissionMode,
   wsStatus,
   error,
-  onResume
+  onResume,
+  onPermissionModeChange
 }: {
   runtime: RuntimeSnapshot | null;
+  permissionMode: SessionPermissionMode;
   wsStatus: WebSocketStatus;
   error: string | null;
   onResume: () => Promise<void>;
+  onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [updatingPermission, setUpdatingPermission] = useState(false);
+  const [confirmFullAccess, setConfirmFullAccess] = useState(false);
   const status = runtime?.status ?? "history";
+  const canChangePermission = status === "history" || status === "waiting_input" || status === "exited" || status === "failed";
 
   async function handleResume() {
     setSubmitting(true);
@@ -844,6 +898,34 @@ function RuntimePanel({
     }
   }
 
+  async function applyPermissionMode(nextMode: SessionPermissionMode) {
+    setUpdatingPermission(true);
+    try {
+      await onPermissionModeChange(nextMode);
+    } finally {
+      setUpdatingPermission(false);
+    }
+  }
+
+  function handlePermissionToggle() {
+    if (!canChangePermission || updatingPermission) return;
+    if (permissionMode === "default") {
+      setConfirmFullAccess(true);
+      return;
+    }
+    void applyPermissionMode("default").catch(() => undefined);
+  }
+
+  async function confirmPermissionMode() {
+    setConfirmFullAccess(false);
+    try {
+      await applyPermissionMode("full_access");
+    } catch {
+      return;
+    }
+  }
+
+
   return (
     <section className="runtimePanel" aria-label="运行状态">
       <div>
@@ -851,17 +933,70 @@ function RuntimePanel({
         <div className="runtimeBadges">
           <StatusBadge status={status} />
           <span>{wsStatusLabel(wsStatus)}</span>
+          <span className={permissionMode === "full_access" ? "permissionBadge fullAccess" : "permissionBadge"}>{permissionMode === "full_access" ? "完全权限" : "需审批"}</span>
           {runtime?.pendingApprovalCount ? <span>待审批 {runtime.pendingApprovalCount}</span> : null}
         </div>
+        <div className="permissionControl">
+          <span className="permissionControlLabel">权限模式</span>
+          <label className={`permissionToggle ${permissionMode === "full_access" ? "enabled" : ""}`}>
+            <input type="checkbox" checked={permissionMode === "full_access"} disabled={!canChangePermission || updatingPermission} onChange={handlePermissionToggle} aria-label="完全权限" />
+            <span className="permissionToggleTrack" aria-hidden="true">
+              <span className="permissionToggleThumb" />
+            </span>
+            <strong>{updatingPermission ? "切换中" : permissionMode === "full_access" ? "已开启" : "需审批"}</strong>
+          </label>
+        </div>
+        {!canChangePermission ? <p className="permissionUnavailable">当前状态不可切换权限模式</p> : null}
         {runtime?.lastError ? <p className="errorText">{runtime.lastError}</p> : null}
         {error ? <p className="errorText">{error}</p> : null}
       </div>
       <button className="ghostButton" type="button" onClick={handleResume} disabled={submitting || status === "starting" || status === "running" || status === "waiting_input" || status === "waiting_approval"}>
         {submitting ? "恢复中" : status === "history" || status === "failed" || status === "exited" ? "恢复会话" : "已恢复"}
       </button>
+      {confirmFullAccess ? (
+        <FullAccessConfirmDialog
+          submitting={updatingPermission}
+          onCancel={() => setConfirmFullAccess(false)}
+          onConfirm={confirmPermissionMode}
+        />
+      ) : null}
     </section>
   );
 }
+
+function FullAccessConfirmDialog({
+  submitting,
+  onCancel,
+  onConfirm
+}: {
+  submitting: boolean;
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  return (
+    <div className="modalBackdrop" role="presentation" onClick={submitting ? undefined : onCancel}>
+      <section className="messageDialog fullAccessDialog" role="dialog" aria-modal="true" aria-labelledby="full-access-title" onClick={(event) => event.stopPropagation()}>
+        <div className="dialogHeader">
+          <div>
+            <h2 id="full-access-title">启用完全权限</h2>
+            <p className="muted">当前会话</p>
+          </div>
+        </div>
+        <div className="dialogBody fullAccessDialogBody">
+          <div className="fullAccessWarning" role="alert">
+            <strong>该会话将跳过审批。</strong>
+            <p>Codex 将以 Web 服务账号获得完整文件系统和网络访问权限。</p>
+          </div>
+          <div className="dialogActions">
+            <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
+            <button className="dangerButton" type="button" onClick={() => void onConfirm()} disabled={submitting}>{submitting ? "启用中" : "确认启用"}</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 
 function ApprovalPanel({
   approvals,
@@ -942,10 +1077,22 @@ function ApprovalCard({
         </div>
       ) : null}
       <div className="approvalActions">
-        <button type="button" onClick={() => submit("accept")} disabled={submitting !== null}>{submitting === "accept" ? "处理中" : "允许"}</button>
-        <button type="button" onClick={() => submit("acceptForSession")} disabled={submitting !== null}>允许本会话</button>
-        <button className="ghostButton" type="button" onClick={() => submit("decline")} disabled={submitting !== null}>拒绝</button>
-        <button className="ghostButton" type="button" onClick={() => submit("cancel")} disabled={submitting !== null}>取消</button>
+        <div className="approvalAllowActions">
+          <button className="approvalAcceptButton" type="button" onClick={() => submit("accept")} disabled={submitting !== null} aria-busy={submitting === "accept"}>
+            {submitting === "accept" ? "正在允许" : "允许一次"}
+          </button>
+          <button className="approvalSessionButton" type="button" onClick={() => submit("acceptForSession")} disabled={submitting !== null} aria-busy={submitting === "acceptForSession"}>
+            {submitting === "acceptForSession" ? "正在设置" : "本会话允许"}
+          </button>
+        </div>
+        <div className="approvalDismissActions">
+          <button className="approvalDeclineButton" type="button" onClick={() => submit("decline")} disabled={submitting !== null} aria-busy={submitting === "decline"}>
+            {submitting === "decline" ? "正在拒绝" : "拒绝"}
+          </button>
+          <button className="ghostButton" type="button" onClick={() => submit("cancel")} disabled={submitting !== null} aria-busy={submitting === "cancel"}>
+            {submitting === "cancel" ? "正在取消" : "取消"}
+          </button>
+        </div>
       </div>
     </article>
   );
@@ -1766,7 +1913,9 @@ function wsStatusLabel(status: WebSocketStatus): string {
 }
 
 function isRuntimeSnapshot(value: unknown): value is RuntimeSnapshot {
-  return Boolean(value && typeof value === "object" && typeof (value as RuntimeSnapshot).threadId === "string");
+  if (!value || typeof value !== "object") return false;
+  const runtime = value as RuntimeSnapshot;
+  return typeof runtime.threadId === "string" && (runtime.permissionMode === "default" || runtime.permissionMode === "full_access");
 }
 
 function isApprovalSummary(value: unknown): value is ApprovalSummary {
