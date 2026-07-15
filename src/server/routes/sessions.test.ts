@@ -242,4 +242,54 @@ describe("session routes", () => {
     expect(submittedBody).toEqual({ text: "继续", permissionMode: "full_access" });
   });
 
+  it("submits one approval decision through the API", async () => {
+    let submitted: { threadId: string; approvalId: string; body: unknown } | null = null;
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => {
+          throw new Error("not used");
+        },
+        getSessionDetail: async () => {
+          throw new Error("not used");
+        }
+      },
+      undefined,
+      {
+        getRuntime: (() => {
+          throw new Error("not used");
+        }) as any,
+        resumeThread: (() => {
+          throw new Error("not used");
+        }) as any,
+        sendInput: (() => {
+          throw new Error("not used");
+        }) as any,
+        submitApproval: ((threadId: string, approvalId: string, body: unknown) => {
+          submitted = { threadId, approvalId, body };
+          return {
+            approval: { id: approvalId, threadId, status: "approved" },
+            runtime: null
+          };
+        }) as any,
+        eventHub: {} as any,
+        approvalService: {} as any
+      }
+    );
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions/thread-1/approvals/approval-1",
+      payload: { decision: "accept", answers: { environment: ["生产"] } }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ approval: { id: "approval-1", status: "approved" } });
+    expect(submitted).toEqual({
+      threadId: "thread-1",
+      approvalId: "approval-1",
+      body: { decision: "accept", answers: { environment: ["生产"] } }
+    });
+  });
+
 });

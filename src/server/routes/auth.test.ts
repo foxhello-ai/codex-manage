@@ -61,6 +61,12 @@ describe("auth routes", () => {
     });
     expect(blocked.statusCode).toBe(401);
 
+    const blockedHealth = await app.inject({
+      method: "GET",
+      url: "/api/health"
+    });
+    expect(blockedHealth.statusCode).toBe(401);
+
     const login = await app.inject({
       method: "POST",
       url: "/api/login",
