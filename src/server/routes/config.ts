@@ -7,19 +7,33 @@ export function registerConfigRoutes(
   config: AppConfig,
   getRuntimeSnapshot?: () => RuntimeSnapshot
 ) {
-  app.get("/api/config", async () => ({
-    host: config.host,
-    port: config.port,
-    codexCliPath: config.codexCliPath,
-    sessionsDir: config.sessionsDir,
-    defaultPassword: false,
-    codexCliVersion: getRuntimeSnapshot?.().codexCliVersion ?? null,
-    codexVersionError: getRuntimeSnapshot?.().codexVersionError ?? null,
-    appServer: getRuntimeSnapshot?.().appServer ?? null
-  }));
+  app.get("/api/config", async () => {
+    const runtime = getRuntimeSnapshot?.();
+    return {
+      host: config.host,
+      port: config.port,
+      codexCliPath: config.codexCliPath,
+      sessionsDir: config.sessionsDir,
+      defaultPassword: config.defaultPassword,
+      codexCliVersion: runtime?.codexCliVersion ?? null,
+      codexVersionError: runtime?.codexVersionError ?? null,
+      appServer: runtime?.appServer ?? null
+    };
+  });
 
-  app.get("/api/health", async () => ({
-    ok: true,
-    appServer: getRuntimeSnapshot?.().appServer ?? null
-  }));
+  app.get("/api/health", async () => {
+    const runtime = getRuntimeSnapshot?.();
+    const appServer = runtime?.appServer ?? null;
+    const codexAvailable = Boolean(runtime?.codexCliVersion);
+    return {
+      ok: codexAvailable && appServer?.status === "ready" && appServer.initialized,
+      checkedAt: new Date().toISOString(),
+      codexCli: {
+        available: codexAvailable,
+        version: runtime?.codexCliVersion ?? null,
+        error: runtime?.codexVersionError ?? null
+      },
+      appServer
+    };
+  });
 }

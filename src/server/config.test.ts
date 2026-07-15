@@ -26,6 +26,7 @@ describe("loadConfig", () => {
     expect(config.host).toBe("0.0.0.0");
     expect(config.port).toBe(3000);
     expect(config.password).toBe("fmzh2026");
+    expect(config.defaultPassword).toBe(true);
     expect(config.codexCliPath).toBe("codex");
     expect(config.sessionsDir).toContain(".codex/sessions");
     expect(config.metadataFile).toContain(".codex-manage/session-metadata.json");
@@ -37,6 +38,22 @@ describe("loadConfig", () => {
       } else {
         process.env[key] = value;
       }
+    }
+  });
+
+  it("records when the password comes from the environment", () => {
+    const previousPassword = process.env.CODEX_WEB_PASSWORD;
+    process.env.CODEX_WEB_PASSWORD = "configured-password";
+
+    const config = loadConfig();
+
+    expect(config.password).toBe("configured-password");
+    expect(config.defaultPassword).toBe(false);
+
+    if (previousPassword === undefined) {
+      delete process.env.CODEX_WEB_PASSWORD;
+    } else {
+      process.env.CODEX_WEB_PASSWORD = previousPassword;
     }
   });
 });

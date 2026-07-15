@@ -141,6 +141,12 @@ h2 {
   font-size: 1.2rem;
 }
 
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .ghostButton {
   border: 1px solid #c9d1d9;
   color: #172026;
@@ -719,6 +725,125 @@ h2 {
   gap: 12px;
 }
 
+.healthOverview {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-left: 6px solid #7a8791;
+  padding: 16px 18px;
+  background: #ffffff;
+}
+
+.healthOverview.healthy {
+  border-left-color: #1f7a4c;
+  background: #f1faf5;
+}
+
+.healthOverview.unhealthy {
+  border-left-color: #b42318;
+  background: #fff5f5;
+}
+
+.healthOverview p {
+  margin: 0 0 4px;
+  color: #5f6f7a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.healthOverview strong {
+  font-size: 1.2rem;
+}
+
+.healthOverview > span {
+  color: #5f6f7a;
+  font-size: 0.86rem;
+}
+
+.settingsSection {
+  display: grid;
+  gap: 0;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.settingsSectionHeader {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #d9e0e7;
+  padding: 0 16px;
+  background: #f6f7f9;
+}
+
+.settingsSectionHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.settingsSectionHeader > span {
+  color: #5f6f7a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.settingsRows {
+  display: grid;
+}
+
+.settingsRow {
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: minmax(140px, 0.35fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #edf0f2;
+  padding: 10px 16px;
+}
+
+.settingsRow:last-child {
+  border-bottom: 0;
+}
+
+.settingsRow span {
+  color: #5f6f7a;
+}
+
+.settingsRow strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.monospaceValue {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.diagnosticBadge {
+  border: 1px solid #c9d1d9;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.diagnosticBadge.ready {
+  border-color: #9ccbb2;
+  color: #155d39;
+  background: #eaf7f0;
+}
+
+.diagnosticBadge.failed {
+  border-color: #f2b8b5;
+  color: #b42318;
+  background: #fff5f5;
+}
+
 .sessionList {
   display: grid;
   gap: 16px;
@@ -966,6 +1091,16 @@ h2 {
     padding: 0 16px;
   }
 
+  .topbarActions {
+    gap: 6px;
+  }
+
+  .topbarActions .iconButton {
+    width: 42px;
+    min-width: 42px;
+    min-height: 42px;
+  }
+
   .content {
     padding: 16px;
   }
@@ -1023,6 +1158,24 @@ h2 {
 
   .detailEyebrow {
     font-size: 0.72rem;
+  }
+
+  .healthOverview {
+    min-height: 82px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .settingsRow {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    padding: 12px 14px;
+  }
+
+  .settingsRow strong {
+    text-align: left;
   }
 
   .mobileOnly {

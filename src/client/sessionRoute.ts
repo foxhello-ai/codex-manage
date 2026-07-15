@@ -1,11 +1,16 @@
 export type SessionRoute =
   | { kind: "list" }
+  | { kind: "settings" }
   | { kind: "detail"; sessionId: string }
   | { kind: "invalid"; message: string };
 
 export function parseSessionRoute(pathname: string): SessionRoute {
   if (pathname === "" || pathname === "/") {
     return { kind: "list" };
+  }
+
+  if (pathname === "/settings") {
+    return { kind: "settings" };
   }
 
   if (!pathname.startsWith("/") || pathname.slice(1).includes("/")) {

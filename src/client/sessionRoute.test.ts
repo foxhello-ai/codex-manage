@@ -7,6 +7,10 @@ describe("session routes", () => {
     expect(parseSessionRoute("")).toEqual({ kind: "list" });
   });
 
+  it("parses the reserved settings path", () => {
+    expect(parseSessionRoute("/settings")).toEqual({ kind: "settings" });
+  });
+
   it("parses and decodes one session path segment", () => {
     expect(parseSessionRoute("/thread-123")).toEqual({ kind: "detail", sessionId: "thread-123" });
     expect(parseSessionRoute("/thread%20name")).toEqual({ kind: "detail", sessionId: "thread name" });

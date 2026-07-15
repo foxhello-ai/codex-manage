@@ -6,6 +6,7 @@ type AppConfig = {
   host: string;
   port: number;
   password: string;
+  defaultPassword: boolean;
   sessionSecret: string;
   codexCliPath: string;
   sessionsDir: string;
@@ -26,6 +27,7 @@ function expandHome(path: string): string {
 }
 
 export function loadConfig(): AppConfig {
+  const defaultPassword = process.env.CODEX_WEB_PASSWORD === undefined;
   const password = process.env.CODEX_WEB_PASSWORD ?? "fmzh2026";
   const sessionSecret = process.env.CODEX_WEB_SESSION_SECRET ?? randomBytes(32).toString("hex");
 
@@ -33,6 +35,7 @@ export function loadConfig(): AppConfig {
     host: process.env.CODEX_WEB_HOST ?? "0.0.0.0",
     port: readPort(process.env.CODEX_WEB_PORT, 3000),
     password,
+    defaultPassword,
     sessionSecret,
     codexCliPath: process.env.CODEX_CLI_PATH ?? "codex",
     sessionsDir: expandHome(process.env.CODEX_SESSIONS_DIR ?? "~/.codex/sessions"),

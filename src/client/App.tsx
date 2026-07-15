@@ -1,12 +1,12 @@
 import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata } from "../shared/api";
-import type { ApprovalDecision, ApprovalSummary, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UserSession, WebSessionEvent } from "../shared/models";
+import { getHealthStatus, getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata } from "../shared/api";
+import type { ApprovalDecision, ApprovalSummary, HealthStatus, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UserSession, WebSessionEvent } from "../shared/models";
 import { isTaskSendShortcut, shouldAutoFollowLiveOutput } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
-type DashboardView = "list" | "detail" | "invalid";
+type DashboardView = "list" | "settings" | "detail" | "invalid";
 
 type LiveCommand = {
   id: string;
@@ -163,6 +163,10 @@ function Dashboard({
   onLogout: () => Promise<void>;
 }) {
   const [initialRoute] = useState(() => parseSessionRoute(window.location.pathname));
+  const [currentConfig, setCurrentConfig] = useState(config);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(initialRoute.kind === "settings");
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [search, setSearch] = useState("");
   const [loadingSessions, setLoadingSessions] = useState(true);
@@ -191,11 +195,11 @@ function Dashboard({
   const selectedSessionIdRef = useRef<string | null>(initialRoute.kind === "detail" ? initialRoute.sessionId : null);
 
   const listenAddress = useMemo(() => {
-    if (!config) return "读取中";
-    return `${config.host}:${config.port}`;
-  }, [config]);
-  const appServerStatus = config?.appServer
-    ? `${config.appServer.status}${config.appServer.initialized ? " / initialized" : ""}`
+    if (!currentConfig) return "读取中";
+    return `${currentConfig.host}:${currentConfig.port}`;
+  }, [currentConfig]);
+  const appServerStatus = currentConfig?.appServer
+    ? `${currentConfig.appServer.status}${currentConfig.appServer.initialized ? " / initialized" : ""}`
     : "未连接";
   const selectedSession = sessions.find((session) => session.id === selectedSessionId)
     ?? (sessionDetail?.id === selectedSessionId ? sessionDetail : null);
@@ -214,10 +218,28 @@ function Dashboard({
     }
   }
 
+  async function loadDiagnostics() {
+    setLoadingDiagnostics(true);
+    setDiagnosticsError(null);
+
+    try {
+      const [nextConfig, nextHealth] = await Promise.all([getPublicConfig(), getHealthStatus()]);
+      setCurrentConfig(nextConfig);
+      setHealth(nextHealth);
+    } catch (caught) {
+      setDiagnosticsError(caught instanceof Error ? caught.message : "诊断信息加载失败");
+    } finally {
+      setLoadingDiagnostics(false);
+    }
+  }
+
   useEffect(() => {
     void loadSessions("");
     if (initialRoute.kind === "detail") {
       void refreshCurrentSession(initialRoute.sessionId);
+    }
+    if (initialRoute.kind === "settings") {
+      void loadDiagnostics();
     }
   }, []);
 
@@ -418,6 +440,13 @@ function Dashboard({
       return;
     }
 
+    if (route.kind === "settings") {
+      setRouteError(null);
+      setViewMode("settings");
+      void loadDiagnostics();
+      return;
+    }
+
     if (route.kind === "invalid") {
       resetSessionDetailState(null);
       setRouteError(route.message);
@@ -565,6 +594,11 @@ function Dashboard({
     setViewMode("list");
   }
 
+  function handleOpenSettings() {
+    if (window.location.pathname !== "/settings") window.history.pushState(null, "", "/settings");
+    applySessionRoute({ kind: "settings" });
+  }
+
   function renderSessionBrowser(showHeading = true) {
     return (
       <SessionBrowser
@@ -584,7 +618,24 @@ function Dashboard({
   }
 
   return (
-    <Shell title="Codex Manage" action={<button className="ghostButton" onClick={onLogout}>登出</button>}>
+    <Shell
+      title="Codex Manage"
+      action={(
+        <div className="topbarActions">
+          <button
+            className="iconButton"
+            type="button"
+            aria-label="打开设置和诊断"
+            title="设置和诊断"
+            onClick={handleOpenSettings}
+            disabled={viewMode === "settings"}
+          >
+            <span aria-hidden="true">⚙</span>
+          </button>
+          <button className="ghostButton" onClick={onLogout}>登出</button>
+        </div>
+      )}
+    >
       {defaultPassword ? (
         <div className="warning" role="status">
           当前密码可通过 CODEX_WEB_PASSWORD 覆盖。
@@ -607,7 +658,7 @@ function Dashboard({
 
           <section className="infoGrid compact" aria-label="当前配置">
             <InfoItem label="监听地址" value={listenAddress} />
-            <InfoItem label="Codex 版本" value={config?.codexCliVersion ?? config?.codexVersionError ?? "读取中"} />
+            <InfoItem label="Codex 版本" value={currentConfig?.codexCliVersion ?? currentConfig?.codexVersionError ?? "读取中"} />
             <InfoItem label="App Server" value={appServerStatus} />
           </section>
 
@@ -670,6 +721,15 @@ function Dashboard({
             )}
           </section>
         </>
+      ) : viewMode === "settings" ? (
+        <SettingsPage
+          config={currentConfig}
+          health={health}
+          loading={loadingDiagnostics}
+          error={diagnosticsError}
+          onBack={handleBackToList}
+          onRefresh={loadDiagnostics}
+        />
       ) : (
         <>
           <section className="toolbar detailToolbar">
@@ -692,7 +752,7 @@ function Dashboard({
         </>
       )}
 
-      {selectedSession ? (
+      {viewMode === "detail" && selectedSession ? (
         <FloatingRuntimeStatus
           sessionTitle={selectedSession.title}
           runtime={runtime}
@@ -711,6 +771,98 @@ const MAX_VISIBLE_LIVE_MESSAGES = 20;
 const MAX_VISIBLE_LIVE_COMMANDS = 20;
 const MAX_LIVE_COMMAND_OUTPUT_CHARS = 12000;
 const FLOATING_RUNTIME_POSITION_KEY = "codex-manage-floating-runtime-position";
+
+function SettingsPage({
+  config,
+  health,
+  loading,
+  error,
+  onBack,
+  onRefresh
+}: {
+  config: PublicConfig | null;
+  health: HealthStatus | null;
+  loading: boolean;
+  error: string | null;
+  onBack: () => void;
+  onRefresh: () => Promise<void>;
+}) {
+  const appServer = health?.appServer ?? config?.appServer ?? null;
+  const cliAvailable = health?.codexCli.available ?? Boolean(config?.codexCliVersion);
+  const statusClass = health?.ok ? "healthy" : health ? "unhealthy" : "unknown";
+  const statusText = loading && !health ? "检查中" : health?.ok ? "运行正常" : health ? "需要检查" : "状态未知";
+
+  return (
+    <>
+      <section className="toolbar detailToolbar">
+        <div className="detailTitleBar">
+          <button className="iconButton" aria-label="返回会话列表" title="返回会话列表" onClick={onBack}>
+            <span aria-hidden="true">←</span>
+          </button>
+          <div>
+            <p className="detailEyebrow">系统</p>
+            <h2>设置和诊断</h2>
+          </div>
+        </div>
+        <div className="toolbarActions">
+          <button className="ghostButton" type="button" onClick={() => void onRefresh()} disabled={loading}>
+            {loading ? "检查中" : "重新检查"}
+          </button>
+        </div>
+      </section>
+
+      <section className={`healthOverview ${statusClass}`} aria-label="系统健康状态">
+        <div>
+          <p>系统健康</p>
+          <strong>{statusText}</strong>
+        </div>
+        <span>{health?.checkedAt ? formatDateTime(health.checkedAt) : "尚未检查"}</span>
+      </section>
+
+      {error ? <div className="errorBanner">{error}</div> : null}
+      {config?.codexVersionError ? <div className="errorBanner">Codex CLI：{config.codexVersionError}</div> : null}
+      {appServer?.lastError ? <div className="errorBanner">App Server：{appServer.lastError}</div> : null}
+
+      <section className="settingsSection" aria-labelledby="web-settings-title">
+        <div className="settingsSectionHeader">
+          <h3 id="web-settings-title">Web 服务</h3>
+          <span>只读</span>
+        </div>
+        <div className="settingsRows">
+          <SettingsRow label="监听地址" value={config?.host ?? "读取中"} />
+          <SettingsRow label="监听端口" value={config ? String(config.port) : "读取中"} />
+          <SettingsRow label="登录密码" value={config ? (config.defaultPassword ? "使用默认密码" : "环境变量已覆盖") : "读取中"} />
+          <SettingsRow label="Sessions 目录" value={config?.sessionsDir ?? "读取中"} monospace />
+        </div>
+      </section>
+
+      <section className="settingsSection" aria-labelledby="codex-settings-title">
+        <div className="settingsSectionHeader">
+          <h3 id="codex-settings-title">Codex 运行环境</h3>
+          <span className={`diagnosticBadge ${cliAvailable ? "ready" : "failed"}`}>
+            {cliAvailable ? "CLI 可用" : "CLI 不可用"}
+          </span>
+        </div>
+        <div className="settingsRows">
+          <SettingsRow label="Codex CLI 路径" value={config?.codexCliPath ?? "读取中"} monospace />
+          <SettingsRow label="Codex CLI 版本" value={health?.codexCli.version ?? config?.codexCliVersion ?? "未读取"} />
+          <SettingsRow label="App Server 状态" value={appServer ? appServerStatusLabel(appServer.status) : "未连接"} />
+          <SettingsRow label="初始化" value={appServer?.initialized ? "已完成" : "未完成"} />
+          <SettingsRow label="进程 ID" value={appServer?.pid ? String(appServer.pid) : "无"} monospace />
+        </div>
+      </section>
+    </>
+  );
+}
+
+function SettingsRow({ label, value, monospace = false }: { label: string; value: string; monospace?: boolean }) {
+  return (
+    <div className="settingsRow">
+      <span>{label}</span>
+      <strong className={monospace ? "monospaceValue" : undefined}>{value}</strong>
+    </div>
+  );
+}
 
 type FloatingPosition = {
   x: number;
@@ -2031,6 +2183,22 @@ function wsStatusLabel(status: WebSocketStatus): string {
     case "idle":
     default:
       return "实时未连接";
+  }
+}
+
+function appServerStatusLabel(status: NonNullable<PublicConfig["appServer"]>["status"]): string {
+  switch (status) {
+    case "ready":
+      return "运行正常";
+    case "starting":
+      return "启动中";
+    case "failed":
+      return "启动失败";
+    case "exited":
+      return "已退出";
+    case "idle":
+    default:
+      return "未启动";
   }
 }
 

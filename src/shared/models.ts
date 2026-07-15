@@ -3,6 +3,13 @@ export type UserSession = {
   defaultPassword: boolean;
 };
 
+export type AppServerSnapshot = {
+  status: "idle" | "starting" | "ready" | "failed" | "exited";
+  pid: number | null;
+  lastError: string | null;
+  initialized: boolean;
+};
+
 export type PublicConfig = {
   host: string;
   port: number;
@@ -11,12 +18,18 @@ export type PublicConfig = {
   defaultPassword: boolean;
   codexCliVersion: string | null;
   codexVersionError: string | null;
-  appServer: {
-    status: "idle" | "starting" | "ready" | "failed" | "exited";
-    pid: number | null;
-    lastError: string | null;
-    initialized: boolean;
-  } | null;
+  appServer: AppServerSnapshot | null;
+};
+
+export type HealthStatus = {
+  ok: boolean;
+  checkedAt: string;
+  codexCli: {
+    available: boolean;
+    version: string | null;
+    error: string | null;
+  };
+  appServer: AppServerSnapshot | null;
 };
 
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";

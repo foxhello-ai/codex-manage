@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, InputResponse, PublicConfig, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, HealthStatus, InputResponse, PublicConfig, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UserSession } from "./models";
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -29,6 +29,10 @@ export function getMe(): Promise<UserSession> {
 
 export function getPublicConfig(): Promise<PublicConfig> {
   return apiRequest<PublicConfig>("/api/config");
+}
+
+export function getHealthStatus(): Promise<HealthStatus> {
+  return apiRequest<HealthStatus>("/api/health");
 }
 
 export function login(password: string): Promise<UserSession> {
