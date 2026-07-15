@@ -2,10 +2,11 @@ import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, 
 import { getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UserSession, WebSessionEvent } from "../shared/models";
 import { isTaskSendShortcut, shouldAutoFollowLiveOutput } from "./sessionInteractions";
+import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
-type DashboardView = "list" | "detail";
+type DashboardView = "list" | "detail" | "invalid";
 
 type LiveCommand = {
   id: string;
@@ -161,19 +162,23 @@ function Dashboard({
   defaultPassword: boolean;
   onLogout: () => Promise<void>;
 }) {
+  const [initialRoute] = useState(() => parseSessionRoute(window.location.pathname));
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [search, setSearch] = useState("");
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    initialRoute.kind === "detail" ? initialRoute.sessionId : null
+  );
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(initialRoute.kind === "detail");
   const [detailError, setDetailError] = useState<string | null>(null);
   const [commands, setCommands] = useState<SessionCommand[]>([]);
   const [commandDiagnostics, setCommandDiagnostics] = useState<SessionCommandDiagnostics | null>(null);
-  const [loadingCommands, setLoadingCommands] = useState(false);
+  const [loadingCommands, setLoadingCommands] = useState(initialRoute.kind === "detail");
   const [commandsError, setCommandsError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<DashboardView>("list");
+  const [viewMode, setViewMode] = useState<DashboardView>(initialRoute.kind === "list" ? "list" : initialRoute.kind);
+  const [routeError, setRouteError] = useState<string | null>(initialRoute.kind === "invalid" ? initialRoute.message : null);
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
   const [permissionMode, setPermissionMode] = useState<SessionPermissionMode>("default");
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalSummary[]>([]);
@@ -183,7 +188,7 @@ function Dashboard({
   const [wsReconnectKey, setWsReconnectKey] = useState(0);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const lastEventSeqRef = useRef(0);
-  const selectedSessionIdRef = useRef<string | null>(null);
+  const selectedSessionIdRef = useRef<string | null>(initialRoute.kind === "detail" ? initialRoute.sessionId : null);
 
   const listenAddress = useMemo(() => {
     if (!config) return "读取中";
@@ -192,7 +197,8 @@ function Dashboard({
   const appServerStatus = config?.appServer
     ? `${config.appServer.status}${config.appServer.initialized ? " / initialized" : ""}`
     : "未连接";
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null;
+  const selectedSession = sessions.find((session) => session.id === selectedSessionId)
+    ?? (sessionDetail?.id === selectedSessionId ? sessionDetail : null);
 
   async function loadSessions(nextSearch = search) {
     setLoadingSessions(true);
@@ -201,13 +207,6 @@ function Dashboard({
     try {
       const response = await getSessions(nextSearch);
       setSessions(response.sessions);
-      if (selectedSessionId && !response.sessions.some((session) => session.id === selectedSessionId)) {
-        setSelectedSessionId(null);
-        setViewMode("list");
-        setSessionDetail(null);
-        setCommands([]);
-        setCommandDiagnostics(null);
-      }
     } catch (caught) {
       setSessionError(caught instanceof Error ? caught.message : "会话列表加载失败");
     } finally {
@@ -216,7 +215,19 @@ function Dashboard({
   }
 
   useEffect(() => {
-    loadSessions("");
+    void loadSessions("");
+    if (initialRoute.kind === "detail") {
+      void refreshCurrentSession(initialRoute.sessionId);
+    }
+  }, []);
+
+  useEffect(() => {
+    function handlePopState() {
+      applySessionRoute(parseSessionRoute(window.location.pathname));
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
   useEffect(() => {
@@ -234,12 +245,14 @@ function Dashboard({
 
     try {
       const response = await getSessionDetail(sessionId);
+      if (selectedSessionIdRef.current !== sessionId) return;
       setSessionDetail(response.session);
     } catch (caught) {
+      if (selectedSessionIdRef.current !== sessionId) return;
       if (!options.silent) setSessionDetail(null);
       setDetailError(caught instanceof Error ? caught.message : "会话详情加载失败");
     } finally {
-      if (!options.silent) setLoadingDetail(false);
+      if (!options.silent && selectedSessionIdRef.current === sessionId) setLoadingDetail(false);
     }
   }
 
@@ -250,13 +263,15 @@ function Dashboard({
 
     try {
       const response = await getSessionCommands(sessionId);
+      if (selectedSessionIdRef.current !== sessionId) return;
       setCommands(response.commands);
       setCommandDiagnostics(response.diagnostics);
     } catch (caught) {
+      if (selectedSessionIdRef.current !== sessionId) return;
       if (!options.silent) setCommands([]);
       setCommandsError(caught instanceof Error ? caught.message : "历史命令加载失败");
     } finally {
-      if (!options.silent) setLoadingCommands(false);
+      if (!options.silent && selectedSessionIdRef.current === sessionId) setLoadingCommands(false);
     }
   }
 
@@ -271,9 +286,11 @@ function Dashboard({
     if (!options.silent) setRuntimeError(null);
     try {
       const response = await getSessionRuntime(sessionId);
+      if (selectedSessionIdRef.current !== sessionId) return;
       syncRuntimeSnapshot(response.runtime);
       lastEventSeqRef.current = Math.max(lastEventSeqRef.current, response.runtime.eventSeq);
     } catch (caught) {
+      if (selectedSessionIdRef.current !== sessionId) return;
       if (!options.silent) setRuntimeError(caught instanceof Error ? caught.message : "运行状态加载失败");
     }
   }
@@ -295,6 +312,7 @@ function Dashboard({
   }
 
   function applyRealtimeEvent(event: WebSessionEvent) {
+    if (selectedSessionIdRef.current !== event.threadId) return;
     lastEventSeqRef.current = Math.max(lastEventSeqRef.current, event.seq);
     const payload = event.payload as Record<string, unknown>;
 
@@ -378,8 +396,9 @@ function Dashboard({
     }
   }
 
-  function handleSelectSession(session: SessionSummary) {
-    setSelectedSessionId(session.id);
+  function resetSessionDetailState(sessionId: string | null) {
+    selectedSessionIdRef.current = sessionId;
+    setSelectedSessionId(sessionId);
     setSessionDetail(null);
     setCommands([]);
     setCommandDiagnostics(null);
@@ -390,8 +409,32 @@ function Dashboard({
     setLiveMessages([]);
     setRuntimeError(null);
     lastEventSeqRef.current = 0;
+  }
+
+  function applySessionRoute(route: SessionRoute) {
+    if (route.kind === "list") {
+      setRouteError(null);
+      setViewMode("list");
+      return;
+    }
+
+    if (route.kind === "invalid") {
+      resetSessionDetailState(null);
+      setRouteError(route.message);
+      setViewMode("invalid");
+      return;
+    }
+
+    resetSessionDetailState(route.sessionId);
+    setRouteError(null);
     setViewMode("detail");
-    refreshCurrentSession(session.id);
+    void refreshCurrentSession(route.sessionId);
+  }
+
+  function handleSelectSession(session: SessionSummary) {
+    const path = buildSessionDetailPath(session.id);
+    if (window.location.pathname !== path) window.history.pushState(null, "", path);
+    applySessionRoute({ kind: "detail", sessionId: session.id });
   }
 
   function handleMetadataSaved(updated: SessionSummary) {
@@ -517,6 +560,8 @@ function Dashboard({
   }
 
   function handleBackToList() {
+    if (window.location.pathname !== "/") window.history.pushState(null, "", "/");
+    setRouteError(null);
     setViewMode("list");
   }
 
@@ -570,7 +615,7 @@ function Dashboard({
             {renderSessionBrowser()}
           </section>
         </>
-      ) : (
+      ) : viewMode === "detail" ? (
         <>
           <section className="toolbar detailToolbar">
             <div className="detailTitleBar">
@@ -579,7 +624,9 @@ function Dashboard({
               </button>
               <div>
                 <p className="detailEyebrow">当前会话</p>
-                <h2 title={selectedSession?.title ?? "会话不存在或已被过滤"}>{selectedSession?.title ?? "会话不存在或已被过滤"}</h2>
+                <h2 title={selectedSession?.title ?? selectedSessionId ?? "会话加载失败"}>
+                  {selectedSession?.title ?? (loadingDetail ? "正在加载会话..." : "会话加载失败")}
+                </h2>
               </div>
             </div>
             <div className="toolbarActions">
@@ -613,9 +660,34 @@ function Dashboard({
                 onSendInput={handleSendInput}
                 onSubmitApproval={handleSubmitApproval}
               />
+            ) : loadingDetail ? (
+              <div className="emptyState">正在加载会话详情...</div>
             ) : (
-              <div className="emptyState">会话不存在或已被过滤，请返回会话列表重新选择。</div>
+              <div className="routeErrorState">
+                <div className="errorBanner">{detailError ?? "会话不存在或无法读取"}</div>
+                <button className="ghostButton" type="button" onClick={handleBackToList}>返回会话列表</button>
+              </div>
             )}
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="toolbar detailToolbar">
+            <div className="detailTitleBar">
+              <button className="iconButton" aria-label="返回会话列表" title="返回会话列表" onClick={handleBackToList}>
+                <span aria-hidden="true">←</span>
+              </button>
+              <div>
+                <p className="detailEyebrow">会话链接</p>
+                <h2>无法打开会话</h2>
+              </div>
+            </div>
+          </section>
+          <section className="sessionDetail" aria-label="会话链接错误">
+            <div className="routeErrorState">
+              <div className="errorBanner">{routeError ?? "会话链接格式不正确"}</div>
+              <button className="ghostButton" type="button" onClick={handleBackToList}>返回会话列表</button>
+            </div>
           </section>
         </>
       )}

@@ -713,6 +713,12 @@ h2 {
   background: #fff5f5;
 }
 
+.routeErrorState {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
 .sessionList {
   display: grid;
   gap: 16px;
