@@ -29,6 +29,59 @@ describe("RuntimeManager", () => {
     expect(first.status).toBe("waiting_input");
     expect(second.status).toBe("waiting_input");
     expect(appServer.requests.filter((request) => request.method === "thread/resume")).toHaveLength(1);
+    expect(appServer.requests[0].params).toEqual({ threadId: "thread-1" });
+  });
+
+  it("applies full access and updates permission settings while waiting for input", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    const fullAccessRuntime = await manager.resumeThread("thread-1", { permissionMode: "full_access" });
+
+    expect(fullAccessRuntime.permissionMode).toBe("full_access");
+    expect(appServer.requests[0]).toEqual({
+      method: "thread/resume",
+      params: {
+        threadId: "thread-1",
+        sandbox: "danger-full-access",
+        approvalPolicy: "never"
+      }
+    });
+
+    const defaultRuntime = await manager.resumeThread("thread-1", { permissionMode: "default" });
+
+    expect(defaultRuntime.permissionMode).toBe("default");
+    expect(appServer.requests[1]).toEqual({
+      method: "thread/settings/update",
+      params: {
+        threadId: "thread-1",
+        approvalPolicy: "on-request",
+        permissions: ":workspace"
+      }
+    });
+
+    const fullAccessAgain = await manager.resumeThread("thread-1", { permissionMode: "full_access" });
+
+    expect(fullAccessAgain.permissionMode).toBe("full_access");
+    expect(appServer.requests[2]).toEqual({
+      method: "thread/settings/update",
+      params: {
+        threadId: "thread-1",
+        approvalPolicy: "never",
+        sandboxPolicy: { type: "dangerFullAccess" }
+      }
+    });
+  });
+
+  it("rejects permission changes while a turn is running", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    await manager.resumeThread("thread-1");
+    await manager.sendInput("thread-1", { text: "继续" });
+
+    await expect(manager.resumeThread("thread-1", { permissionMode: "full_access" })).rejects.toThrow("暂时不能切换权限模式");
+    expect(appServer.requests.some((request) => request.method === "thread/settings/update")).toBe(false);
   });
 
   it("starts a turn when sending input", async () => {

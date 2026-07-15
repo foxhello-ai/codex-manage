@@ -2,11 +2,12 @@ import type { JsonRpcNotification, JsonRpcRequest } from "./CodexAppServerClient
 import { ApprovalService } from "./ApprovalService";
 import { EventHub } from "./EventHub";
 import type { CodexAppServerClient } from "./CodexAppServerClient";
-import type { ApprovalDecision, ApprovalResponse, RuntimeSnapshot, RuntimeStatus } from "../../shared/models";
+import type { ApprovalDecision, ApprovalResponse, RuntimeSnapshot, RuntimeStatus, SessionPermissionMode } from "../../shared/models";
 
 type RuntimeState = {
   threadId: string;
   status: RuntimeStatus;
+  permissionMode: SessionPermissionMode;
   activeTurnId: string | null;
   startedAt: string;
   updatedAt: string;
@@ -15,6 +16,7 @@ type RuntimeState = {
 
 type SendInputParams = {
   text: string;
+  permissionMode?: SessionPermissionMode;
 };
 
 type SubmitApprovalParams = {
@@ -38,16 +40,28 @@ export class RuntimeManager {
     this.appServer.on("error", (error: Error) => this.markAllFailed(error.message));
   }
 
-  async resumeThread(threadId: string): Promise<RuntimeSnapshot> {
+  async resumeThread(threadId: string, options: { permissionMode?: SessionPermissionMode } = {}): Promise<RuntimeSnapshot> {
     const current = this.runtimes.get(threadId);
     if (current && current.status !== "failed" && current.status !== "exited") {
+      const permissionMode = options.permissionMode;
+      if (permissionMode && permissionMode !== current.permissionMode) {
+        if (current.status !== "waiting_input") {
+          throw new Error("会话运行中或正在等待审批，暂时不能切换权限模式");
+        }
+        await this.appServer.request("thread/settings/update", buildPermissionSettings(threadId, permissionMode));
+        this.setRuntime(threadId, { permissionMode, lastError: null });
+      }
       return this.snapshot(threadId);
     }
 
-    this.setRuntime(threadId, { status: "starting", activeTurnId: null, lastError: null });
+    const permissionMode = options.permissionMode ?? "default";
+    this.setRuntime(threadId, { status: "starting", permissionMode, activeTurnId: null, lastError: null });
 
     try {
-      await this.appServer.request("thread/resume", { threadId });
+      const params = permissionMode === "full_access"
+        ? { threadId, sandbox: "danger-full-access", approvalPolicy: "never" }
+        : { threadId };
+      await this.appServer.request("thread/resume", params);
       const runtime = this.runtimes.get(threadId);
       if (runtime?.status === "starting") {
         this.setRuntime(threadId, { status: "waiting_input", lastError: null });
@@ -66,7 +80,7 @@ export class RuntimeManager {
 
     const runtime = this.runtimes.get(threadId);
     if (!runtime || runtime.status === "history" || runtime.status === "failed" || runtime.status === "exited") {
-      await this.resumeThread(threadId);
+      await this.resumeThread(threadId, { permissionMode: params.permissionMode });
     }
 
     const latest = this.runtimes.get(threadId);
@@ -197,6 +211,7 @@ export class RuntimeManager {
     const next: RuntimeState = {
       threadId,
       status: patch.status ?? current?.status ?? "history",
+      permissionMode: patch.permissionMode ?? current?.permissionMode ?? "default",
       activeTurnId: patch.activeTurnId !== undefined ? patch.activeTurnId : current?.activeTurnId ?? null,
       startedAt: current?.startedAt ?? now,
       updatedAt: now,
@@ -212,6 +227,7 @@ export class RuntimeManager {
       threadId,
       status: "history" as RuntimeStatus,
       activeTurnId: null,
+      permissionMode: "default" as SessionPermissionMode,
       startedAt: now,
       updatedAt: now,
       lastError: null
@@ -223,6 +239,21 @@ export class RuntimeManager {
       eventSeq: this.eventHub.getLastSeq(threadId)
     };
   }
+}
+
+function buildPermissionSettings(threadId: string, permissionMode: SessionPermissionMode) {
+  if (permissionMode === "full_access") {
+    return {
+      threadId,
+      approvalPolicy: "never",
+      sandboxPolicy: { type: "dangerFullAccess" }
+    };
+  }
+  return {
+    threadId,
+    approvalPolicy: "on-request",
+    permissions: ":workspace"
+  };
 }
 
 function mapRuntimeStatus(value: Record<string, unknown>): RuntimeStatus {

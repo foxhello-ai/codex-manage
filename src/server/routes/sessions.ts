@@ -19,8 +19,15 @@ const MetadataBody = z.object({
   remarkTitle: z.string().max(120).nullable()
 });
 
+const PermissionMode = z.enum(["default", "full_access"]);
+
+const ResumeBody = z.object({
+  permissionMode: PermissionMode.optional().default("default")
+});
+
 const InputBody = z.object({
-  text: z.string().trim().min(1).max(20000)
+  text: z.string().trim().min(1).max(20000),
+  permissionMode: PermissionMode.optional().default("default")
 });
 
 const ApprovalParams = z.object({
@@ -80,12 +87,17 @@ export function registerSessionRoutes(
       return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
     }
 
+    const body = ResumeBody.safeParse(request.body ?? {});
+    if (!body.success) {
+      return sendError(reply, 400, "INVALID_PERMISSION_MODE", "会话权限模式不正确");
+    }
+
     if (!runtimeManager) {
       return sendError(reply, 503, "RUNTIME_UNAVAILABLE", "运行态管理器不可用");
     }
 
     try {
-      const runtime = await runtimeManager.resumeThread(params.data.id);
+      const runtime = await runtimeManager.resumeThread(params.data.id, body.data);
       return reply.send({ runtime });
     } catch (error) {
       return sendError(reply, 503, "SESSION_RESUME_FAILED", error instanceof Error ? error.message : "会话恢复失败");

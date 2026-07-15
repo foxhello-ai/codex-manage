@@ -123,6 +123,7 @@ describe("session routes", () => {
 
 
   it("resumes a session", async () => {
+    let resumedOptions: { permissionMode?: "default" | "full_access" } | undefined;
     const app = buildApp(
       {
         listSessions: async () => [],
@@ -138,16 +139,20 @@ describe("session routes", () => {
         getRuntime: (() => {
           throw new Error("not used");
         }) as any,
-        resumeThread: async (threadId: string) => ({
-          threadId,
-          status: "waiting_input",
-          activeTurnId: null,
-          startedAt: "2026-07-14T00:00:00.000Z",
-          updatedAt: "2026-07-14T00:00:00.000Z",
-          lastError: null,
-          pendingApprovalCount: 0,
-          eventSeq: 1
-        }),
+        resumeThread: async (threadId: string, options: { permissionMode?: "default" | "full_access" } = {}) => {
+          resumedOptions = options;
+          return {
+            threadId,
+            status: "waiting_input",
+            permissionMode: options.permissionMode ?? "default",
+            activeTurnId: null,
+            startedAt: "2026-07-14T00:00:00.000Z",
+            updatedAt: "2026-07-14T00:00:00.000Z",
+            lastError: null,
+            pendingApprovalCount: 0,
+            eventSeq: 1
+          };
+        },
         sendInput: (() => {
           throw new Error("not used");
         }) as any,
@@ -159,13 +164,37 @@ describe("session routes", () => {
       }
     );
 
-    const response = await app.inject({ method: "POST", url: "/api/sessions/thread-1/resume", payload: {} });
+    const response = await app.inject({ method: "POST", url: "/api/sessions/thread-1/resume", payload: { permissionMode: "full_access" } });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ runtime: { threadId: "thread-1", status: "waiting_input" } });
+    expect(resumedOptions).toEqual({ permissionMode: "full_access" });
   });
 
+  it("rejects an invalid permission mode", async () => {
+    const app = buildApp({
+      listSessions: async () => [],
+      updateMetadata: async () => {
+        throw new Error("not used");
+      },
+      getSessionDetail: async () => {
+        throw new Error("not used");
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions/thread-1/resume",
+      payload: { permissionMode: "invalid" }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: { code: "INVALID_PERMISSION_MODE" } });
+  });
+
+
   it("submits input", async () => {
+    let submittedBody: { text: string; permissionMode?: "default" | "full_access" } | undefined;
     const app = buildApp(
       {
         listSessions: async () => [],
@@ -184,16 +213,20 @@ describe("session routes", () => {
         resumeThread: (() => {
           throw new Error("not used");
         }) as any,
-        sendInput: async (threadId: string, body: { text: string }) => ({
-          threadId,
-          status: body.text === "继续" ? "running" : "failed",
-          activeTurnId: "turn-1",
-          startedAt: "2026-07-14T00:00:00.000Z",
-          updatedAt: "2026-07-14T00:00:00.000Z",
-          lastError: null,
-          pendingApprovalCount: 0,
-          eventSeq: 1
-        }),
+        sendInput: async (threadId: string, body: { text: string; permissionMode?: "default" | "full_access" }) => {
+          submittedBody = body;
+          return {
+            threadId,
+            status: body.text === "继续" ? "running" : "failed",
+            permissionMode: body.permissionMode ?? "default",
+            activeTurnId: "turn-1",
+            startedAt: "2026-07-14T00:00:00.000Z",
+            updatedAt: "2026-07-14T00:00:00.000Z",
+            lastError: null,
+            pendingApprovalCount: 0,
+            eventSeq: 1
+          };
+        },
         submitApproval: (() => {
           throw new Error("not used");
         }) as any,
@@ -202,10 +235,11 @@ describe("session routes", () => {
       }
     );
 
-    const response = await app.inject({ method: "POST", url: "/api/sessions/thread-1/input", payload: { text: "继续" } });
+    const response = await app.inject({ method: "POST", url: "/api/sessions/thread-1/input", payload: { text: "继续", permissionMode: "full_access" } });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ runtime: { threadId: "thread-1", status: "running" } });
+    expect(submittedBody).toEqual({ text: "继续", permissionMode: "full_access" });
   });
 
 });

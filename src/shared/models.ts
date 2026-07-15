@@ -120,9 +120,12 @@ export type ApiErrorBody = {
 
 export type RuntimeStatus = SessionStatus;
 
+export type SessionPermissionMode = "default" | "full_access";
+
 export type RuntimeSnapshot = {
   threadId: string;
   status: RuntimeStatus;
+  permissionMode: SessionPermissionMode;
   activeTurnId: string | null;
   startedAt: string;
   updatedAt: string;

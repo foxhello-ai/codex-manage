@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, InputResponse, PublicConfig, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionsResponse, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, InputResponse, PublicConfig, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UserSession } from "./models";
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -70,17 +70,17 @@ export function getSessionRuntime(sessionId: string): Promise<RuntimeResponse> {
   return apiRequest<RuntimeResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/runtime`);
 }
 
-export function resumeSession(sessionId: string): Promise<RuntimeResponse> {
+export function resumeSession(sessionId: string, permissionMode: SessionPermissionMode = "default"): Promise<RuntimeResponse> {
   return apiRequest<RuntimeResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/resume`, {
     method: "POST",
-    body: JSON.stringify({})
+    body: JSON.stringify({ permissionMode })
   });
 }
 
-export function sendSessionInput(sessionId: string, text: string): Promise<InputResponse> {
+export function sendSessionInput(sessionId: string, text: string, permissionMode: SessionPermissionMode = "default"): Promise<InputResponse> {
   return apiRequest<InputResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/input`, {
     method: "POST",
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, permissionMode })
   });
 }
 
