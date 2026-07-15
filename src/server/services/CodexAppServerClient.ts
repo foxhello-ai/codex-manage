@@ -132,7 +132,7 @@ export class CodexAppServerClient extends EventEmitter {
       clientInfo: {
         name: "codex_manage",
         title: "Codex Manage",
-        version: "0.1.0"
+        version: "1.0.0"
       },
       capabilities: {
         experimentalApi: true

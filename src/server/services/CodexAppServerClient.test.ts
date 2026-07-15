@@ -63,6 +63,7 @@ describe("CodexAppServerClient", () => {
       initialized: true
     });
     expect(messages.map((message) => message.method)).toEqual(["initialize", "initialized"]);
+    expect(messages[0].params.clientInfo.version).toBe("1.0.0");
   });
 
   it("routes responses, notifications, and server requests", async () => {
