@@ -145,10 +145,36 @@ test("approval actions render and resolve without mobile overlap", async ({ page
   await page.routeWebSocket(/\/api\/sessions\/.*\/ws/, (socket) => {
     setTimeout(() => {
       socket.send(JSON.stringify({
-        seq: 1,
+        seq: 4,
         threadId: target.id,
         type: "snapshot",
-        payload: { runtime, approvals: [approval], events: [] },
+        payload: {
+          runtime: { ...runtime, eventSeq: 4 },
+          approvals: [approval],
+          events: [
+            {
+              seq: 2,
+              threadId: target.id,
+              type: "agent_message_delta",
+              payload: { turnId: "turn-m12", itemId: "message-m12", delta: "M12 实时回复" },
+              createdAt: "2026-07-15T00:00:01.100Z"
+            },
+            {
+              seq: 3,
+              threadId: target.id,
+              type: "command_started",
+              payload: { turnId: "turn-m12", itemId: "command-m12", command: "npm test", cwd: "/config/projects/codex-manage", status: "running" },
+              createdAt: "2026-07-15T00:00:01.200Z"
+            },
+            {
+              seq: 4,
+              threadId: target.id,
+              type: "command_output_delta",
+              payload: { turnId: "turn-m12", itemId: "command-m12", delta: "M12 tests running" },
+              createdAt: "2026-07-15T00:00:01.300Z"
+            }
+          ]
+        },
         createdAt: "2026-07-15T00:00:01.000Z"
       }));
     }, 300);
@@ -172,6 +198,8 @@ test("approval actions render and resolve without mobile overlap", async ({ page
   await expect(approvalPanel.getByRole("button", { name: "本会话允许" })).toBeVisible();
   await expect(approvalPanel.getByRole("button", { name: "拒绝", exact: true })).toBeVisible();
   await expect(approvalPanel.getByRole("button", { name: "取消", exact: true })).toBeVisible();
+  await expect(page.getByText("M12 实时回复", { exact: true })).toBeVisible();
+  await expect(page.getByText("M12 tests running", { exact: true })).toBeVisible();
   if (testInfo.project.name === "mobile") {
     await expect(page.getByRole("region", { name: "移动运行状态" })).toContainText("待审批 1");
   }
