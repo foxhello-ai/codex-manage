@@ -1813,6 +1813,29 @@ textarea {
   background: #ffffff;
 }
 
+.livePanel .messageItem.user {
+  border-color: #91b9d8;
+  background: #f4f9fd;
+}
+
+.livePanel .messageItem.failed {
+  border-color: #e08787;
+  background: #fff7f6;
+}
+
+.deliveryStatus.sending {
+  color: #5f6f7a;
+}
+
+.deliveryStatus.sent {
+  color: #147d58;
+}
+
+.deliveryStatus.failed {
+  color: #b42318;
+  font-weight: 800;
+}
+
 .liveOutputBody {
   max-height: 520px;
   display: grid;
