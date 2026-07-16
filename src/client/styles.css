@@ -1085,7 +1085,7 @@ h2 {
   .appShell.reserveFloatingStatus .content {
     width: min(1120px, calc(100% - 336px));
     margin-right: auto;
-    margin-left: 24px;
+    margin-left: auto;
   }
 }
 
@@ -2424,9 +2424,17 @@ textarea {
   }
 
   .approvalActions button {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     min-height: 44px;
-    padding: 0 10px;
+    height: auto;
+    padding: 6px 10px;
+    overflow: visible;
     font-size: 0.86rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   .approvalPanel,
