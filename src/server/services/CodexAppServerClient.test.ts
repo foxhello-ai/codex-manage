@@ -117,4 +117,24 @@ describe("CodexAppServerClient", () => {
       initialized: false
     });
   });
+
+  it("times out unanswered requests and clears pending state", async () => {
+    const fake = createFakeProcess();
+    readJsonLines(fake.stdin, (message) => {
+      if (message.method === "initialize") {
+        fake.stdout.write(`${JSON.stringify({ id: message.id, result: {} })}\n`);
+      }
+    });
+
+    const client = new CodexAppServerClient({
+      codexCliPath: "codex",
+      requestTimeoutMs: 5,
+      spawnProcess: (() => fake) as any
+    });
+
+    await client.start();
+    await expect(client.request("thread/resume", { threadId: "thread-1" })).rejects.toThrow(
+      "codex app-server request timed out: thread/resume"
+    );
+  });
 });

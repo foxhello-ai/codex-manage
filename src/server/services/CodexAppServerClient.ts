@@ -37,16 +37,19 @@ export type CodexAppServerSnapshot = {
 type PendingRequest = {
   resolve: (value: unknown) => void;
   reject: (reason: Error) => void;
+  timeout: NodeJS.Timeout;
 };
 
 export type CodexAppServerClientOptions = {
   codexCliPath: string;
   spawnProcess?: typeof spawn;
+  requestTimeoutMs?: number;
 };
 
 export class CodexAppServerClient extends EventEmitter {
   private readonly codexCliPath: string;
   private readonly spawnProcess: typeof spawn;
+  private readonly requestTimeoutMs: number;
   private process: ChildProcessWithoutNullStreams | null = null;
   private stdoutLines: Interface | null = null;
   private nextRequestId = 1;
@@ -59,6 +62,7 @@ export class CodexAppServerClient extends EventEmitter {
     super();
     this.codexCliPath = options.codexCliPath;
     this.spawnProcess = options.spawnProcess ?? spawn;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 60000;
   }
 
   getSnapshot(): CodexAppServerSnapshot {
@@ -152,14 +156,24 @@ export class CodexAppServerClient extends EventEmitter {
     const message: JsonRpcRequest = { id, method, params };
 
     return new Promise<T>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`codex app-server request timed out: ${method}`));
+      }, this.requestTimeoutMs);
+
       this.pending.set(id, {
         resolve: (value) => resolve(value as T),
-        reject
+        reject,
+        timeout
       });
 
       this.process?.stdin.write(`${JSON.stringify(message)}\n`, (error) => {
         if (!error) return;
-        this.pending.delete(id);
+        const pending = this.pending.get(id);
+        if (pending) {
+          clearTimeout(pending.timeout);
+          this.pending.delete(id);
+        }
         reject(error);
       });
     });
@@ -217,6 +231,7 @@ export class CodexAppServerClient extends EventEmitter {
     if (!pending) return;
 
     this.pending.delete(response.id);
+    clearTimeout(pending.timeout);
 
     if (response.error) {
       pending.reject(new Error(response.error.message));
@@ -237,6 +252,7 @@ export class CodexAppServerClient extends EventEmitter {
 
   private rejectAll(error: Error) {
     for (const pending of this.pending.values()) {
+      clearTimeout(pending.timeout);
       pending.reject(error);
     }
     this.pending.clear();

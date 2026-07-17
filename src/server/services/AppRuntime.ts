@@ -23,6 +23,9 @@ export class AppRuntime {
     this.appServer.on("error", () => {
       // Snapshot state carries the error for diagnostics; avoid an unhandled EventEmitter error.
     });
+    this.appServer.on("stderr", (text: string) => {
+      console.error(`[codex app-server] ${text}`);
+    });
   }
 
   async start(): Promise<void> {
