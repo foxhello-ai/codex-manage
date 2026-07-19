@@ -2,7 +2,7 @@ import type { JsonRpcNotification, JsonRpcRequest } from "./CodexAppServerClient
 import { ApprovalService } from "./ApprovalService";
 import { EventHub } from "./EventHub";
 import type { CodexAppServerClient } from "./CodexAppServerClient";
-import type { ApprovalDecision, ApprovalResponse, RuntimeSnapshot, RuntimeStatus, SessionPermissionMode } from "../../shared/models";
+import type { ApprovalDecision, ApprovalResponse, RuntimeSnapshot, RuntimeStatus, SessionModelState, SessionPermissionMode } from "../../shared/models";
 
 type RuntimeState = {
   threadId: string;
@@ -239,9 +239,31 @@ export class RuntimeManager {
     return {
       ...runtime,
       pendingApprovalCount: this.approvalService.getPendingCount(threadId),
-      eventSeq: this.eventHub.getLastSeq(threadId)
+      eventSeq: this.eventHub.getLastSeq(threadId),
+      model: null,
+      modelProvider: null,
+      reasoningEffort: null,
+      modelSelection: emptyModelState(),
+      modelChangeStatus: "idle",
+      modelChangeError: null
     };
   }
+}
+
+function emptyModelState(): SessionModelState {
+  return {
+    mode: "follow_session",
+    preferredModel: null,
+    preferredReasoningEffort: null,
+    actualModel: null,
+    actualModelProvider: null,
+    actualReasoningEffort: null,
+    actualModelSupported: null,
+    applied: false,
+    confirmationPending: false,
+    updatedAt: null,
+    lastError: null
+  };
 }
 
 function buildPermissionSettings(threadId: string, permissionMode: SessionPermissionMode) {

@@ -3,7 +3,7 @@
 ## 1. 文档信息
 
 - 文档日期：2026-07-19
-- 文档状态：用户已确认，待执行
+- 文档状态：用户已确认，实施中
 - 需求状态：用户已确认
 - 详细设计状态：用户已确认
 - 实施代码基线：`feature/f-20260717-replace-logo`
@@ -42,7 +42,7 @@
 | 里程碑 | 名称 | 状态 | 主要需求 | 退出门槛 |
 | --- | --- | --- | --- | --- |
 | MC-M0 | 基线冻结与实施准备 | 已完成 | 全部 | 需求、设计、协议和边界均已确认 |
-| MC-M1 | 共享契约与偏好持久化 | 待开始 | MR-009、MR-010、MR-011 | 类型、兼容读取和原子写入测试通过 |
+| MC-M1 | 共享契约与偏好持久化 | 已完成 | MR-009、MR-010、MR-011 | 类型、兼容读取和原子写入测试通过 |
 | MC-M2 | 支持模型目录与查询 API | 待开始 | MR-001、MR-002、MR-017 | 分页、缓存、刷新、校验和路由测试通过 |
 | MC-M3 | 历史模型解析与会话详情 | 待开始 | MR-003、MR-004 | 历史模型可准确展示且不可用模型只读 |
 | MC-M4 | 会话模型业务服务与变更 API | 待开始 | MR-005、MR-007、MR-010、MR-011 | 状态矩阵、偏好生命周期和 API 测试通过 |
@@ -107,13 +107,13 @@ MC-M1 ────────────────┘
 
 任务：
 
-- [ ] MC-T101：在 `src/shared/models.ts` 增加 `ModelOption`、`ModelCatalogResponse`、`SessionModelState`、`ModelSelectionResponse` 和运行态扩展字段。
-- [ ] MC-T102：在 `src/shared/api.ts` 增加模型列表、模型变更和错误响应契约。
-- [ ] MC-T103：定义统一 `ModelErrorCode` 和安全错误详情结构。
-- [ ] MC-T104：扩展 `SessionMetadataStore`，增加 `modelSelection` 默认值和旧格式兼容读取。
-- [ ] MC-T105：实现备注与模型偏好互不覆盖的 patch/update 接口。
-- [ ] MC-T106：增加同一元数据文件写入队列和临时文件原子替换。
-- [ ] MC-T107：覆盖旧格式、未知字段保留、并发写入和写入失败测试。
+- [x] MC-T101：在 `src/shared/models.ts` 增加 `ModelOption`、`ModelCatalogResponse`、`SessionModelState`、`ModelSelectionResponse` 和运行态扩展字段。
+- [x] MC-T102：在 `src/shared/api.ts` 增加模型列表、模型变更和错误响应契约。
+- [x] MC-T103：定义统一 `ModelErrorCode` 和安全错误详情结构。
+- [x] MC-T104：扩展 `SessionMetadataStore`，增加 `modelSelection` 默认值和旧格式兼容读取。
+- [x] MC-T105：实现备注与模型偏好互不覆盖的 patch/update 接口。
+- [x] MC-T106：增加同一元数据文件写入队列和临时文件原子替换。
+- [x] MC-T107：覆盖旧格式、未知字段保留、并发写入和写入失败测试。
 
 主要文件：
 
@@ -432,7 +432,7 @@ npm run test:e2e
 ## 19. 当前进度
 
 - [x] MC-M0：基线冻结与实施准备。
-- [ ] MC-M1：共享契约与偏好持久化。
+- [x] MC-M1：共享契约与偏好持久化。
 - [ ] MC-M2：支持模型目录与查询 API。
 - [ ] MC-M3：历史模型解析与会话详情。
 - [ ] MC-M4：会话模型业务服务与变更 API。
@@ -441,4 +441,4 @@ npm run test:e2e
 - [ ] MC-M7：全量自动化、回归与安全验证。
 - [ ] MC-M8：真实环境验收与交付。
 
-下一执行入口：MC-M1。完成 MC-M1 后，MC-M2 与 MC-M3 可以并行推进。
+下一执行入口：MC-M2 与 MC-M3。

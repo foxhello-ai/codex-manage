@@ -1,4 +1,16 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, HealthStatus, InputResponse, PublicConfig, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, HealthStatus, InputResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode: number,
+    readonly code: string,
+    readonly details?: unknown
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -17,7 +29,12 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     } catch {
       body = undefined;
     }
-    throw new Error(body?.error.message ?? `Request failed: ${response.status}`);
+    throw new ApiRequestError(
+      body?.error.message ?? `Request failed: ${response.status}`,
+      response.status,
+      body?.error.code ?? "REQUEST_FAILED",
+      body?.error.details
+    );
   }
 
   return (await response.json()) as T;
@@ -55,6 +72,10 @@ export function getSessions(search?: string): Promise<SessionsResponse> {
   return apiRequest<SessionsResponse>(`/api/sessions${params.size ? `?${params.toString()}` : ""}`);
 }
 
+export function getModels(forceRefresh = false): Promise<ModelCatalogResponse> {
+  return apiRequest<ModelCatalogResponse>(`/api/models${forceRefresh ? "?refresh=true" : ""}`);
+}
+
 export function getSessionDetail(sessionId: string): Promise<SessionDetailResponse> {
   return apiRequest<SessionDetailResponse>(`/api/sessions/${encodeURIComponent(sessionId)}`);
 }
@@ -67,6 +88,13 @@ export function updateSessionMetadata(sessionId: string, remarkTitle: string | n
   return apiRequest<SessionMetadataResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/metadata`, {
     method: "PATCH",
     body: JSON.stringify({ remarkTitle })
+  });
+}
+
+export function updateSessionModel(sessionId: string, input: UpdateModelSelectionInput): Promise<ModelSelectionResponse> {
+  return apiRequest<ModelSelectionResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/model`, {
+    method: "PATCH",
+    body: JSON.stringify(input)
   });
 }
 
