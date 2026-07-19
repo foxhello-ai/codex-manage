@@ -5,11 +5,13 @@ import { loadConfig } from "./config";
 import { registerAuthHook } from "./auth/hooks";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerConfigRoutes } from "./routes/config";
+import { registerModelRoutes } from "./routes/models";
 import { registerSessionRoutes } from "./routes/sessions";
 import { AppRuntime } from "./services/AppRuntime";
 import { SessionService } from "./services/SessionService";
 import { SessionMetadataStore } from "./services/SessionMetadataStore";
 import { JsonlSessionParser } from "./services/JsonlSessionParser";
+import { ModelCatalogService } from "./services/ModelCatalogService";
 import { registerStaticClient } from "./staticClient";
 
 const config = loadConfig();
@@ -19,6 +21,7 @@ const app = Fastify({
 });
 const runtime = new AppRuntime(config);
 const metadataStore = new SessionMetadataStore(config.metadataFile);
+const modelCatalog = new ModelCatalogService(runtime.appServer);
 const sessionService = new SessionService(runtime.appServer, metadataStore);
 const jsonlSessionParser = new JsonlSessionParser(config.sessionsDir);
 
@@ -30,6 +33,7 @@ await app.register(websocket);
 registerAuthHook(app);
 registerAuthRoutes(app, config);
 registerConfigRoutes(app, config, () => runtime.getSnapshot());
+registerModelRoutes(app, modelCatalog);
 registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager);
 
 if (process.env.NODE_ENV === "production") {
