@@ -1,9 +1,13 @@
+import cookie from "@fastify/cookie";
+import websocket from "@fastify/websocket";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
+import { registerAuthHook } from "../auth/hooks";
 import { registerSessionRoutes } from "./sessions";
 import type { SessionService } from "../services/SessionService";
 import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 import type { RuntimeManager } from "../services/RuntimeManager";
+import type { SessionModelService } from "../services/SessionModelService";
 import type { RuntimeSnapshot, SessionModelState } from "../../shared/models";
 
 function emptyModelState(): SessionModelState {
@@ -46,14 +50,59 @@ function runtimeSnapshot(threadId: string, patch: Partial<RuntimeSnapshot> = {})
 function buildApp(
   service: Pick<SessionService, "listSessions" | "getSessionDetail" | "updateMetadata">,
   parser?: Pick<JsonlSessionParser, "listCommands">,
-  runtime?: Pick<RuntimeManager, "getRuntime" | "resumeThread" | "sendInput" | "submitApproval" | "eventHub" | "approvalService">
+  runtime?: Pick<RuntimeManager, "getRuntime" | "resumeThread" | "sendInput" | "submitApproval" | "eventHub" | "approvalService">,
+  modelService?: Pick<SessionModelService, "updateSelection" | "resolveForResume" | "resolveForTurn">
 ) {
   const app = Fastify();
-  registerSessionRoutes(app, service as SessionService, parser as JsonlSessionParser | undefined, runtime as RuntimeManager | undefined);
+  registerSessionRoutes(
+    app,
+    service as SessionService,
+    parser as JsonlSessionParser | undefined,
+    runtime as RuntimeManager | undefined,
+    modelService as SessionModelService | undefined
+  );
   return app;
 }
 
 describe("session routes", () => {
+  it("rejects unauthenticated model changes and WebSocket upgrades", async () => {
+    const app = Fastify();
+    await app.register(cookie, { secret: "test-secret-at-least-thirty-two-characters" });
+    await app.register(websocket);
+    registerAuthHook(app);
+    registerSessionRoutes(
+      app,
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        getSessionDetail: async () => { throw new Error("not used"); }
+      } as unknown as SessionService,
+      undefined,
+      {
+        getRuntime: (threadId: string) => runtimeSnapshot(threadId),
+        eventHub: {
+          getLastSeq: () => 0,
+          getEvents: () => [],
+          subscribe: () => () => undefined
+        },
+        approvalService: { listPending: () => [] }
+      } as unknown as RuntimeManager,
+      {
+        updateSelection: async () => { throw new Error("must not be called"); }
+      } as unknown as SessionModelService
+    );
+    await app.ready();
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/sessions/thread-1/model",
+      payload: { mode: "override", model: "frontier-v2" }
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ error: { code: "UNAUTHENTICATED" } });
+    await expect(app.injectWS("/api/sessions/thread-1/ws")).rejects.toThrow(/401/);
+  });
+
   it("returns session detail", async () => {
     const app = buildApp({
       listSessions: async () => [],
@@ -316,6 +365,86 @@ describe("session routes", () => {
       approvalId: "approval-1",
       body: { decision: "accept", answers: { environment: ["生产"] } }
     });
+  });
+
+  it("updates a session model through the domain service", async () => {
+    const runtime = runtimeSnapshot("thread-1", {
+      status: "waiting_input",
+      model: "gpt-5.6-sol",
+      modelSelection: {
+        ...emptyModelState(),
+        mode: "override",
+        preferredModel: "gpt-5.6-sol",
+        actualModel: "gpt-5.6-sol",
+        applied: true
+      },
+      modelChangeStatus: "applied"
+    });
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        getSessionDetail: async () => { throw new Error("not used"); }
+      },
+      undefined,
+      {
+        getRuntime: () => runtime,
+        resumeThread: async () => runtime,
+        sendInput: async () => runtime,
+        submitApproval: (() => { throw new Error("not used"); }) as any,
+        eventHub: {} as any,
+        approvalService: {} as any
+      },
+      {
+        updateSelection: async (_sessionId, input) => ({
+          selection: runtime.modelSelection,
+          runtime,
+          applied: input.mode === "override",
+          confirmationPending: false
+        }),
+        resolveForResume: async () => ({ mode: "follow_session", model: null, reasoningEffort: null }),
+        resolveForTurn: async () => ({ mode: "follow_session", model: null, reasoningEffort: null })
+      }
+    );
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/sessions/thread-1/model",
+      payload: { mode: "override", model: "gpt-5.6-sol", reasoningEffort: "high" }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      applied: true,
+      selection: { preferredModel: "gpt-5.6-sol" }
+    });
+  });
+
+  it("maps model domain errors from the model endpoint", async () => {
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        getSessionDetail: async () => { throw new Error("not used"); }
+      },
+      undefined,
+      undefined,
+      {
+        updateSelection: async () => {
+          const { ModelDomainError } = await import("../modelErrors");
+          throw new ModelDomainError("MODEL_SWITCH_NOT_ALLOWED", "当前会话状态不允许切换模型", 409);
+        },
+        resolveForResume: async () => ({ mode: "follow_session", model: null, reasoningEffort: null }),
+        resolveForTurn: async () => ({ mode: "follow_session", model: null, reasoningEffort: null })
+      }
+    );
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/sessions/thread-1/model",
+      payload: { mode: "override", model: "gpt-5.6-sol" }
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: { code: "MODEL_SWITCH_NOT_ALLOWED" } });
   });
 
 });

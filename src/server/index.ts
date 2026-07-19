@@ -12,6 +12,7 @@ import { SessionService } from "./services/SessionService";
 import { SessionMetadataStore } from "./services/SessionMetadataStore";
 import { JsonlSessionParser } from "./services/JsonlSessionParser";
 import { ModelCatalogService } from "./services/ModelCatalogService";
+import { SessionModelService } from "./services/SessionModelService";
 import { registerStaticClient } from "./staticClient";
 
 const config = loadConfig();
@@ -22,8 +23,21 @@ const app = Fastify({
 const runtime = new AppRuntime(config);
 const metadataStore = new SessionMetadataStore(config.metadataFile);
 const modelCatalog = new ModelCatalogService(runtime.appServer);
-const sessionService = new SessionService(runtime.appServer, metadataStore);
 const jsonlSessionParser = new JsonlSessionParser(config.sessionsDir);
+const sessionService = new SessionService(
+  runtime.appServer,
+  metadataStore,
+  jsonlSessionParser,
+  modelCatalog,
+  runtime.runtimeManager
+);
+const sessionModelService = new SessionModelService(
+  modelCatalog,
+  metadataStore,
+  jsonlSessionParser,
+  runtime.runtimeManager
+);
+
 
 await app.register(cookie, {
   secret: config.sessionSecret
@@ -34,7 +48,7 @@ registerAuthHook(app);
 registerAuthRoutes(app, config);
 registerConfigRoutes(app, config, () => runtime.getSnapshot());
 registerModelRoutes(app, modelCatalog);
-registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager);
+registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager, sessionModelService);
 
 if (process.env.NODE_ENV === "production") {
   await registerStaticClient(app, config.clientDir);

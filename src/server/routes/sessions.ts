@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sendError } from "../httpErrors";
+import { ModelDomainError, sanitizeModelError } from "../modelErrors";
 import type { SessionService } from "../services/SessionService";
 import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 import type { RuntimeManager } from "../services/RuntimeManager";
+import type { SessionModelService } from "../services/SessionModelService";
 import { isAuthenticated } from "../auth/session";
 
 const ListQuery = z.object({
@@ -22,13 +24,28 @@ const MetadataBody = z.object({
 const PermissionMode = z.enum(["default", "full_access"]);
 
 const ResumeBody = z.object({
-  permissionMode: PermissionMode.optional().default("default")
+  permissionMode: PermissionMode.optional().default("default"),
+  model: z.string().trim().min(1).max(200).nullable().optional(),
+  reasoningEffort: z.string().trim().min(1).max(40).nullable().optional()
 });
 
 const InputBody = z.object({
   text: z.string().trim().min(1).max(20000),
   permissionMode: PermissionMode.optional().default("default")
 });
+
+const UpdateModelBody = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("follow_session"),
+    model: z.null().optional(),
+    reasoningEffort: z.null().optional()
+  }),
+  z.object({
+    mode: z.literal("override"),
+    model: z.string().trim().min(1).max(200),
+    reasoningEffort: z.string().trim().min(1).max(40).nullable().optional()
+  })
+]);
 
 const ApprovalParams = z.object({
   id: z.string().min(1),
@@ -44,7 +61,8 @@ export function registerSessionRoutes(
   app: FastifyInstance,
   sessionService: SessionService,
   jsonlSessionParser?: JsonlSessionParser,
-  runtimeManager?: RuntimeManager
+  runtimeManager?: RuntimeManager,
+  sessionModelService?: SessionModelService
 ) {
   app.get("/api/sessions", async (request, reply) => {
     const parsed = ListQuery.safeParse(request.query);
@@ -81,6 +99,27 @@ export function registerSessionRoutes(
     return reply.send({ runtime: runtimeManager.getRuntime(params.data.id) });
   });
 
+  app.patch("/api/sessions/:id/model", async (request, reply) => {
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
+    }
+    const body = UpdateModelBody.safeParse(request.body);
+    if (!body.success) {
+      return sendError(reply, 400, "INVALID_MODEL_SELECTION", "模型选择参数不正确");
+    }
+    if (!sessionModelService) {
+      return sendError(reply, 503, "MODEL_SERVICE_UNAVAILABLE", "模型服务不可用");
+    }
+
+    try {
+      const result = await sessionModelService.updateSelection(params.data.id, body.data);
+      return reply.status(result.confirmationPending ? 202 : 200).send(result);
+    } catch (error) {
+      return sendModelError(reply, error);
+    }
+  });
+
   app.post("/api/sessions/:id/resume", async (request, reply) => {
     const params = SessionParams.safeParse(request.params);
     if (!params.success) {
@@ -97,10 +136,20 @@ export function registerSessionRoutes(
     }
 
     try {
-      const runtime = await runtimeManager.resumeThread(params.data.id, body.data);
+      const modelOverride = sessionModelService
+        ? await sessionModelService.resolveForResume(
+            params.data.id,
+            body.data.model ? { model: body.data.model, reasoningEffort: body.data.reasoningEffort } : undefined
+          )
+        : undefined;
+      const runtime = await runtimeManager.resumeThread(params.data.id, {
+        permissionMode: body.data.permissionMode,
+        modelOverride
+      });
       return reply.send({ runtime });
     } catch (error) {
-      return sendError(reply, 503, "SESSION_RESUME_FAILED", error instanceof Error ? error.message : "会话恢复失败");
+      if (error instanceof ModelDomainError) return sendModelError(reply, error);
+      return sendError(reply, 503, "SESSION_RESUME_FAILED", sanitizeModelError(error));
     }
   });
 
@@ -120,10 +169,17 @@ export function registerSessionRoutes(
     }
 
     try {
-      const runtime = await runtimeManager.sendInput(params.data.id, body.data);
+      const modelOverride = sessionModelService
+        ? await sessionModelService.resolveForTurn(params.data.id)
+        : undefined;
+      const runtime = await runtimeManager.sendInput(params.data.id, {
+        ...body.data,
+        modelOverride
+      });
       return reply.send({ runtime });
     } catch (error) {
-      return sendError(reply, 409, "SESSION_INPUT_FAILED", error instanceof Error ? error.message : "任务发送失败");
+      if (error instanceof ModelDomainError) return sendModelError(reply, error);
+      return sendError(reply, 409, "SESSION_INPUT_FAILED", sanitizeModelError(error));
     }
   });
 
@@ -261,5 +317,14 @@ export function registerSessionRoutes(
         error instanceof Error ? error.message : "Codex app-server 不可用"
       );
     }
+  });
+}
+
+function sendModelError(reply: Parameters<typeof sendError>[0], error: unknown) {
+  if (error instanceof ModelDomainError) {
+    return sendError(reply, error.statusCode, error.code, error.message, error.details);
+  }
+  return sendError(reply, 502, "MODEL_SWITCH_FAILED", "模型切换失败", {
+    cause: sanitizeModelError(error)
   });
 }

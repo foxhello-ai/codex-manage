@@ -168,4 +168,123 @@ describe("RuntimeManager", () => {
     expect(events.some((event: any) => event.type === "approval_requested")).toBe(true);
     expect(events.some((event: any) => event.type === "approval_resolved")).toBe(true);
   });
+  it("confirms a waiting-input model update from thread settings notification", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any, { modelConfirmationTimeoutMs: 100 });
+    await manager.resumeThread("thread-1");
+
+    const events: any[] = [];
+    manager.eventHub.subscribe("thread-1", (event) => events.push(event));
+    const pending = manager.updateModel("thread-1", {
+      model: "gpt-5.6-sol",
+      reasoningEffort: "high",
+      option: {
+        id: "gpt-5.6-sol",
+        model: "gpt-5.6-sol",
+        displayName: "GPT-5.6-Sol",
+        description: null,
+        hidden: false,
+        isDefault: true,
+        supportedReasoningEfforts: ["high"],
+        defaultReasoningEffort: "high",
+        upgradeModel: null,
+        upgradeCopy: null
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    appServer.emit("notification", {
+      method: "thread/settings/updated",
+      params: {
+        threadId: "thread-1",
+        threadSettings: {
+          model: "gpt-5.6-sol",
+          modelProvider: "openai",
+          effort: "high"
+        }
+      }
+    });
+
+    await expect(pending).resolves.toMatchObject({
+      model: "gpt-5.6-sol",
+      reasoningEffort: "high",
+      modelChangeStatus: "applied",
+      modelSelection: { applied: true, confirmationPending: false }
+    });
+    expect(appServer.requests.at(-1)).toEqual({
+      method: "thread/settings/update",
+      params: { threadId: "thread-1", model: "gpt-5.6-sol", effort: "high" }
+    });
+    expect(events.some((event) => event.type === "model_change_started")).toBe(true);
+    expect(events.some((event) => event.type === "model_change_completed")).toBe(true);
+  });
+
+  it("returns confirmation pending after the notification timeout and reconciles a late notification", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any, { modelConfirmationTimeoutMs: 5 });
+    await manager.resumeThread("thread-1");
+
+    const result = await manager.updateModel("thread-1", {
+      model: "gpt-5.6-sol",
+      reasoningEffort: null,
+      option: {
+        id: "gpt-5.6-sol",
+        model: "gpt-5.6-sol",
+        displayName: "GPT-5.6-Sol",
+        description: null,
+        hidden: false,
+        isDefault: true,
+        supportedReasoningEfforts: [],
+        defaultReasoningEffort: null,
+        upgradeModel: null,
+        upgradeCopy: null
+      }
+    });
+    expect(result).toMatchObject({
+      modelChangeStatus: "confirming",
+      modelSelection: { confirmationPending: true, applied: false }
+    });
+
+    appServer.emit("notification", {
+      method: "thread/settings/updated",
+      params: {
+        threadId: "thread-1",
+        threadSettings: { model: "gpt-5.6-sol", modelProvider: "openai" }
+      }
+    });
+    expect(manager.getRuntime("thread-1")).toMatchObject({
+      model: "gpt-5.6-sol",
+      modelChangeStatus: "applied",
+      modelSelection: { confirmationPending: false, applied: true }
+    });
+  });
+
+  it("passes an explicit model through resume, effort settings, and turn start", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    await manager.sendInput("thread-1", {
+      text: "继续",
+      modelOverride: {
+        mode: "override",
+        model: "gpt-5.6-sol",
+        reasoningEffort: "high"
+      }
+    });
+
+    expect(appServer.requests).toMatchObject([
+      {
+        method: "thread/resume",
+        params: { threadId: "thread-1", model: "gpt-5.6-sol" }
+      },
+      {
+        method: "thread/settings/update",
+        params: { threadId: "thread-1", effort: "high" }
+      },
+      {
+        method: "turn/start",
+        params: { threadId: "thread-1", model: "gpt-5.6-sol", effort: "high" }
+      }
+    ]);
+  });
+
 });

@@ -103,4 +103,64 @@ describe("JsonlSessionParser", () => {
       }
     });
   });
+  it("reads the last historical model state with malformed-line tolerance", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "codex-jsonl-model-state-"));
+    await writeFile(join(dir, "session.jsonl"), jsonl([
+      {
+        type: "session_meta",
+        timestamp: "2026-07-19T00:00:00Z",
+        payload: { id: "thread-1", model_provider: "custom" }
+      },
+      {
+        type: "turn_context",
+        timestamp: "2026-07-19T00:01:00Z",
+        payload: { model: "old-model", reasoning_effort: "medium" }
+      },
+      "not json",
+      {
+        type: "turn_context",
+        timestamp: "2026-07-19T00:02:00Z",
+        payload: {
+          collaboration_mode: { settings: { model: "gpt-5.6-sol", reasoning_effort: "high" } }
+        }
+      },
+      {
+        type: "event_msg",
+        timestamp: "2026-07-19T00:03:00Z",
+        payload: {
+          type: "thread_settings_applied",
+          threadSettings: { model: "gpt-5.6-sol", modelProvider: "openai", effort: "xhigh" }
+        }
+      }
+    ]));
+
+    await expect(new JsonlSessionParser(dir).readModelState("thread-1")).resolves.toEqual({
+      state: {
+        model: "gpt-5.6-sol",
+        modelProvider: "openai",
+        reasoningEffort: "xhigh",
+        updatedAt: "2026-07-19T00:03:00Z"
+      },
+      diagnostics: {
+        scannedFiles: 1,
+        parsedLines: 4,
+        parseErrors: 1,
+        matchedSessionFile: true
+      }
+    });
+  });
+
+  it("returns null model state for a non-matching session", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "codex-jsonl-model-empty-"));
+    await writeFile(join(dir, "session.jsonl"), jsonl([
+      { type: "session_meta", payload: { id: "other" } },
+      { type: "turn_context", payload: { model: "other-model" } }
+    ]));
+
+    await expect(new JsonlSessionParser(dir).readModelState("thread-1")).resolves.toMatchObject({
+      state: { model: null, modelProvider: null, reasoningEffort: null, updatedAt: null },
+      diagnostics: { matchedSessionFile: false }
+    });
+  });
+
 });

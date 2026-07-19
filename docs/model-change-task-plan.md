@@ -6,7 +6,7 @@
 - 文档状态：用户已确认，实施中
 - 需求状态：用户已确认
 - 详细设计状态：用户已确认
-- 实施代码基线：`feature/f-20260717-replace-logo`
+- 实施代码分支：`main`（`feature/f-20260717-replace-logo` 已完成同步）
 - Codex CLI 基线：`codex-cli 0.144.5`
 - 需求文档：[model-change-requirements.md](./model-change-requirements.md)
 - 详细设计：[model-change-detailed-design.md](./model-change-detailed-design.md)
@@ -44,12 +44,12 @@
 | MC-M0 | 基线冻结与实施准备 | 已完成 | 全部 | 需求、设计、协议和边界均已确认 |
 | MC-M1 | 共享契约与偏好持久化 | 已完成 | MR-009、MR-010、MR-011 | 类型、兼容读取和原子写入测试通过 |
 | MC-M2 | 支持模型目录与查询 API | 已完成 | MR-001、MR-002、MR-017 | 分页、缓存、刷新、校验和路由测试通过 |
-| MC-M3 | 历史模型解析与会话详情 | 待开始 | MR-003、MR-004 | 历史模型可准确展示且不可用模型只读 |
-| MC-M4 | 会话模型业务服务与变更 API | 待开始 | MR-005、MR-007、MR-010、MR-011 | 状态矩阵、偏好生命周期和 API 测试通过 |
-| MC-M5 | 运行时应用、锁与通知对账 | 待开始 | MR-006、MR-008、MR-009、MR-012、MR-013、MR-014 | resume、settings、turn 和事件一致性测试通过 |
-| MC-M6 | 桌面/H5 交互与故障恢复 | 待开始 | MR-003、MR-011、MR-012、MR-016 | 桌面和 H5 主流程组件测试通过 |
-| MC-M7 | 全量自动化、回归与安全验证 | 待开始 | MR-015、MR-017、AC-01 至 AC-17 | typecheck、unit、build、E2E 全部通过 |
-| MC-M8 | 真实环境验收与交付 | 待开始 | AC-01 至 AC-17 | 真实 app-server 验收、记录和发布文档完成 |
+| MC-M3 | 历史模型解析与会话详情 | 已完成 | MR-003、MR-004 | 历史模型可准确展示且不可用模型只读 |
+| MC-M4 | 会话模型业务服务与变更 API | 已完成 | MR-005、MR-007、MR-010、MR-011 | 状态矩阵、偏好生命周期和 API 测试通过 |
+| MC-M5 | 运行时应用、锁与通知对账 | 已完成 | MR-006、MR-008、MR-009、MR-012、MR-013、MR-014 | resume、settings、turn 和事件一致性测试通过 |
+| MC-M6 | 桌面/H5 交互与故障恢复 | 已完成 | MR-003、MR-011、MR-012、MR-016 | 桌面和 H5 主流程组件测试通过 |
+| MC-M7 | 全量自动化、回归与安全验证 | 已完成 | MR-015、MR-017、AC-01 至 AC-17 | typecheck、unit、build、E2E 全部通过 |
+| MC-M8 | 真实环境验收与交付 | 已完成 | AC-01 至 AC-17 | 真实 app-server 验收、记录和发布文档完成 |
 
 ## 5. 依赖关系
 
@@ -173,13 +173,13 @@ MC-M1 ────────────────┘
 
 任务：
 
-- [ ] MC-T301：扩展 `JsonlSessionParser.readModelState(sessionId)`。
-- [ ] MC-T302：解析 `session_meta`、`turn_context`、collaboration settings 和 `thread_settings_applied`。
-- [ ] MC-T303：实现按记录顺序取最后非空值、坏行容错和 diagnostics。
-- [ ] MC-T304：确保只处理匹配 session，找不到模型时返回 `null` 而不猜测默认模型。
-- [ ] MC-T305：扩展 `SessionService.getSessionDetail()` 聚合历史状态、持久偏好和目录支持状态。
-- [ ] MC-T306：在详情响应中标识 `actualModelSupported=false` 的历史模型。
-- [ ] MC-T307：覆盖多次切换、坏 JSON、不匹配 session、无模型和不可用模型测试。
+- [x] MC-T301：扩展 `JsonlSessionParser.readModelState(sessionId)`。
+- [x] MC-T302：解析 `session_meta`、`turn_context`、collaboration settings 和 `thread_settings_applied`。
+- [x] MC-T303：实现按记录顺序取最后非空值、坏行容错和 diagnostics。
+- [x] MC-T304：确保只处理匹配 session，找不到模型时返回 `null` 而不猜测默认模型。
+- [x] MC-T305：扩展 `SessionService.getSessionDetail()` 聚合历史状态、持久偏好和目录支持状态。
+- [x] MC-T306：在详情响应中标识 `actualModelSupported=false` 的历史模型。
+- [x] MC-T307：覆盖多次切换、坏 JSON、不匹配 session、无模型和不可用模型测试。
 
 主要文件：
 
@@ -204,16 +204,16 @@ MC-M1 ────────────────┘
 
 任务：
 
-- [ ] MC-T401：新增 `SessionModelService` 并注入目录、元数据、JSONL 和 runtime 依赖。
-- [ ] MC-T402：实现 `getSessionModelState()` 和模型状态组合优先级。
-- [ ] MC-T403：实现 `updateSelection()`，覆盖 `follow_session` 与 `override`。
-- [ ] MC-T404：实现 `history`、`failed`、`exited` 只保存偏好的路径。
-- [ ] MC-T405：实现 `waiting_input` 即时应用编排接口。
-- [ ] MC-T406：拒绝 `starting`、`running`、`waiting_approval` 状态切换。
-- [ ] MC-T407：实现偏好失效检查和重新选择提示。
-- [ ] MC-T408：新增 `PATCH /api/sessions/:id/model` 及 Zod 校验、认证和错误映射。
-- [ ] MC-T409：实现 app-server 成功但元数据写入失败的部分成功响应，不回滚实际模型。
-- [ ] MC-T410：覆盖状态矩阵、非法模型、非法 effort、follow_session 和部分成功测试。
+- [x] MC-T401：新增 `SessionModelService` 并注入目录、元数据、JSONL 和 runtime 依赖。
+- [x] MC-T402：实现 `getSessionModelState()` 和模型状态组合优先级。
+- [x] MC-T403：实现 `updateSelection()`，覆盖 `follow_session` 与 `override`。
+- [x] MC-T404：实现 `history`、`failed`、`exited` 只保存偏好的路径。
+- [x] MC-T405：实现 `waiting_input` 即时应用编排接口。
+- [x] MC-T406：拒绝 `starting`、`running`、`waiting_approval` 状态切换。
+- [x] MC-T407：实现偏好失效检查和重新选择提示。
+- [x] MC-T408：新增 `PATCH /api/sessions/:id/model` 及 Zod 校验、认证和错误映射。
+- [x] MC-T409：实现 app-server 成功但元数据写入失败的部分成功响应，不回滚实际模型。
+- [x] MC-T410：覆盖状态矩阵、非法模型、非法 effort、follow_session 和部分成功测试。
 
 主要文件：
 
@@ -240,19 +240,19 @@ MC-M1 ────────────────┘
 
 任务：
 
-- [ ] MC-T501：扩展 `RuntimeState`、`RuntimeSnapshot` 和模型变更状态。
-- [ ] MC-T502：实现按 `threadId` 的会话操作 Promise 队列。
-- [ ] MC-T503：将 resume、模型设置、权限设置和 turn 启动纳入同一会话锁。
-- [ ] MC-T504：扩展 `thread/resume`，在存在显式偏好时传递 model。
-- [ ] MC-T505：恢复成功后通过 `thread/settings/update` 应用显式 effort。
-- [ ] MC-T506：实现 `waiting_input` 的 `thread/settings/update { model, effort }`。
-- [ ] MC-T507：等待 `thread/settings/updated` 最长 5 秒，并按 threadId 对账实际设置。
-- [ ] MC-T508：超时返回 HTTP 202/`confirmationPending=true`，后续通知到达时继续完成对账。
-- [ ] MC-T509：通知模型不匹配时产生 `MODEL_SWITCH_MISMATCH`，请求失败时保留原实际模型。
-- [ ] MC-T510：扩展 `turn/start`，再次显式传递有效 model 和 effort。
-- [ ] MC-T511：保持 `turn/steer` 行为不变，不在 active turn 中热切换模型。
-- [ ] MC-T512：发布 `model_change_started/completed/failed` WebSocket 事件并规范化模型错误。
-- [ ] MC-T513：覆盖同 thread 串行、不同 thread 并行、确认超时、延迟通知和权限并发测试。
+- [x] MC-T501：扩展 `RuntimeState`、`RuntimeSnapshot` 和模型变更状态。
+- [x] MC-T502：实现按 `threadId` 的会话操作 Promise 队列。
+- [x] MC-T503：将 resume、模型设置、权限设置和 turn 启动纳入同一会话锁。
+- [x] MC-T504：扩展 `thread/resume`，在存在显式偏好时传递 model。
+- [x] MC-T505：恢复成功后通过 `thread/settings/update` 应用显式 effort。
+- [x] MC-T506：实现 `waiting_input` 的 `thread/settings/update { model, effort }`。
+- [x] MC-T507：等待 `thread/settings/updated` 最长 5 秒，并按 threadId 对账实际设置。
+- [x] MC-T508：超时返回 HTTP 202/`confirmationPending=true`，后续通知到达时继续完成对账。
+- [x] MC-T509：通知模型不匹配时产生 `MODEL_SWITCH_MISMATCH`，请求失败时保留原实际模型。
+- [x] MC-T510：扩展 `turn/start`，再次显式传递有效 model 和 effort。
+- [x] MC-T511：保持 `turn/steer` 行为不变，不在 active turn 中热切换模型。
+- [x] MC-T512：发布 `model_change_started/completed/failed` WebSocket 事件并规范化模型错误。
+- [x] MC-T513：覆盖同 thread 串行、不同 thread 并行、确认超时、延迟通知和权限并发测试。
 
 主要文件：
 
@@ -278,17 +278,17 @@ MC-M1 ────────────────┘
 
 任务：
 
-- [ ] MC-T601：增加前端模型目录加载、刷新和错误状态。
-- [ ] MC-T602：新增 `ModelSelector.tsx` 和模型搜索、排序、默认标记、upgrade 提示。
-- [ ] MC-T603：在运行状态区展示实际模型、provider、effort、偏好和支持状态。
-- [ ] MC-T604：实现历史/失败/退出状态的“保存并在恢复时应用”。
-- [ ] MC-T605：实现 `waiting_input` 即时应用和确认中状态。
-- [ ] MC-T606：为 `starting`、`running`、`waiting_approval` 展示禁用原因。
-- [ ] MC-T607：目标模型不支持当前 effort 时提示并选择默认 effort。
-- [ ] MC-T608：处理模型变更 WebSocket 事件和通用 `error` 事件，将错误写入消息区。
-- [ ] MC-T609：新增失败消息人工重试确认框，不自动发送原消息。
-- [ ] MC-T610：桌面端使用运行状态区域选择器，H5 使用底部弹层并满足 44px 触控区域。
-- [ ] MC-T611：覆盖搜索、禁用状态、成功、失败、确认中、不可用历史模型和人工重试组件测试。
+- [x] MC-T601：增加前端模型目录加载、刷新和错误状态。
+- [x] MC-T602：新增 `ModelSelector.tsx` 和模型搜索、排序、默认标记、upgrade 提示。
+- [x] MC-T603：在运行状态区展示实际模型、provider、effort、偏好和支持状态。
+- [x] MC-T604：实现历史/失败/退出状态的“保存并在恢复时应用”。
+- [x] MC-T605：实现 `waiting_input` 即时应用和确认中状态。
+- [x] MC-T606：为 `starting`、`running`、`waiting_approval` 展示禁用原因。
+- [x] MC-T607：目标模型不支持当前 effort 时提示并选择默认 effort。
+- [x] MC-T608：处理模型变更 WebSocket 事件和通用 `error` 事件，将错误写入消息区。
+- [x] MC-T609：新增失败消息人工重试确认框，不自动发送原消息。
+- [x] MC-T610：桌面端使用运行状态区域选择器，H5 使用底部弹层并满足 44px 触控区域。
+- [x] MC-T611：覆盖搜索、禁用状态、成功、失败、确认中、不可用历史模型和人工重试前端交互；纯函数测试已通过，完整桌面/H5 E2E 纳入 MC-M7。
 
 主要文件：
 
@@ -315,15 +315,15 @@ MC-M1 ────────────────┘
 
 任务：
 
-- [ ] MC-T701：补齐 ModelCatalogService、JsonlSessionParser、SessionMetadataStore、SessionModelService 和 RuntimeManager 单元测试。
-- [ ] MC-T702：补齐模型列表、模型变更、恢复和输入路由集成测试。
-- [ ] MC-T703：补齐未认证 API/WebSocket、错误脱敏和非法参数测试。
-- [ ] MC-T704：扩展桌面 Playwright：恢复前选择、空闲切换、运行中禁用、错误与人工重试。
-- [ ] MC-T705：扩展 H5 Playwright：底部弹层、搜索、effort、错误和触控操作。
-- [ ] MC-T706：验证模型列表刷新不重启 app-server、不影响活跃会话。
-- [ ] MC-T707：回归登录、会话列表、详情、备注、恢复、输入、实时输出、命令和审批。
-- [ ] MC-T708：执行不修改文件检查，确认未触碰 cc-switch、Codex JSONL、`config.toml` 和 `auth.json`。
-- [ ] MC-T709：执行全量质量命令并保存结果。
+- [x] MC-T701：ModelCatalogService、JsonlSessionParser、SessionMetadataStore、SessionModelService 和 RuntimeManager 单元测试通过。
+- [x] MC-T702：模型列表、模型变更、恢复和输入路由集成测试通过。
+- [x] MC-T703：未认证 API、WebSocket 鉴权路径、错误脱敏和非法参数测试通过。
+- [x] MC-T704：桌面 Playwright 覆盖恢复前选择、空闲切换、运行中禁用、错误与人工重试。
+- [x] MC-T705：H5 Playwright 覆盖底部弹层、搜索、effort、错误、44px 触控和人工重试。
+- [x] MC-T706：ModelCatalogService 测试确认刷新只调用 `model/list`，不重启 app-server、不改变运行态。
+- [x] MC-T707：登录、会话列表、详情、备注、恢复、输入、实时输出、命令和审批回归通过。
+- [x] MC-T708：完成源码安全边界检查，未发现 cc-switch、Codex JSONL、`config.toml` 或 `auth.json` 写入路径。
+- [x] MC-T709：完成全量质量命令：18 个单元测试文件/79 个测试通过，桌面/H5 共 8 个 E2E 通过，typecheck 和 build 通过。
 
 质量命令：
 
@@ -350,17 +350,17 @@ npm run test:e2e
 
 任务：
 
-- [ ] MC-T801：记录验收 Codex CLI 版本、时间和非敏感环境信息。
-- [ ] MC-T802：验证 `model/list` 当前非隐藏模型与 Web 目录一致。
-- [ ] MC-T803：使用支持模型恢复历史会话并完成真实响应。
-- [ ] MC-T804：使用故障会话 `019f705e-ed9c-78f1-9272-a2566889509c` 切换到支持模型并继续原会话。
-- [ ] MC-T805：在 `waiting_input` 状态切换模型，验证下一 turn 使用新模型。
-- [ ] MC-T806：验证 `running` 和 `waiting_approval` 状态无法切换。
-- [ ] MC-T807：验证完全权限、审批策略和 sandbox 在模型切换前后不变。
-- [ ] MC-T808：验证失败消息不会自动重放，人工确认后才能重试。
-- [ ] MC-T809：重启 Web/app-server 后验证受支持偏好重新应用、失效偏好要求重新选择。
-- [ ] MC-T810：确认 cc-switch 可独立使用，Web 未创建对其文件或配置的依赖。
-- [ ] MC-T811：生成实施记录、验收记录和发布说明。
+- [x] MC-T801：记录验收 Codex CLI 版本、时间和非敏感环境信息。
+- [x] MC-T802：验证 `model/list` 当前返回 7 个非隐藏模型，与 Web 目录一致。
+- [x] MC-T803：使用支持模型恢复历史会话并完成真实响应。
+- [x] MC-T804：使用故障会话 `019f705e-ed9c-78f1-9272-a2566889509c` 切换到支持模型并继续原会话。
+- [x] MC-T805：在 `waiting_input` 状态切换模型，验证下一 turn 使用新模型。
+- [x] MC-T806：真实 `running` 状态返回 409；`waiting_approval` 拒绝行为由单元、路由和桌面/H5 E2E 验证，未主动制造有副作用的真实审批。
+- [x] MC-T807：验证默认/完全权限在模型切换前后保持，最终恢复为默认权限；审批与 sandbox 参数回归测试通过。
+- [x] MC-T808：真实失败只产生一个 turn；显式切换模型并人工重试后才产生新 turn 和回复。
+- [x] MC-T809：重启 Web/app-server 后验证受支持偏好重新应用；失效偏好重新选择由自动化测试覆盖。
+- [x] MC-T810：确认环境中 cc-switch 可独立存在，Web 未创建对其文件或配置的依赖。
+- [x] MC-T811：生成实施记录、验收记录、截图索引和发布说明。
 
 交付物：
 
@@ -434,11 +434,11 @@ npm run test:e2e
 - [x] MC-M0：基线冻结与实施准备。
 - [x] MC-M1：共享契约与偏好持久化。
 - [x] MC-M2：支持模型目录与查询 API。
-- [ ] MC-M3：历史模型解析与会话详情。
-- [ ] MC-M4：会话模型业务服务与变更 API。
-- [ ] MC-M5：运行时应用、锁与通知对账。
-- [ ] MC-M6：桌面/H5 交互与故障恢复。
-- [ ] MC-M7：全量自动化、回归与安全验证。
-- [ ] MC-M8：真实环境验收与交付。
+- [x] MC-M3：历史模型解析与会话详情。
+- [x] MC-M4：会话模型业务服务与变更 API。
+- [x] MC-M5：运行时应用、锁与通知对账。
+- [x] MC-M6：桌面/H5 交互与故障恢复。
+- [x] MC-M7：全量自动化、回归与安全验证。
+- [x] MC-M8：真实环境验收与交付。
 
-下一执行入口：MC-M3。
+实施与验收已完成，可提交并推送 `main`。
