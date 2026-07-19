@@ -1,6 +1,8 @@
 import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { getHealthStatus, getMe, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata } from "../shared/api";
-import type { ApprovalDecision, ApprovalSummary, HealthStatus, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UserSession, WebSessionEvent } from "../shared/models";
+import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
+import type { ApprovalDecision, ApprovalSummary, HealthStatus, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserSession, WebSessionEvent } from "../shared/models";
+import { ModelSelector } from "./ModelSelector";
+import { modelSwitchDisabledReason } from "./modelSelection";
 import { isTaskSendShortcut, shouldAutoFollowLiveOutput } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 
@@ -27,6 +29,14 @@ type LiveMessage = {
   itemId: string | null;
   text: string;
   deliveryStatus: "sending" | "sent" | "failed" | null;
+};
+
+type LiveErrorNotice = {
+  id: string;
+  message: string;
+  code: string | null;
+  willRetry: boolean;
+  createdAt: string;
 };
 
 
@@ -189,11 +199,22 @@ function Dashboard({
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalSummary[]>([]);
   const [liveCommands, setLiveCommands] = useState<LiveCommand[]>([]);
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
+  const [liveErrors, setLiveErrors] = useState<LiveErrorNotice[]>([]);
   const [wsStatus, setWsStatus] = useState<WebSocketStatus>("idle");
   const [wsReconnectKey, setWsReconnectKey] = useState(0);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [modelCatalog, setModelCatalog] = useState<ModelCatalogResponse | null>(null);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelCatalogError, setModelCatalogError] = useState<string | null>(null);
+  const [modelActionError, setModelActionError] = useState<string | null>(null);
+  const [updatingModel, setUpdatingModel] = useState(false);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [retryMessage, setRetryMessage] = useState<string | null>(null);
+  const [retryDialogOpen, setRetryDialogOpen] = useState(false);
   const lastEventSeqRef = useRef(0);
   const selectedSessionIdRef = useRef<string | null>(initialRoute.kind === "detail" ? initialRoute.sessionId : null);
+  const liveMessagesRef = useRef<LiveMessage[]>([]);
+  const retryMessageRef = useRef<string | null>(null);
 
   const listenAddress = useMemo(() => {
     if (!currentConfig) return "读取中";
@@ -204,6 +225,9 @@ function Dashboard({
     : "未连接";
   const selectedSession = sessions.find((session) => session.id === selectedSessionId)
     ?? (sessionDetail?.id === selectedSessionId ? sessionDetail : null);
+  const currentModelState = runtime && runtime.status !== "history"
+    ? runtime.modelSelection
+    : sessionDetail?.modelState ?? runtime?.modelSelection ?? emptyModelState();
 
   async function loadSessions(nextSearch = search) {
     setLoadingSessions(true);
@@ -260,6 +284,14 @@ function Dashboard({
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    liveMessagesRef.current = liveMessages;
+  }, [liveMessages]);
+
+  useEffect(() => {
+    retryMessageRef.current = retryMessage;
+  }, [retryMessage]);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -320,6 +352,9 @@ function Dashboard({
 
   function syncRuntimeSnapshot(nextRuntime: RuntimeSnapshot) {
     setRuntime(nextRuntime);
+    setSessionDetail((current) => current && current.id === nextRuntime.threadId
+      ? { ...current, status: nextRuntime.status, modelState: nextRuntime.modelSelection }
+      : current);
     if (nextRuntime.status !== "history") {
       setPermissionMode(nextRuntime.permissionMode);
     }
@@ -354,6 +389,71 @@ function Dashboard({
     }
   }
 
+  async function loadModelCatalog(forceRefresh = false) {
+    if (!forceRefresh && modelCatalog) return;
+    setLoadingModels(true);
+    setModelCatalogError(null);
+    try {
+      const response = await getModels(forceRefresh);
+      setModelCatalog(response);
+      if (response.stale && response.lastError) setModelCatalogError(response.lastError);
+    } catch (caught) {
+      setModelCatalogError(caught instanceof Error ? caught.message : "支持模型列表加载失败");
+    } finally {
+      setLoadingModels(false);
+    }
+  }
+
+  function handleOpenModelPicker() {
+    const disabledReason = modelSwitchDisabledReason(runtime?.status ?? selectedSession?.status ?? "history");
+    if (disabledReason) {
+      setModelActionError(disabledReason);
+      return;
+    }
+    setModelActionError(null);
+    setModelPickerOpen(true);
+    void loadModelCatalog();
+  }
+
+  async function handleApplyModel(input: UpdateModelSelectionInput) {
+    if (!selectedSessionId) return;
+    const sessionId = selectedSessionId;
+    setUpdatingModel(true);
+    setModelActionError(null);
+    try {
+      const response = await updateSessionModel(sessionId, input);
+      if (selectedSessionIdRef.current !== sessionId) return;
+      syncRuntimeSnapshot(response.runtime);
+      setSessionDetail((current) => current && current.id === sessionId
+        ? { ...current, modelState: response.selection }
+        : current);
+      setModelPickerOpen(false);
+      if (retryMessageRef.current) setRetryDialogOpen(true);
+    } catch (caught) {
+      if (selectedSessionIdRef.current !== sessionId) return;
+      const message = caught instanceof Error ? caught.message : "模型切换失败";
+      setModelActionError(message);
+      setLiveErrors((current) => upsertById(current, {
+        id: `model-action-${sessionId}`,
+        message,
+        code: "MODEL_SWITCH_FAILED",
+        willRetry: false,
+        createdAt: new Date().toISOString()
+      }));
+      await loadRuntime(sessionId, { silent: true });
+    } finally {
+      setUpdatingModel(false);
+    }
+  }
+
+  async function handleRetryLastMessage() {
+    if (!retryMessage) return;
+    await handleSendInput(retryMessage, { isRetry: true });
+    setRetryDialogOpen(false);
+    setRetryMessage(null);
+    retryMessageRef.current = null;
+  }
+
   function applyRealtimeEvent(event: WebSessionEvent) {
     if (selectedSessionIdRef.current !== event.threadId) return;
     lastEventSeqRef.current = Math.max(lastEventSeqRef.current, event.seq);
@@ -366,6 +466,100 @@ function Dashboard({
 
     if (event.type === "turn_completed") {
       void refreshCurrentSession(event.threadId, { silent: true });
+      return;
+    }
+
+    if (event.type === "model_change_started") {
+      const requestedModel = readPayloadString(payload.requestedModel);
+      const reasoningEffort = readPayloadString(payload.reasoningEffort);
+      setModelActionError(null);
+      setRuntime((current) => current ? {
+        ...current,
+        modelChangeStatus: "pending",
+        modelChangeError: null,
+        modelSelection: {
+          ...current.modelSelection,
+          mode: requestedModel ? "override" : current.modelSelection.mode,
+          preferredModel: requestedModel ?? current.modelSelection.preferredModel,
+          preferredReasoningEffort: reasoningEffort,
+          applied: false,
+          confirmationPending: false,
+          lastError: null
+        }
+      } : current);
+      return;
+    }
+
+    if (event.type === "model_change_completed") {
+      const actualModel = readPayloadString(payload.actualModel);
+      const modelProvider = readPayloadString(payload.modelProvider);
+      const reasoningEffort = readPayloadString(payload.reasoningEffort);
+      setModelActionError(null);
+      setRuntime((current) => current ? {
+        ...current,
+        model: actualModel ?? current.model,
+        modelProvider: modelProvider ?? current.modelProvider,
+        reasoningEffort,
+        modelChangeStatus: "applied",
+        modelChangeError: null,
+        modelSelection: {
+          ...current.modelSelection,
+          actualModel: actualModel ?? current.modelSelection.actualModel,
+          actualModelProvider: modelProvider ?? current.modelSelection.actualModelProvider,
+          actualReasoningEffort: reasoningEffort,
+          actualModelSupported: true,
+          applied: true,
+          confirmationPending: false,
+          lastError: null
+        }
+      } : current);
+      void refreshCurrentSession(event.threadId, { silent: true });
+      if (retryMessageRef.current) setRetryDialogOpen(true);
+      return;
+    }
+
+    if (event.type === "model_change_failed") {
+      const message = readPayloadString(payload.message) ?? "模型切换失败";
+      const code = readPayloadString(payload.errorCode);
+      setModelActionError(message);
+      setRuntime((current) => current ? {
+        ...current,
+        modelChangeStatus: "failed",
+        modelChangeError: message,
+        modelSelection: { ...current.modelSelection, applied: false, confirmationPending: false, lastError: message }
+      } : current);
+      setLiveErrors((current) => upsertById(current, {
+        id: `model-change-${event.threadId}`,
+        message,
+        code,
+        willRetry: false,
+        createdAt: event.createdAt
+      }));
+      return;
+    }
+
+    if (event.type === "error") {
+      const message = readRealtimeErrorMessage(payload) ?? "Codex 执行失败";
+      const willRetry = payload.willRetry === true;
+      const turnId = readPayloadString(payload.turnId) ?? "current";
+      const retryingId = `retrying-${event.threadId}-${turnId}`;
+      setLiveErrors((current) => willRetry
+        ? upsertById(current, { id: retryingId, message, code: readPayloadString(payload.errorCode), willRetry, createdAt: event.createdAt })
+        : [
+            ...current.filter((item) => item.id !== retryingId),
+            {
+              id: `terminal-${event.seq}`,
+              message,
+              code: readPayloadString(payload.errorCode),
+              willRetry: false,
+              createdAt: event.createdAt
+            }
+          ]);
+      if (!willRetry) {
+        const failedMessage = [...liveMessagesRef.current].reverse().find((messageItem) => messageItem.role === "user")?.text ?? null;
+        retryMessageRef.current = failedMessage;
+        setRetryMessage(failedMessage);
+      }
       return;
     }
 
@@ -450,7 +644,14 @@ function Dashboard({
     setPendingApprovals([]);
     setLiveCommands([]);
     setLiveMessages([]);
+    liveMessagesRef.current = [];
+    setLiveErrors([]);
     setRuntimeError(null);
+    setModelActionError(null);
+    setModelPickerOpen(false);
+    setRetryMessage(null);
+    retryMessageRef.current = null;
+    setRetryDialogOpen(false);
     lastEventSeqRef.current = 0;
   }
 
@@ -544,22 +745,26 @@ function Dashboard({
     }
   }
 
-  async function handleSendInput(text: string) {
+  async function handleSendInput(text: string, options: { isRetry?: boolean } = {}) {
     if (!selectedSessionId) return;
+    if (!options.isRetry) {
+      setRetryDialogOpen(false);
+      setRetryMessage(null);
+      retryMessageRef.current = null;
+    }
     const sessionId = selectedSessionId;
     const messageId = createLocalMessageId();
+    const localMessage: LiveMessage = {
+      id: messageId,
+      role: "user",
+      turnId: null,
+      itemId: null,
+      text,
+      deliveryStatus: "sending"
+    };
     setRuntimeError(null);
-    setLiveMessages((current) => [
-      ...current,
-      {
-        id: messageId,
-        role: "user",
-        turnId: null,
-        itemId: null,
-        text,
-        deliveryStatus: "sending"
-      }
-    ]);
+    liveMessagesRef.current = [...liveMessagesRef.current, localMessage];
+    setLiveMessages((current) => [...current, localMessage]);
     try {
       const response = await sendSessionInput(sessionId, text, permissionMode);
       if (selectedSessionIdRef.current !== sessionId) return;
@@ -569,7 +774,17 @@ function Dashboard({
     } catch (caught) {
       if (selectedSessionIdRef.current !== sessionId) throw caught;
       setLiveMessages((current) => updateLiveMessageDeliveryStatus(current, messageId, "failed"));
-      setRuntimeError(caught instanceof Error ? caught.message : "任务发送失败");
+      const message = caught instanceof Error ? caught.message : "任务发送失败";
+      setRuntimeError(message);
+      setLiveErrors((current) => upsertById(current, {
+        id: `input-${messageId}`,
+        message,
+        code: null,
+        willRetry: false,
+        createdAt: new Date().toISOString()
+      }));
+      retryMessageRef.current = text;
+      setRetryMessage(text);
       throw caught;
     }
   }
@@ -749,10 +964,15 @@ function Dashboard({
                 pendingApprovals={pendingApprovals}
                 liveCommands={liveCommands}
                 liveMessages={liveMessages}
+                liveErrors={liveErrors}
                 wsStatus={wsStatus}
+                modelState={currentModelState}
+                updatingModel={updatingModel}
                 onResume={handleResume}
                 onPermissionModeChange={handlePermissionModeChange}
+                onOpenModelPicker={handleOpenModelPicker}
                 onSendInput={handleSendInput}
+                onOpenRetry={() => setRetryDialogOpen(true)}
                 onSubmitApproval={handleSubmitApproval}
               />
             ) : loadingDetail ? (
@@ -825,6 +1045,29 @@ function Dashboard({
           runtime={runtime}
           wsStatus={wsStatus}
           pendingApprovalCount={pendingApprovals.length}
+        />
+      ) : null}
+
+      {viewMode === "detail" && selectedSession ? (
+        <ModelSelector
+          open={modelPickerOpen}
+          catalog={modelCatalog}
+          current={currentModelState}
+          loading={loadingModels}
+          submitting={updatingModel}
+          error={modelActionError ?? modelCatalogError}
+          onClose={() => setModelPickerOpen(false)}
+          onRefresh={() => loadModelCatalog(true)}
+          onApply={handleApplyModel}
+        />
+      ) : null}
+
+      {viewMode === "detail" && retryDialogOpen && retryMessage ? (
+        <RetryLastMessageDialog
+          message={retryMessage}
+          model={currentModelState.actualModel ?? currentModelState.preferredModel}
+          onCancel={() => setRetryDialogOpen(false)}
+          onConfirm={handleRetryLastMessage}
         />
       ) : null}
     </Shell>
@@ -1114,10 +1357,15 @@ function SessionDetailPanel({
   pendingApprovals,
   liveCommands,
   liveMessages,
+  liveErrors,
   wsStatus,
+  modelState,
+  updatingModel,
   onResume,
   onPermissionModeChange,
+  onOpenModelPicker,
   onSendInput,
+  onOpenRetry,
   onSubmitApproval
 }: {
   fallbackSession: SessionSummary;
@@ -1134,17 +1382,22 @@ function SessionDetailPanel({
   pendingApprovals: ApprovalSummary[];
   liveCommands: LiveCommand[];
   liveMessages: LiveMessage[];
+  liveErrors: LiveErrorNotice[];
   wsStatus: WebSocketStatus;
+  modelState: SessionModelState;
+  updatingModel: boolean;
   onResume: () => Promise<void>;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
+  onOpenModelPicker: () => void;
   onSendInput: (text: string) => Promise<void>;
+  onOpenRetry: () => void;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
   const session = detail ?? fallbackSession;
   const [expandedMessage, setExpandedMessage] = useState<{ title: string; text: string; meta?: string } | null>(null);
   const [visibleTurnCount, setVisibleTurnCount] = useState(DEFAULT_VISIBLE_TURNS);
   const [showHistoryDuringLive, setShowHistoryDuringLive] = useState(false);
-  const hasLiveOutput = liveMessages.length > 0 || liveCommands.some((command) => !isLiveCommandCompleted(command));
+  const hasLiveOutput = liveMessages.length > 0 || liveErrors.length > 0 || liveCommands.some((command) => !isLiveCommandCompleted(command));
   const showHistory = !hasLiveOutput || showHistoryDuringLive;
 
   useEffect(() => {
@@ -1169,7 +1422,11 @@ function SessionDetailPanel({
           <LiveOutputPanel
             liveMessages={liveMessages}
             liveCommands={liveCommands}
+            liveErrors={liveErrors}
             runtimeStatus={runtime?.status ?? "history"}
+            canRetry={Boolean(liveErrors.some((notice) => !notice.willRetry) && liveMessages.some((message) => message.role === "user"))}
+            onChooseModel={onOpenModelPicker}
+            onRetry={onOpenRetry}
             onShowHistory={() => setShowHistoryDuringLive(true)}
           />
         ) : null}
@@ -1191,8 +1448,11 @@ function SessionDetailPanel({
           permissionMode={permissionMode}
           wsStatus={wsStatus}
           error={runtimeError}
+          modelState={modelState}
+          updatingModel={updatingModel}
           onResume={onResume}
           onPermissionModeChange={onPermissionModeChange}
+          onOpenModelPicker={onOpenModelPicker}
         />
 
         {hasLiveOutput && !showHistory ? <div className="historyHiddenNotice">实时输出进行中，历史会话内容已隐藏。</div> : null}
@@ -1241,21 +1501,31 @@ function RuntimePanel({
   permissionMode,
   wsStatus,
   error,
+  modelState,
+  updatingModel,
   onResume,
-  onPermissionModeChange
+  onPermissionModeChange,
+  onOpenModelPicker
 }: {
   runtime: RuntimeSnapshot | null;
   permissionMode: SessionPermissionMode;
   wsStatus: WebSocketStatus;
   error: string | null;
+  modelState: SessionModelState;
+  updatingModel: boolean;
   onResume: () => Promise<void>;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
+  onOpenModelPicker: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [updatingPermission, setUpdatingPermission] = useState(false);
   const [confirmFullAccess, setConfirmFullAccess] = useState(false);
   const status = runtime?.status ?? "history";
   const canChangePermission = status === "history" || status === "waiting_input" || status === "exited" || status === "failed";
+  const modelDisabledReason = modelSwitchDisabledReason(status);
+  const actualModel = runtime?.model ?? modelState.actualModel;
+  const actualProvider = runtime?.modelProvider ?? modelState.actualModelProvider;
+  const actualEffort = runtime?.reasoningEffort ?? modelState.actualReasoningEffort;
 
   async function handleResume() {
     setSubmitting(true);
@@ -1315,6 +1585,31 @@ function RuntimePanel({
           </label>
         </div>
         {!canChangePermission ? <p className="permissionUnavailable">当前状态不可切换权限模式</p> : null}
+        <div className="modelControl">
+          <div className="modelStateGrid">
+            <span>当前模型</span>
+            <strong title={actualModel ?? "未识别"}>{actualModel ?? "未识别"}</strong>
+            {modelState.actualModelSupported === false ? <small className="unsupportedModelBadge">当前会话模型，不在可选列表</small> : null}
+            <span>提供方 / 推理强度</span>
+            <strong>{[actualProvider, actualEffort].filter(Boolean).join(" · ") || "未识别"}</strong>
+            <span>Web 偏好</span>
+            <strong title={modelState.preferredModel ?? undefined}>
+              {modelState.mode === "override"
+                ? [modelState.preferredModel, modelState.preferredReasoningEffort].filter(Boolean).join(" · ")
+                : "跟随会话"}
+            </strong>
+          </div>
+          <div className="modelControlActions">
+            <button className="ghostButton" type="button" onClick={onOpenModelPicker} disabled={Boolean(modelDisabledReason) || updatingModel}>
+              {updatingModel ? "切换中" : modelState.actualModelSupported === false ? "切换到支持模型" : "切换模型"}
+            </button>
+            {modelDisabledReason ? <p>{modelDisabledReason}</p> : null}
+            {!modelDisabledReason && modelState.mode === "override" && !modelState.applied ? <p>已保存，将在恢复会话时应用。</p> : null}
+            {modelState.confirmationPending || runtime?.modelChangeStatus === "confirming" ? <p>app-server 已接受，正在等待实际模型确认。</p> : null}
+            {runtime?.modelChangeStatus && runtime.modelChangeStatus !== "idle" ? <p>切换状态：{modelChangeStatusLabel(runtime.modelChangeStatus)}</p> : null}
+          </div>
+        </div>
+        {runtime?.modelChangeError || modelState.lastError ? <p className="errorText">{runtime?.modelChangeError ?? modelState.lastError}</p> : null}
         {runtime?.lastError ? <p className="errorText">{runtime.lastError}</p> : null}
         {error ? <p className="errorText">{error}</p> : null}
       </div>
@@ -1358,6 +1653,61 @@ function FullAccessConfirmDialog({
           <div className="dialogActions">
             <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
             <button className="dangerButton" type="button" onClick={() => void onConfirm()} disabled={submitting}>{submitting ? "启用中" : "确认启用"}</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function RetryLastMessageDialog({
+  message,
+  model,
+  onCancel,
+  onConfirm
+}: {
+  message: string;
+  model: string | null;
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirmRetry() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onConfirm();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "重试发送失败");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="modalBackdrop" role="presentation" onClick={submitting ? undefined : onCancel}>
+      <section className="messageDialog retryMessageDialog" role="dialog" aria-modal="true" aria-labelledby="retry-message-title" onClick={(event) => event.stopPropagation()}>
+        <div className="dialogHeader">
+          <div>
+            <h2 id="retry-message-title">确认重试上一条消息</h2>
+            <p className="muted">将创建新的 turn，原失败记录会保留。</p>
+          </div>
+        </div>
+        <div className="dialogBody retryMessageBody">
+          <div className="retryModelSummary">
+            <span>本次使用模型</span>
+            <strong title={model ?? "跟随会话"}>{model ?? "跟随会话"}</strong>
+          </div>
+          <div className="retryMessagePreview">
+            <span>原消息内容</span>
+            <div><MarkdownContent text={message} /></div>
+          </div>
+          {error ? <div className="errorBanner">{error}</div> : null}
+          <div className="dialogActions">
+            <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
+            <button type="button" onClick={() => void confirmRetry()} disabled={submitting}>{submitting ? "重试中" : "使用当前模型重试"}</button>
           </div>
         </div>
       </section>
@@ -1469,12 +1819,20 @@ function ApprovalCard({
 function LiveOutputPanel({
   liveMessages,
   liveCommands,
+  liveErrors,
   runtimeStatus,
+  canRetry,
+  onChooseModel,
+  onRetry,
   onShowHistory
 }: {
   liveMessages: LiveMessage[];
   liveCommands: LiveCommand[];
+  liveErrors: LiveErrorNotice[];
   runtimeStatus: SessionStatus;
+  canRetry: boolean;
+  onChooseModel: () => void;
+  onRetry: () => void;
   onShowHistory: () => void;
 }) {
   const outputBodyRef = useRef<HTMLDivElement | null>(null);
@@ -1482,14 +1840,14 @@ function LiveOutputPanel({
   const visibleMessages = useMemo(() => liveMessages.slice(-MAX_VISIBLE_LIVE_MESSAGES), [liveMessages]);
   const visibleCommands = useMemo(() => runningCommands.slice(-MAX_VISIBLE_LIVE_COMMANDS), [runningCommands]);
   const hiddenCount = liveMessages.length + runningCommands.length - visibleMessages.length - visibleCommands.length;
-  const visibleCount = liveMessages.length + runningCommands.length;
+  const visibleCount = liveMessages.length + runningCommands.length + liveErrors.length;
 
   useEffect(() => {
     if (!shouldAutoFollowLiveOutput(runtimeStatus)) return;
     const outputBody = outputBodyRef.current;
     if (!outputBody) return;
     outputBody.scrollTop = outputBody.scrollHeight;
-  }, [runtimeStatus, visibleMessages, visibleCommands]);
+  }, [runtimeStatus, visibleMessages, visibleCommands, liveErrors]);
 
   if (visibleCount === 0) return null;
 
@@ -1506,6 +1864,15 @@ function LiveOutputPanel({
       </div>
       <div className="liveOutputBody" ref={outputBodyRef}>
         {hiddenCount > 0 ? <div className="liveHiddenNotice">已隐藏较早的 {hiddenCount} 条实时输出</div> : null}
+        {liveErrors.map((notice) => (
+          <LiveErrorCard
+            notice={notice}
+            canRetry={canRetry && !notice.willRetry}
+            onChooseModel={onChooseModel}
+            onRetry={onRetry}
+            key={notice.id}
+          />
+        ))}
         {visibleMessages.map((message) => (
           <article className={`messageItem ${message.role} liveMessage${message.deliveryStatus ? ` ${message.deliveryStatus}` : ""}`} key={message.id}>
             <div className="messageHeader">
@@ -1522,6 +1889,35 @@ function LiveOutputPanel({
         ))}
       </div>
     </section>
+  );
+}
+
+function LiveErrorCard({
+  notice,
+  canRetry,
+  onChooseModel,
+  onRetry
+}: {
+  notice: LiveErrorNotice;
+  canRetry: boolean;
+  onChooseModel: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <article className={`liveErrorCard${notice.willRetry ? " retrying" : " terminal"}`} role={notice.willRetry ? "status" : "alert"}>
+      <div>
+        <strong>{notice.willRetry ? "模型请求正在重试" : "模型请求失败"}</strong>
+        <span>{formatDateTime(notice.createdAt)}</span>
+      </div>
+      <p>{notice.message}</p>
+      {notice.code ? <code>{notice.code}</code> : null}
+      {!notice.willRetry ? (
+        <div className="liveErrorActions">
+          <button className="ghostButton" type="button" onClick={onChooseModel}>选择其他模型</button>
+          {canRetry ? <button type="button" onClick={onRetry}>重试上一条消息</button> : null}
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -2298,6 +2694,38 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function emptyModelState(): SessionModelState {
+  return {
+    mode: "follow_session",
+    preferredModel: null,
+    preferredReasoningEffort: null,
+    updatedAt: null,
+    actualModel: null,
+    actualModelProvider: null,
+    actualReasoningEffort: null,
+    actualModelSupported: null,
+    applied: false,
+    confirmationPending: false,
+    lastError: null
+  };
+}
+
+function modelChangeStatusLabel(status: RuntimeSnapshot["modelChangeStatus"]): string {
+  switch (status) {
+    case "pending":
+      return "正在请求";
+    case "confirming":
+      return "等待确认";
+    case "applied":
+      return "已应用";
+    case "failed":
+      return "失败";
+    case "idle":
+    default:
+      return "空闲";
+  }
+}
+
 function wsStatusLabel(status: WebSocketStatus): string {
   switch (status) {
     case "connected":
@@ -2340,6 +2768,14 @@ function isApprovalSummary(value: unknown): value is ApprovalSummary {
 
 function readPayloadString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function readRealtimeErrorMessage(payload: Record<string, unknown>): string | null {
+  const direct = readPayloadString(payload.message);
+  if (direct) return direct;
+  if (!payload.error || typeof payload.error !== "object") return readPayloadString(payload.error);
+  const error = payload.error as Record<string, unknown>;
+  return readPayloadString(error.message) ?? readPayloadString(error.error);
 }
 
 function readPayloadNumber(value: unknown): number | null {

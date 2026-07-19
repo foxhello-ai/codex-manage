@@ -6,7 +6,7 @@
 - 文档状态：用户已确认，实施中
 - 需求状态：用户已确认
 - 详细设计状态：用户已确认
-- 实施代码基线：`feature/f-20260717-replace-logo`
+- 实施代码分支：`main`（`feature/f-20260717-replace-logo` 已完成同步）
 - Codex CLI 基线：`codex-cli 0.144.5`
 - 需求文档：[model-change-requirements.md](./model-change-requirements.md)
 - 详细设计：[model-change-detailed-design.md](./model-change-detailed-design.md)
@@ -47,7 +47,7 @@
 | MC-M3 | 历史模型解析与会话详情 | 已完成 | MR-003、MR-004 | 历史模型可准确展示且不可用模型只读 |
 | MC-M4 | 会话模型业务服务与变更 API | 已完成 | MR-005、MR-007、MR-010、MR-011 | 状态矩阵、偏好生命周期和 API 测试通过 |
 | MC-M5 | 运行时应用、锁与通知对账 | 已完成 | MR-006、MR-008、MR-009、MR-012、MR-013、MR-014 | resume、settings、turn 和事件一致性测试通过 |
-| MC-M6 | 桌面/H5 交互与故障恢复 | 待开始 | MR-003、MR-011、MR-012、MR-016 | 桌面和 H5 主流程组件测试通过 |
+| MC-M6 | 桌面/H5 交互与故障恢复 | 已完成 | MR-003、MR-011、MR-012、MR-016 | 桌面和 H5 主流程组件测试通过 |
 | MC-M7 | 全量自动化、回归与安全验证 | 待开始 | MR-015、MR-017、AC-01 至 AC-17 | typecheck、unit、build、E2E 全部通过 |
 | MC-M8 | 真实环境验收与交付 | 待开始 | AC-01 至 AC-17 | 真实 app-server 验收、记录和发布文档完成 |
 
@@ -278,17 +278,17 @@ MC-M1 ────────────────┘
 
 任务：
 
-- [ ] MC-T601：增加前端模型目录加载、刷新和错误状态。
-- [ ] MC-T602：新增 `ModelSelector.tsx` 和模型搜索、排序、默认标记、upgrade 提示。
-- [ ] MC-T603：在运行状态区展示实际模型、provider、effort、偏好和支持状态。
-- [ ] MC-T604：实现历史/失败/退出状态的“保存并在恢复时应用”。
-- [ ] MC-T605：实现 `waiting_input` 即时应用和确认中状态。
-- [ ] MC-T606：为 `starting`、`running`、`waiting_approval` 展示禁用原因。
-- [ ] MC-T607：目标模型不支持当前 effort 时提示并选择默认 effort。
-- [ ] MC-T608：处理模型变更 WebSocket 事件和通用 `error` 事件，将错误写入消息区。
-- [ ] MC-T609：新增失败消息人工重试确认框，不自动发送原消息。
-- [ ] MC-T610：桌面端使用运行状态区域选择器，H5 使用底部弹层并满足 44px 触控区域。
-- [ ] MC-T611：覆盖搜索、禁用状态、成功、失败、确认中、不可用历史模型和人工重试组件测试。
+- [x] MC-T601：增加前端模型目录加载、刷新和错误状态。
+- [x] MC-T602：新增 `ModelSelector.tsx` 和模型搜索、排序、默认标记、upgrade 提示。
+- [x] MC-T603：在运行状态区展示实际模型、provider、effort、偏好和支持状态。
+- [x] MC-T604：实现历史/失败/退出状态的“保存并在恢复时应用”。
+- [x] MC-T605：实现 `waiting_input` 即时应用和确认中状态。
+- [x] MC-T606：为 `starting`、`running`、`waiting_approval` 展示禁用原因。
+- [x] MC-T607：目标模型不支持当前 effort 时提示并选择默认 effort。
+- [x] MC-T608：处理模型变更 WebSocket 事件和通用 `error` 事件，将错误写入消息区。
+- [x] MC-T609：新增失败消息人工重试确认框，不自动发送原消息。
+- [x] MC-T610：桌面端使用运行状态区域选择器，H5 使用底部弹层并满足 44px 触控区域。
+- [x] MC-T611：覆盖搜索、禁用状态、成功、失败、确认中、不可用历史模型和人工重试前端交互；纯函数测试已通过，完整桌面/H5 E2E 纳入 MC-M7。
 
 主要文件：
 
@@ -437,8 +437,8 @@ npm run test:e2e
 - [x] MC-M3：历史模型解析与会话详情。
 - [x] MC-M4：会话模型业务服务与变更 API。
 - [x] MC-M5：运行时应用、锁与通知对账。
-- [ ] MC-M6：桌面/H5 交互与故障恢复。
+- [x] MC-M6：桌面/H5 交互与故障恢复。
 - [ ] MC-M7：全量自动化、回归与安全验证。
 - [ ] MC-M8：真实环境验收与交付。
 
-下一执行入口：MC-M6。
+下一执行入口：MC-M7。
