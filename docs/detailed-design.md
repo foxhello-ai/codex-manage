@@ -118,7 +118,7 @@ Codex 集成：
 
 ```text
 CODEX_WEB_HOST=0.0.0.0
-CODEX_WEB_PORT=3000
+CODEX_WEB_PORT=4310
 CODEX_WEB_PASSWORD=fmzh2026
 CODEX_CLI_PATH=codex
 CODEX_SESSIONS_DIR=~/.codex/sessions
@@ -128,7 +128,7 @@ CODEX_WEB_SESSION_SECRET=<auto-or-env>
 默认值：
 
 - 监听地址：`0.0.0.0`
-- 监听端口：`3000`
+- 监听端口：`4310`
 - 默认密码：`fmzh2026`
 - Codex CLI：`codex`
 - 会话目录：`~/.codex/sessions`
@@ -702,3 +702,12 @@ MVP 只读展示：
 - 移动端可完整完成登录、查看、恢复、输入、审批。
 - 不提供删除历史会话能力。
 
+## 22. 增量详细设计
+
+### 22.1 会话模型切换
+
+app-server 当前支持模型列表、会话级模型覆盖、历史模型解析、运行时状态、桌面/H5 交互、错误恢复和测试设计以以下文档为准：
+
+- [Codex Web 会话模型切换详细设计](./model-change-detailed-design.md)
+
+该文档已于 2026-07-19 由用户审核通过，实施按 [会话模型切换任务计划](./model-change-task-plan.md) 执行。

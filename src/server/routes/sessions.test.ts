@@ -4,6 +4,44 @@ import { registerSessionRoutes } from "./sessions";
 import type { SessionService } from "../services/SessionService";
 import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 import type { RuntimeManager } from "../services/RuntimeManager";
+import type { RuntimeSnapshot, SessionModelState } from "../../shared/models";
+
+function emptyModelState(): SessionModelState {
+  return {
+    mode: "follow_session",
+    preferredModel: null,
+    preferredReasoningEffort: null,
+    actualModel: null,
+    actualModelProvider: null,
+    actualReasoningEffort: null,
+    actualModelSupported: null,
+    applied: false,
+    confirmationPending: false,
+    updatedAt: null,
+    lastError: null
+  };
+}
+
+function runtimeSnapshot(threadId: string, patch: Partial<RuntimeSnapshot> = {}): RuntimeSnapshot {
+  return {
+    threadId,
+    status: "history",
+    permissionMode: "default",
+    activeTurnId: null,
+    startedAt: "2026-07-14T00:00:00.000Z",
+    updatedAt: "2026-07-14T00:00:00.000Z",
+    lastError: null,
+    pendingApprovalCount: 0,
+    eventSeq: 1,
+    model: null,
+    modelProvider: null,
+    reasoningEffort: null,
+    modelSelection: emptyModelState(),
+    modelChangeStatus: "idle",
+    modelChangeError: null,
+    ...patch
+  };
+}
 
 function buildApp(
   service: Pick<SessionService, "listSessions" | "getSessionDetail" | "updateMetadata">,
@@ -38,6 +76,7 @@ describe("session routes", () => {
         path: "/sessions/thread-1.jsonl",
         modelProvider: "openai",
         historyMode: "full",
+        modelState: { ...emptyModelState(), actualModelProvider: "openai" },
         turns: []
       })
     });
@@ -141,17 +180,10 @@ describe("session routes", () => {
         }) as any,
         resumeThread: async (threadId: string, options: { permissionMode?: "default" | "full_access" } = {}) => {
           resumedOptions = options;
-          return {
-            threadId,
+          return runtimeSnapshot(threadId, {
             status: "waiting_input",
-            permissionMode: options.permissionMode ?? "default",
-            activeTurnId: null,
-            startedAt: "2026-07-14T00:00:00.000Z",
-            updatedAt: "2026-07-14T00:00:00.000Z",
-            lastError: null,
-            pendingApprovalCount: 0,
-            eventSeq: 1
-          };
+            permissionMode: options.permissionMode ?? "default"
+          });
         },
         sendInput: (() => {
           throw new Error("not used");
@@ -215,17 +247,11 @@ describe("session routes", () => {
         }) as any,
         sendInput: async (threadId: string, body: { text: string; permissionMode?: "default" | "full_access" }) => {
           submittedBody = body;
-          return {
-            threadId,
+          return runtimeSnapshot(threadId, {
             status: body.text === "继续" ? "running" : "failed",
             permissionMode: body.permissionMode ?? "default",
-            activeTurnId: "turn-1",
-            startedAt: "2026-07-14T00:00:00.000Z",
-            updatedAt: "2026-07-14T00:00:00.000Z",
-            lastError: null,
-            pendingApprovalCount: 0,
-            eventSeq: 1
-          };
+            activeTurnId: "turn-1"
+          });
         },
         submitApproval: (() => {
           throw new Error("not used");

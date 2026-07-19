@@ -1,5 +1,6 @@
 import type { CodexAppServerClient } from "./CodexAppServerClient";
 import type { SessionMetadataStore } from "./SessionMetadataStore";
+import type { SessionModelState } from "../../shared/models";
 
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
 
@@ -22,6 +23,7 @@ export type SessionDetail = SessionSummary & {
   path: string | null;
   modelProvider: string | null;
   historyMode: string | null;
+  modelState: SessionModelState;
   turns: SessionTurn[];
 };
 
@@ -62,7 +64,10 @@ type ListSessionsParams = {
   limit?: number;
 };
 
-type MetadataStore = Pick<SessionMetadataStore, "getAll" | "update">;
+type MetadataStore = {
+  getAll(): Promise<Record<string, { remarkTitle: string | null }>>;
+  update(sessionId: string, metadata: { remarkTitle: string | null }): Promise<{ remarkTitle: string | null }>;
+};
 
 export class SessionService {
   constructor(
@@ -113,6 +118,7 @@ export class SessionService {
       path: readString(thread.path),
       modelProvider: readString(thread.modelProvider),
       historyMode: readString(thread.historyMode),
+      modelState: emptyModelState(readString(thread.modelProvider)),
       turns: readArray(thread.turns).map((turn, index) => toTurn(turn, index))
     };
   }
@@ -173,6 +179,22 @@ export class SessionService {
       source: readSource(source.source)
     };
   }
+}
+
+function emptyModelState(modelProvider: string | null): SessionModelState {
+  return {
+    mode: "follow_session",
+    preferredModel: null,
+    preferredReasoningEffort: null,
+    actualModel: null,
+    actualModelProvider: modelProvider,
+    actualReasoningEffort: null,
+    actualModelSupported: null,
+    applied: false,
+    confirmationPending: false,
+    updatedAt: null,
+    lastError: null
+  };
 }
 
 function toTurn(value: unknown, index: number): SessionTurn {

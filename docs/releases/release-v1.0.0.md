@@ -84,7 +84,7 @@ npm start
 
 ```text
 CODEX_WEB_HOST=0.0.0.0
-CODEX_WEB_PORT=3000
+CODEX_WEB_PORT=4310
 CODEX_WEB_PASSWORD=<your-password>
 CODEX_CLI_PATH=codex
 CODEX_SESSIONS_DIR=~/.codex/sessions

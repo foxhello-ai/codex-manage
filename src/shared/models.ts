@@ -57,6 +57,87 @@ export type SessionMetadataResponse = {
   session: SessionSummary;
 };
 
+export type ModelOption = {
+  id: string;
+  model: string;
+  displayName: string;
+  description: string | null;
+  hidden: boolean;
+  isDefault: boolean;
+  supportedReasoningEfforts: string[];
+  defaultReasoningEffort: string | null;
+  upgradeModel: string | null;
+  upgradeCopy: string | null;
+};
+
+export type ModelCatalogResponse = {
+  models: ModelOption[];
+  loadedAt: string;
+  stale: boolean;
+  lastError: string | null;
+};
+
+export type ModelSelectionMode = "follow_session" | "override";
+
+export type PersistedModelSelection = {
+  mode: ModelSelectionMode;
+  preferredModel: string | null;
+  preferredReasoningEffort: string | null;
+  updatedAt: string | null;
+};
+
+export type SessionModelState = PersistedModelSelection & {
+  actualModel: string | null;
+  actualModelProvider: string | null;
+  actualReasoningEffort: string | null;
+  actualModelSupported: boolean | null;
+  applied: boolean;
+  confirmationPending: boolean;
+  lastError: string | null;
+};
+
+export type ModelChangeStatus = "idle" | "pending" | "confirming" | "applied" | "failed";
+
+export type UpdateModelSelectionInput =
+  | {
+      mode: "follow_session";
+      model?: null;
+      reasoningEffort?: null;
+    }
+  | {
+      mode: "override";
+      model: string;
+      reasoningEffort?: string | null;
+    };
+
+export type ModelOverrideInput = {
+  model: string;
+  reasoningEffort?: string | null;
+};
+
+export type ValidatedModelSelection = {
+  model: string;
+  reasoningEffort: string | null;
+  option: ModelOption;
+};
+
+export type ResolvedModelOverride = {
+  mode: ModelSelectionMode;
+  model: string | null;
+  reasoningEffort: string | null;
+};
+
+export type ModelErrorCode =
+  | "MODEL_LIST_UNAVAILABLE"
+  | "MODEL_NOT_SUPPORTED"
+  | "MODEL_EFFORT_NOT_SUPPORTED"
+  | "MODEL_SWITCH_NOT_ALLOWED"
+  | "MODEL_SWITCH_FAILED"
+  | "MODEL_SWITCH_MISMATCH"
+  | "MODEL_PREFERENCE_PERSIST_FAILED"
+  | "MODEL_PROVIDER_UNAVAILABLE"
+  | "MODEL_REQUEST_TIMEOUT";
+
 
 export type SessionDetailResponse = {
   session: SessionDetail;
@@ -66,6 +147,7 @@ export type SessionDetail = SessionSummary & {
   path: string | null;
   modelProvider: string | null;
   historyMode: string | null;
+  modelState: SessionModelState;
   turns: SessionTurn[];
 };
 
@@ -145,6 +227,12 @@ export type RuntimeSnapshot = {
   lastError: string | null;
   pendingApprovalCount: number;
   eventSeq: number;
+  model: string | null;
+  modelProvider: string | null;
+  reasoningEffort: string | null;
+  modelSelection: SessionModelState;
+  modelChangeStatus: ModelChangeStatus;
+  modelChangeError: string | null;
 };
 
 export type RuntimeResponse = {
@@ -153,6 +241,13 @@ export type RuntimeResponse = {
 
 export type InputResponse = {
   runtime: RuntimeSnapshot;
+};
+
+export type ModelSelectionResponse = {
+  selection: SessionModelState;
+  runtime: RuntimeSnapshot;
+  applied: boolean;
+  confirmationPending: boolean;
 };
 
 export type WebSessionEvent = {
@@ -169,6 +264,9 @@ export type WebSessionEvent = {
     | "command_completed"
     | "approval_requested"
     | "approval_resolved"
+    | "model_change_started"
+    | "model_change_completed"
+    | "model_change_failed"
     | "error"
     | "warning"
     | "raw";

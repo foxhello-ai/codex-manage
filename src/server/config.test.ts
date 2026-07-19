@@ -24,7 +24,7 @@ describe("loadConfig", () => {
     const config = loadConfig();
 
     expect(config.host).toBe("0.0.0.0");
-    expect(config.port).toBe(3000);
+    expect(config.port).toBe(4310);
     expect(config.password).toBe("fmzh2026");
     expect(config.defaultPassword).toBe(true);
     expect(config.codexCliPath).toBe("codex");
