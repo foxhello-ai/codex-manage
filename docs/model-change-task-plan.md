@@ -44,7 +44,7 @@
 | MC-M0 | 基线冻结与实施准备 | 已完成 | 全部 | 需求、设计、协议和边界均已确认 |
 | MC-M1 | 共享契约与偏好持久化 | 已完成 | MR-009、MR-010、MR-011 | 类型、兼容读取和原子写入测试通过 |
 | MC-M2 | 支持模型目录与查询 API | 已完成 | MR-001、MR-002、MR-017 | 分页、缓存、刷新、校验和路由测试通过 |
-| MC-M3 | 历史模型解析与会话详情 | 待开始 | MR-003、MR-004 | 历史模型可准确展示且不可用模型只读 |
+| MC-M3 | 历史模型解析与会话详情 | 已完成 | MR-003、MR-004 | 历史模型可准确展示且不可用模型只读 |
 | MC-M4 | 会话模型业务服务与变更 API | 待开始 | MR-005、MR-007、MR-010、MR-011 | 状态矩阵、偏好生命周期和 API 测试通过 |
 | MC-M5 | 运行时应用、锁与通知对账 | 待开始 | MR-006、MR-008、MR-009、MR-012、MR-013、MR-014 | resume、settings、turn 和事件一致性测试通过 |
 | MC-M6 | 桌面/H5 交互与故障恢复 | 待开始 | MR-003、MR-011、MR-012、MR-016 | 桌面和 H5 主流程组件测试通过 |
@@ -173,13 +173,13 @@ MC-M1 ────────────────┘
 
 任务：
 
-- [ ] MC-T301：扩展 `JsonlSessionParser.readModelState(sessionId)`。
-- [ ] MC-T302：解析 `session_meta`、`turn_context`、collaboration settings 和 `thread_settings_applied`。
-- [ ] MC-T303：实现按记录顺序取最后非空值、坏行容错和 diagnostics。
-- [ ] MC-T304：确保只处理匹配 session，找不到模型时返回 `null` 而不猜测默认模型。
-- [ ] MC-T305：扩展 `SessionService.getSessionDetail()` 聚合历史状态、持久偏好和目录支持状态。
-- [ ] MC-T306：在详情响应中标识 `actualModelSupported=false` 的历史模型。
-- [ ] MC-T307：覆盖多次切换、坏 JSON、不匹配 session、无模型和不可用模型测试。
+- [x] MC-T301：扩展 `JsonlSessionParser.readModelState(sessionId)`。
+- [x] MC-T302：解析 `session_meta`、`turn_context`、collaboration settings 和 `thread_settings_applied`。
+- [x] MC-T303：实现按记录顺序取最后非空值、坏行容错和 diagnostics。
+- [x] MC-T304：确保只处理匹配 session，找不到模型时返回 `null` 而不猜测默认模型。
+- [x] MC-T305：扩展 `SessionService.getSessionDetail()` 聚合历史状态、持久偏好和目录支持状态。
+- [x] MC-T306：在详情响应中标识 `actualModelSupported=false` 的历史模型。
+- [x] MC-T307：覆盖多次切换、坏 JSON、不匹配 session、无模型和不可用模型测试。
 
 主要文件：
 
@@ -434,11 +434,11 @@ npm run test:e2e
 - [x] MC-M0：基线冻结与实施准备。
 - [x] MC-M1：共享契约与偏好持久化。
 - [x] MC-M2：支持模型目录与查询 API。
-- [ ] MC-M3：历史模型解析与会话详情。
+- [x] MC-M3：历史模型解析与会话详情。
 - [ ] MC-M4：会话模型业务服务与变更 API。
 - [ ] MC-M5：运行时应用、锁与通知对账。
 - [ ] MC-M6：桌面/H5 交互与故障恢复。
 - [ ] MC-M7：全量自动化、回归与安全验证。
 - [ ] MC-M8：真实环境验收与交付。
 
-下一执行入口：MC-M3。
+下一执行入口：MC-M4。

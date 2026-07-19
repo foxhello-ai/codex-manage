@@ -22,8 +22,14 @@ const app = Fastify({
 const runtime = new AppRuntime(config);
 const metadataStore = new SessionMetadataStore(config.metadataFile);
 const modelCatalog = new ModelCatalogService(runtime.appServer);
-const sessionService = new SessionService(runtime.appServer, metadataStore);
 const jsonlSessionParser = new JsonlSessionParser(config.sessionsDir);
+const sessionService = new SessionService(
+  runtime.appServer,
+  metadataStore,
+  jsonlSessionParser,
+  modelCatalog,
+  runtime.runtimeManager
+);
 
 await app.register(cookie, {
   secret: config.sessionSecret

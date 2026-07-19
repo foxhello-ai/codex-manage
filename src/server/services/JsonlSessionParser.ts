@@ -30,6 +30,17 @@ export type SessionCommandsResult = {
   commands: SessionCommand[];
   diagnostics: SessionCommandDiagnostics;
 };
+export type HistoricalModelState = {
+  model: string | null;
+  modelProvider: string | null;
+  reasoningEffort: string | null;
+  updatedAt: string | null;
+};
+
+export type HistoricalModelStateResult = {
+  state: HistoricalModelState;
+  diagnostics: SessionCommandDiagnostics;
+};
 
 type JsonlRecord = {
   timestamp?: unknown;
@@ -68,6 +79,34 @@ export class JsonlSessionParser {
       commands: allCommands.sort((left, right) => compareNullableString(left.timestamp, right.timestamp)),
       diagnostics
     };
+  }
+
+  async readModelState(sessionId: string): Promise<HistoricalModelStateResult> {
+    const files = await this.walk(this.sessionsDir);
+    const diagnostics: SessionCommandDiagnostics = {
+      scannedFiles: files.length,
+      parsedLines: 0,
+      parseErrors: 0,
+      matchedSessionFile: false
+    };
+    const state: HistoricalModelState = {
+      model: null,
+      modelProvider: null,
+      reasoningEffort: null,
+      updatedAt: null
+    };
+
+    for (const file of files) {
+      const parsed = await this.parseModelFile(file, diagnostics);
+      if (!parsed.sessionIds.has(sessionId)) continue;
+      diagnostics.matchedSessionFile = true;
+      if (parsed.state.model !== null) state.model = parsed.state.model;
+      if (parsed.state.modelProvider !== null) state.modelProvider = parsed.state.modelProvider;
+      if (parsed.state.reasoningEffort !== null) state.reasoningEffort = parsed.state.reasoningEffort;
+      if (parsed.state.updatedAt !== null) state.updatedAt = parsed.state.updatedAt;
+    }
+
+    return { state, diagnostics };
   }
 
   private async parseFile(filePath: string, diagnostics: SessionCommandDiagnostics) {
@@ -144,6 +183,81 @@ export class JsonlSessionParser {
     };
   }
 
+  private async parseModelFile(filePath: string, diagnostics: SessionCommandDiagnostics) {
+    const raw = await readFile(filePath, "utf8");
+    const sessionIds = new Set<string>();
+    const state: HistoricalModelState = {
+      model: null,
+      modelProvider: null,
+      reasoningEffort: null,
+      updatedAt: null
+    };
+
+    for (const line of raw.split(/\r?\n/)) {
+      if (!line) continue;
+      let record: JsonlRecord;
+      try {
+        record = JSON.parse(line) as JsonlRecord;
+        diagnostics.parsedLines += 1;
+      } catch {
+        diagnostics.parseErrors += 1;
+        continue;
+      }
+
+      const payload = asRecord(record.payload);
+      const recordType = readString(record.type);
+      if (recordType === "session_meta") {
+        for (const value of [payload.id, payload.session_id]) {
+          const id = readString(value);
+          if (id) sessionIds.add(id);
+        }
+        applyModelValues(state, {
+          modelProvider: readString(payload.model_provider) ?? readString(payload.modelProvider),
+          timestamp: readString(record.timestamp)
+        });
+      }
+
+      if (recordType === "turn_context") {
+        const collaborationSettings = asRecord(asRecord(payload.collaboration_mode).settings);
+        applyModelValues(state, {
+          model: readString(collaborationSettings.model) ?? readString(payload.model),
+          modelProvider: readString(payload.model_provider) ?? readString(payload.modelProvider),
+          reasoningEffort:
+            readString(collaborationSettings.reasoning_effort)
+            ?? readString(collaborationSettings.reasoningEffort)
+            ?? readString(payload.reasoning_effort)
+            ?? readString(payload.reasoningEffort),
+          timestamp: readString(record.timestamp)
+        });
+      }
+
+      if (recordType === "event_msg" && readString(payload.type) === "thread_settings_applied") {
+        const settings = {
+          ...asRecord(payload.thread_settings),
+          ...asRecord(payload.threadSettings)
+        };
+        applyModelValues(state, {
+          model: readString(settings.model) ?? readString(payload.model),
+          modelProvider:
+            readString(settings.model_provider)
+            ?? readString(settings.modelProvider)
+            ?? readString(payload.model_provider)
+            ?? readString(payload.modelProvider),
+          reasoningEffort:
+            readString(settings.reasoning_effort)
+            ?? readString(settings.reasoningEffort)
+            ?? readString(settings.effort)
+            ?? readString(payload.reasoning_effort)
+            ?? readString(payload.reasoningEffort)
+            ?? readString(payload.effort),
+          timestamp: readString(record.timestamp)
+        });
+      }
+    }
+
+    return { sessionIds, state };
+  }
+
   private async walk(dir: string, output: string[] = []): Promise<string[]> {
     let entries;
     try {
@@ -164,6 +278,30 @@ export class JsonlSessionParser {
 
     return output;
   }
+}
+
+function applyModelValues(
+  state: HistoricalModelState,
+  values: Partial<Omit<HistoricalModelState, "updatedAt">> & { timestamp?: string | null }
+) {
+  let changed = false;
+  if (values.model) {
+    state.model = values.model;
+    changed = true;
+  }
+  if (values.modelProvider) {
+    state.modelProvider = values.modelProvider;
+    changed = true;
+  }
+  if (values.reasoningEffort) {
+    state.reasoningEffort = values.reasoningEffort;
+    changed = true;
+  }
+  if (changed && values.timestamp) state.updatedAt = values.timestamp;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function parseArguments(value: unknown): Record<string, unknown> | null {

@@ -1,6 +1,9 @@
 import type { CodexAppServerClient } from "./CodexAppServerClient";
 import type { SessionMetadataStore } from "./SessionMetadataStore";
 import type { SessionModelState } from "../../shared/models";
+import type { JsonlSessionParser } from "./JsonlSessionParser";
+import type { ModelCatalogService } from "./ModelCatalogService";
+import type { RuntimeManager } from "./RuntimeManager";
 
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
 
@@ -66,13 +69,25 @@ type ListSessionsParams = {
 
 type MetadataStore = {
   getAll(): Promise<Record<string, { remarkTitle: string | null }>>;
+  get?(sessionId: string): Promise<{
+    remarkTitle: string | null;
+    modelSelection: {
+      mode: "follow_session" | "override";
+      preferredModel: string | null;
+      preferredReasoningEffort: string | null;
+      updatedAt: string | null;
+    };
+  }>;
   update(sessionId: string, metadata: { remarkTitle: string | null }): Promise<{ remarkTitle: string | null }>;
 };
 
 export class SessionService {
   constructor(
     private readonly appServer: Pick<CodexAppServerClient, "request" | "getSnapshot">,
-    private readonly metadataStore?: MetadataStore
+    private readonly metadataStore?: MetadataStore,
+    private readonly jsonlParser?: Pick<JsonlSessionParser, "readModelState">,
+    private readonly modelCatalog?: Pick<ModelCatalogService, "list">,
+    private readonly runtimeManager?: Pick<RuntimeManager, "getRuntime">
   ) {}
 
   async listSessions(params: ListSessionsParams = {}): Promise<SessionSummary[]> {
@@ -112,13 +127,15 @@ export class SessionService {
     }
 
     const thread = response.thread && typeof response.thread === "object" ? (response.thread as Record<string, unknown>) : {};
+    const modelState = await this.buildModelState(sessionId, readString(thread.modelProvider));
+
 
     return {
       ...summary,
       path: readString(thread.path),
       modelProvider: readString(thread.modelProvider),
       historyMode: readString(thread.historyMode),
-      modelState: emptyModelState(readString(thread.modelProvider)),
+      modelState,
       turns: readArray(thread.turns).map((turn, index) => toTurn(turn, index))
     };
   }
@@ -136,6 +153,55 @@ export class SessionService {
     }
 
     return session;
+  }
+
+  private async buildModelState(sessionId: string, threadModelProvider: string | null): Promise<SessionModelState> {
+    const [metadata, historical] = await Promise.all([
+      this.metadataStore?.get?.(sessionId),
+      this.jsonlParser?.readModelState(sessionId).catch(() => undefined)
+    ]);
+    const runtime = this.runtimeManager?.getRuntime(sessionId);
+    const actualModel = runtime?.model ?? historical?.state.model ?? null;
+    const actualModelProvider = runtime?.modelProvider ?? historical?.state.modelProvider ?? threadModelProvider;
+    const actualReasoningEffort = runtime?.reasoningEffort ?? historical?.state.reasoningEffort ?? null;
+    let actualModelSupported: boolean | null = null;
+
+    if (actualModel && this.modelCatalog) {
+      try {
+        const catalog = await this.modelCatalog.list();
+        actualModelSupported = catalog.models.some((model) => model.model === actualModel);
+      } catch {
+        actualModelSupported = null;
+      }
+    }
+
+    const persisted = metadata?.modelSelection ?? {
+      mode: "follow_session" as const,
+      preferredModel: null,
+      preferredReasoningEffort: null,
+      updatedAt: null
+    };
+
+    if (runtime && runtime.status !== "history") {
+      return {
+        ...runtime.modelSelection,
+        actualModel,
+        actualModelProvider,
+        actualReasoningEffort,
+        actualModelSupported
+      };
+    }
+
+    return {
+      ...persisted,
+      actualModel,
+      actualModelProvider,
+      actualReasoningEffort,
+      actualModelSupported,
+      applied: persisted.mode === "override" && persisted.preferredModel === actualModel,
+      confirmationPending: false,
+      lastError: null
+    };
   }
 
   private assertReady(): void {
@@ -179,22 +245,6 @@ export class SessionService {
       source: readSource(source.source)
     };
   }
-}
-
-function emptyModelState(modelProvider: string | null): SessionModelState {
-  return {
-    mode: "follow_session",
-    preferredModel: null,
-    preferredReasoningEffort: null,
-    actualModel: null,
-    actualModelProvider: modelProvider,
-    actualReasoningEffort: null,
-    actualModelSupported: null,
-    applied: false,
-    confirmationPending: false,
-    updatedAt: null,
-    lastError: null
-  };
 }
 
 function toTurn(value: unknown, index: number): SessionTurn {

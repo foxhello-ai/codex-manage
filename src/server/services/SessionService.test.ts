@@ -218,4 +218,158 @@ describe("SessionService", () => {
 
     await expect(service.listSessions()).rejects.toThrow("Codex app-server is not ready");
   });
+  it("combines persisted preference with unsupported historical model state", async () => {
+    const service = new SessionService(
+      readyClient({
+        thread: {
+          id: "thread-1",
+          sessionId: "thread-1",
+          preview: "model state",
+          cwd: "/workspace/app",
+          createdAt: 1,
+          updatedAt: 2,
+          modelProvider: "thread-provider",
+          turns: []
+        }
+      }),
+      {
+        getAll: async () => ({ "thread-1": { remarkTitle: null } }),
+        get: async () => ({
+          remarkTitle: null,
+          modelSelection: {
+            mode: "override" as const,
+            preferredModel: "gpt-5.6-sol",
+            preferredReasoningEffort: "high",
+            updatedAt: "2026-07-19T00:00:00.000Z"
+          }
+        }),
+        update: async (_sessionId, metadata) => metadata
+      },
+      {
+        readModelState: async () => ({
+          state: {
+            model: "z-ai/glm-5.2",
+            modelProvider: "custom",
+            reasoningEffort: "medium",
+            updatedAt: "2026-07-19T00:01:00.000Z"
+          },
+          diagnostics: { scannedFiles: 1, parsedLines: 3, parseErrors: 0, matchedSessionFile: true }
+        })
+      },
+      {
+        list: async () => ({
+          models: [{
+            id: "gpt-5.6-sol",
+            model: "gpt-5.6-sol",
+            displayName: "GPT-5.6-Sol",
+            description: null,
+            hidden: false,
+            isDefault: true,
+            supportedReasoningEfforts: ["high"],
+            defaultReasoningEffort: "high",
+            upgradeModel: null,
+            upgradeCopy: null
+          }],
+          loadedAt: "2026-07-19T00:00:00.000Z",
+          stale: false,
+          lastError: null
+        })
+      }
+    );
+
+    await expect(service.getSessionDetail("thread-1")).resolves.toMatchObject({
+      modelState: {
+        mode: "override",
+        preferredModel: "gpt-5.6-sol",
+        actualModel: "z-ai/glm-5.2",
+        actualModelProvider: "custom",
+        actualReasoningEffort: "medium",
+        actualModelSupported: false,
+        applied: false
+      }
+    });
+  });
+
+  it("prefers active runtime model state over historical JSONL", async () => {
+    const service = new SessionService(
+      readyClient({
+        thread: {
+          id: "thread-1",
+          preview: "runtime model",
+          cwd: "/workspace/app",
+          createdAt: 1,
+          updatedAt: 2,
+          turns: []
+        }
+      }),
+      undefined,
+      {
+        readModelState: async () => ({
+          state: { model: "old-model", modelProvider: "old-provider", reasoningEffort: "low", updatedAt: null },
+          diagnostics: { scannedFiles: 1, parsedLines: 2, parseErrors: 0, matchedSessionFile: true }
+        })
+      },
+      {
+        list: async () => ({
+          models: [{
+            id: "gpt-5.6-sol",
+            model: "gpt-5.6-sol",
+            displayName: "GPT-5.6-Sol",
+            description: null,
+            hidden: false,
+            isDefault: true,
+            supportedReasoningEfforts: ["high"],
+            defaultReasoningEffort: "high",
+            upgradeModel: null,
+            upgradeCopy: null
+          }],
+          loadedAt: "2026-07-19T00:00:00.000Z",
+          stale: false,
+          lastError: null
+        })
+      },
+      {
+        getRuntime: () => ({
+          threadId: "thread-1",
+          status: "waiting_input" as const,
+          permissionMode: "default" as const,
+          activeTurnId: null,
+          startedAt: "2026-07-19T00:00:00.000Z",
+          updatedAt: "2026-07-19T00:00:00.000Z",
+          lastError: null,
+          pendingApprovalCount: 0,
+          eventSeq: 0,
+          model: "gpt-5.6-sol",
+          modelProvider: "openai",
+          reasoningEffort: "high",
+          modelSelection: {
+            mode: "override" as const,
+            preferredModel: "gpt-5.6-sol",
+            preferredReasoningEffort: "high",
+            actualModel: "gpt-5.6-sol",
+            actualModelProvider: "openai",
+            actualReasoningEffort: "high",
+            actualModelSupported: true,
+            applied: true,
+            confirmationPending: false,
+            updatedAt: "2026-07-19T00:00:00.000Z",
+            lastError: null
+          },
+          modelChangeStatus: "applied" as const,
+          modelChangeError: null
+        })
+      }
+    );
+
+    await expect(service.getSessionDetail("thread-1")).resolves.toMatchObject({
+      modelState: {
+        actualModel: "gpt-5.6-sol",
+        actualModelProvider: "openai",
+        actualReasoningEffort: "high",
+        actualModelSupported: true,
+        applied: true
+      }
+    });
+  });
+
 });
