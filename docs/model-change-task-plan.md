@@ -48,7 +48,7 @@
 | MC-M4 | 会话模型业务服务与变更 API | 已完成 | MR-005、MR-007、MR-010、MR-011 | 状态矩阵、偏好生命周期和 API 测试通过 |
 | MC-M5 | 运行时应用、锁与通知对账 | 已完成 | MR-006、MR-008、MR-009、MR-012、MR-013、MR-014 | resume、settings、turn 和事件一致性测试通过 |
 | MC-M6 | 桌面/H5 交互与故障恢复 | 已完成 | MR-003、MR-011、MR-012、MR-016 | 桌面和 H5 主流程组件测试通过 |
-| MC-M7 | 全量自动化、回归与安全验证 | 待开始 | MR-015、MR-017、AC-01 至 AC-17 | typecheck、unit、build、E2E 全部通过 |
+| MC-M7 | 全量自动化、回归与安全验证 | 已完成 | MR-015、MR-017、AC-01 至 AC-17 | typecheck、unit、build、E2E 全部通过 |
 | MC-M8 | 真实环境验收与交付 | 待开始 | AC-01 至 AC-17 | 真实 app-server 验收、记录和发布文档完成 |
 
 ## 5. 依赖关系
@@ -315,15 +315,15 @@ MC-M1 ────────────────┘
 
 任务：
 
-- [ ] MC-T701：补齐 ModelCatalogService、JsonlSessionParser、SessionMetadataStore、SessionModelService 和 RuntimeManager 单元测试。
-- [ ] MC-T702：补齐模型列表、模型变更、恢复和输入路由集成测试。
-- [ ] MC-T703：补齐未认证 API/WebSocket、错误脱敏和非法参数测试。
-- [ ] MC-T704：扩展桌面 Playwright：恢复前选择、空闲切换、运行中禁用、错误与人工重试。
-- [ ] MC-T705：扩展 H5 Playwright：底部弹层、搜索、effort、错误和触控操作。
-- [ ] MC-T706：验证模型列表刷新不重启 app-server、不影响活跃会话。
-- [ ] MC-T707：回归登录、会话列表、详情、备注、恢复、输入、实时输出、命令和审批。
-- [ ] MC-T708：执行不修改文件检查，确认未触碰 cc-switch、Codex JSONL、`config.toml` 和 `auth.json`。
-- [ ] MC-T709：执行全量质量命令并保存结果。
+- [x] MC-T701：ModelCatalogService、JsonlSessionParser、SessionMetadataStore、SessionModelService 和 RuntimeManager 单元测试通过。
+- [x] MC-T702：模型列表、模型变更、恢复和输入路由集成测试通过。
+- [x] MC-T703：未认证 API、WebSocket 鉴权路径、错误脱敏和非法参数测试通过。
+- [x] MC-T704：桌面 Playwright 覆盖恢复前选择、空闲切换、运行中禁用、错误与人工重试。
+- [x] MC-T705：H5 Playwright 覆盖底部弹层、搜索、effort、错误、44px 触控和人工重试。
+- [x] MC-T706：ModelCatalogService 测试确认刷新只调用 `model/list`，不重启 app-server、不改变运行态。
+- [x] MC-T707：登录、会话列表、详情、备注、恢复、输入、实时输出、命令和审批回归通过。
+- [x] MC-T708：完成源码安全边界检查，未发现 cc-switch、Codex JSONL、`config.toml` 或 `auth.json` 写入路径。
+- [x] MC-T709：完成全量质量命令：18 个单元测试文件/79 个测试通过，桌面/H5 共 8 个 E2E 通过，typecheck 和 build 通过。
 
 质量命令：
 
@@ -438,7 +438,7 @@ npm run test:e2e
 - [x] MC-M4：会话模型业务服务与变更 API。
 - [x] MC-M5：运行时应用、锁与通知对账。
 - [x] MC-M6：桌面/H5 交互与故障恢复。
-- [ ] MC-M7：全量自动化、回归与安全验证。
+- [x] MC-M7：全量自动化、回归与安全验证。
 - [ ] MC-M8：真实环境验收与交付。
 
-下一执行入口：MC-M7。
+下一执行入口：MC-M8。

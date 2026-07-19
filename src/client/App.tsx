@@ -1065,7 +1065,7 @@ function Dashboard({
       {viewMode === "detail" && retryDialogOpen && retryMessage ? (
         <RetryLastMessageDialog
           message={retryMessage}
-          model={currentModelState.actualModel ?? currentModelState.preferredModel}
+          model={currentModelState.mode === "override" ? currentModelState.preferredModel : currentModelState.actualModel}
           onCancel={() => setRetryDialogOpen(false)}
           onConfirm={handleRetryLastMessage}
         />

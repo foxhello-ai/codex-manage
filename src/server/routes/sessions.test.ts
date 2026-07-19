@@ -1,5 +1,8 @@
+import cookie from "@fastify/cookie";
+import websocket from "@fastify/websocket";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
+import { registerAuthHook } from "../auth/hooks";
 import { registerSessionRoutes } from "./sessions";
 import type { SessionService } from "../services/SessionService";
 import type { JsonlSessionParser } from "../services/JsonlSessionParser";
@@ -62,6 +65,44 @@ function buildApp(
 }
 
 describe("session routes", () => {
+  it("rejects unauthenticated model changes and WebSocket upgrades", async () => {
+    const app = Fastify();
+    await app.register(cookie, { secret: "test-secret-at-least-thirty-two-characters" });
+    await app.register(websocket);
+    registerAuthHook(app);
+    registerSessionRoutes(
+      app,
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        getSessionDetail: async () => { throw new Error("not used"); }
+      } as unknown as SessionService,
+      undefined,
+      {
+        getRuntime: (threadId: string) => runtimeSnapshot(threadId),
+        eventHub: {
+          getLastSeq: () => 0,
+          getEvents: () => [],
+          subscribe: () => () => undefined
+        },
+        approvalService: { listPending: () => [] }
+      } as unknown as RuntimeManager,
+      {
+        updateSelection: async () => { throw new Error("must not be called"); }
+      } as unknown as SessionModelService
+    );
+    await app.ready();
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/sessions/thread-1/model",
+      payload: { mode: "override", model: "frontier-v2" }
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ error: { code: "UNAUTHENTICATED" } });
+    await expect(app.injectWS("/api/sessions/thread-1/ws")).rejects.toThrow(/401/);
+  });
+
   it("returns session detail", async () => {
     const app = buildApp({
       listSessions: async () => [],
