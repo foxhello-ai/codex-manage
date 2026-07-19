@@ -16,6 +16,7 @@
 - 在 Web 页面中继续输入任务并实时查看 Codex 输出。
 - 展示命令执行过程。
 - 支持 Codex CLI 审批交互，包括允许和拒绝。
+- 支持按会话查看并切换 app-server 当前支持的模型。
 - 提供一个默认密码登录能力。
 - 支持本机和局域网访问。
 
@@ -276,7 +277,7 @@ MVP 至少支持以下配置：
 
 ```text
 监听地址: 0.0.0.0
-监听端口: 3000
+监听端口: 4310
 默认密码: 环境变量 CODEX_WEB_PASSWORD，未设置时为 fmzh2026
 Codex CLI: codex
 会话目录: ~/.codex/sessions
@@ -420,6 +421,11 @@ MVP 中设置页可以只展示当前配置，不一定支持在线修改。
 - `POST /api/sessions/:id/input`
 - `POST /api/sessions/:id/approval`
 - `GET /api/sessions/:id/runtime`
+
+模型：
+
+- `GET /api/models`
+- `PATCH /api/sessions/:id/model`
 
 实时事件：
 
@@ -573,3 +579,14 @@ MVP 验收时应满足：
 - Web 不提供删除历史会话能力。
 - 未登录访问管理接口会被拒绝，`GET /api/me` 认证状态探测接口除外。
 
+## 12. 增量需求
+
+### 12.1 模型选择与变更
+
+当前支持模型列表、会话级切换、故障模型恢复、推理强度、错误处理以及与 cc-switch 的隔离边界以以下审核文档为准：
+
+- [Codex Web 模型选择与变更需求审核文档](./model-change-requirements.md)
+- [Codex Web 会话模型切换详细设计](./model-change-detailed-design.md)
+- [Codex Web 会话模型切换实施任务计划](./model-change-task-plan.md)
+
+该能力属于 MVP 完成后的增量需求，不改变既有 M0-M12 验收结论。需求和详细设计已于 2026-07-19 审核通过，当前进入待实施阶段。
