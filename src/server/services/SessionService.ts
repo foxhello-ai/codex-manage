@@ -4,6 +4,7 @@ import type { SessionModelState } from "../../shared/models";
 import type { JsonlSessionParser } from "./JsonlSessionParser";
 import type { ModelCatalogService } from "./ModelCatalogService";
 import type { RuntimeManager } from "./RuntimeManager";
+import { sanitizeModelError } from "../modelErrors";
 
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
 
@@ -330,11 +331,12 @@ function readNumber(value: unknown): number | null {
 
 function readError(value: unknown): string | null {
   if (value === null || value === undefined) return null;
-  if (typeof value === "string") return value;
+  if (typeof value === "string") return sanitizeModelError(value);
   if (typeof value === "object" && "message" in value) {
-    return readString((value as { message?: unknown }).message);
+    const message = readString((value as { message?: unknown }).message);
+    return message ? sanitizeModelError(message) : null;
   }
-  return String(value);
+  return sanitizeModelError(String(value));
 }
 
 function readUnixSeconds(value: unknown): string {

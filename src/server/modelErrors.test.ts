@@ -21,6 +21,8 @@ describe("model errors", () => {
     expect(message).not.toContain("abc");
     expect(message).not.toContain("xyz");
     expect(message).not.toContain("auth.json");
+    expect(message).not.toContain("example.test");
+    expect(message).toContain("[REDACTED_URL]");
     expect(message).toContain("[REDACTED]");
   });
 });

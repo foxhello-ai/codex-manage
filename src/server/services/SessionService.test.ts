@@ -136,7 +136,7 @@ describe("SessionService", () => {
                 {
                   id: "turn-1",
                   status: "completed",
-                  error: null,
+                  error: "upstream https://provider.example/v1/responses unavailable",
                   startedAt: 1784000000,
                   completedAt: 1784000010,
                   durationMs: 10000,
@@ -185,6 +185,7 @@ describe("SessionService", () => {
         {
           id: "turn-1",
           status: "completed",
+          error: "upstream [REDACTED_URL] unavailable",
           items: [
             { id: "item-user", type: "user_message", text: "用户消息" },
             { id: "item-agent", type: "agent_message", text: "Codex 回复", phase: "final" },

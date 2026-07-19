@@ -17,6 +17,7 @@ export function sanitizeModelError(error: unknown): string {
   return raw
     .replace(/(authorization|cookie|token|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, "$1=[REDACTED]")
     .replace(/([?&](?:token|api[_-]?key|authorization)=)[^&#\s]+/gi, "$1[REDACTED]")
+    .replace(/\bhttps?:\/\/[^\s"'<>),;]+/gi, "[REDACTED_URL]")
     .replace(/(?:~\/)?\.codex\/(?:config\.toml|auth\.json)/gi, "[REDACTED_CONFIG]")
     .slice(0, 2000);
 }
