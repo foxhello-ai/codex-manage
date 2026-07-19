@@ -33,7 +33,7 @@ export function loadConfig(): AppConfig {
 
   return {
     host: process.env.CODEX_WEB_HOST ?? "0.0.0.0",
-    port: readPort(process.env.CODEX_WEB_PORT, 3000),
+    port: readPort(process.env.CODEX_WEB_PORT, 4310),
     password,
     defaultPassword,
     sessionSecret,
