@@ -59,7 +59,7 @@
 - 提供受认证保护的 `/api/config` 和 `/api/health`。
 - 生产构建同时生成 Vite 前端产物和 esbuild 服务端产物。
 - Fastify 提供静态文件服务和会话详情 SPA 回退。
-- 支持 `codex.foxhello.com`、`codex.foxhello.cn` 开发访问配置。
+- 支持 `codex.example.com`、`codex.example.cn` 开发访问配置。
 
 ## 安全边界
 

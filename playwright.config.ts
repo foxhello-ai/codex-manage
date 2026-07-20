@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 const port = Number(process.env.CODEX_E2E_PORT ?? 3014);
-const password = process.env.CODEX_E2E_PASSWORD ?? "fmzh2026";
+const password = process.env.CODEX_E2E_PASSWORD ?? "admin";
 const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({

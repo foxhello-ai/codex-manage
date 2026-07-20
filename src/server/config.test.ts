@@ -25,7 +25,7 @@ describe("loadConfig", () => {
 
     expect(config.host).toBe("0.0.0.0");
     expect(config.port).toBe(4310);
-    expect(config.password).toBe("fmzh2026");
+    expect(config.password).toBe("admin");
     expect(config.defaultPassword).toBe(true);
     expect(config.codexCliPath).toBe("codex");
     expect(config.sessionsDir).toContain(".codex/sessions");
