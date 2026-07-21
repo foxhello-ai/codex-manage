@@ -2,7 +2,16 @@ node_modules/
 dist/
 .env
 .env.*
+!.env.example
+!**/.env.example
 *.log
 .codex-manage/
 test-results/
 playwright-report/
+apps/desktop/dist/
+apps/desktop/release/
+apps/control-api/dist/
+apps/admin-web/dist/
+resources/cloudflared/*
+!resources/cloudflared/README.md
+!resources/cloudflared/manifest.example.json

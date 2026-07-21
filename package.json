@@ -3,17 +3,42 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.6.2",
+  "engines": {
+    "node": ">=22.5.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:client": "vite --host 0.0.0.0",
     "build": "npm run typecheck && npm run build:client && npm run build:server",
     "build:client": "vite build",
-    "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server/index.js",
+    "build:server": "npm run build:server:web && npm run build:server:desktop",
+    "build:server:web": "esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server/index.js",
+    "build:server:desktop": "esbuild src/server/desktop-entry.ts --bundle --platform=node --format=cjs --sourcemap --outfile=dist/server/desktop-entry.cjs",
+    "build:desktop": "npm run build && npm --workspace @codex-manage/desktop run build",
+    "build:control": "npm --workspace @codex-manage/control-api run build",
+    "build:admin": "npm --workspace @codex-manage/admin-web run build",
+    "build:all": "npm run build:desktop && npm run build:control && npm run build:admin",
+    "desktop:dev": "npm run build && npm --workspace @codex-manage/desktop run dev",
+    "control:dev": "npm --workspace @codex-manage/control-api run dev",
+    "control:worker": "npm --workspace @codex-manage/control-api run worker",
+    "control:migrate": "npm --workspace @codex-manage/control-api run migrate",
+    "admin:dev": "npm --workspace @codex-manage/admin-web run dev",
+    "cloudflared:fetch": "node tooling/fetch-cloudflared.mjs",
+    "dist:desktop": "npm run build:desktop && npm --workspace @codex-manage/desktop run dist",
     "start": "NODE_ENV=production node dist/server/index.js",
     "typecheck": "tsc --noEmit",
+    "typecheck:desktop": "tsc --noEmit -p apps/desktop/tsconfig.json",
+    "typecheck:all": "npm run typecheck && npm run typecheck:desktop && npm --workspace @codex-manage/control-api run typecheck && npm --workspace @codex-manage/admin-web run typecheck",
     "test": "vitest run",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "test:desktop:e2e": "npm run build:desktop && playwright test -c playwright.desktop.config.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -32,6 +57,7 @@
     "@vitejs/plugin-react": "^5.1.2",
     "concurrently": "^9.2.1",
     "esbuild": "^0.28.1",
+    "npm": "^11.6.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.0",
