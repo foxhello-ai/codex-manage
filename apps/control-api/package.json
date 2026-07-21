@@ -1,0 +1,29 @@
+{
+  "name": "@codex-manage/control-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts src/worker.ts src/migrate.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outdir=dist && node scripts/copy-assets.mjs",
+    "start": "node dist/index.js",
+    "worker": "node dist/worker.js",
+    "migrate": "tsx src/migrate.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "fastify": "^5.6.2",
+    "pg": "^8.22.0",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "@types/node": "^25.0.2",
+    "@types/pg": "^8.20.0",
+    "esbuild": "^0.28.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}
