@@ -4,6 +4,10 @@ import type { RuntimeSnapshot, SessionModelState, SessionStatus } from "../../sr
 const password = process.env.CODEX_E2E_PASSWORD ?? "fmzh2026";
 const acceptanceDir = "docs/acceptance/2026-07-15";
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
 function modelState(patch: Partial<SessionModelState> = {}): SessionModelState {
   return {
     mode: "follow_session",

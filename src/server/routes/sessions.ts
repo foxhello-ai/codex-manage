@@ -7,6 +7,7 @@ import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 import type { RuntimeManager } from "../services/RuntimeManager";
 import type { SessionModelService } from "../services/SessionModelService";
 import { isAuthenticated } from "../auth/session";
+import type { LocalAuthService } from "../auth/LocalAuthService";
 
 const ListQuery = z.object({
   search: z.string().optional(),
@@ -62,7 +63,8 @@ export function registerSessionRoutes(
   sessionService: SessionService,
   jsonlSessionParser?: JsonlSessionParser,
   runtimeManager?: RuntimeManager,
-  sessionModelService?: SessionModelService
+  sessionModelService?: SessionModelService,
+  authService?: LocalAuthService
 ) {
   app.get("/api/sessions", async (request, reply) => {
     const parsed = ListQuery.safeParse(request.query);
@@ -210,7 +212,7 @@ export function registerSessionRoutes(
   if (runtimeManager) {
     app.get("/api/sessions/:id/ws", { websocket: true }, (socket, request) => {
       const params = SessionParams.safeParse(request.params);
-      if (!params.success || !isAuthenticated(request)) {
+      if (!params.success || !isAuthenticated(request, authService)) {
         socket.close(1008, "unauthenticated");
         return;
       }

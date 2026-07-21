@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, HealthStatus, InputResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, HealthStatus, InputResponse, LocalAuthSessionsResponse, ModelCatalogResponse, ModelSelectionResponse, PairingCodeResponse, PublicConfig, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -56,6 +56,44 @@ export function login(password: string): Promise<UserSession> {
   return apiRequest<UserSession>("/api/login", {
     method: "POST",
     body: JSON.stringify({ password })
+  });
+}
+
+export function setupLocalAuth(password: string): Promise<UserSession> {
+  return apiRequest<UserSession>("/api/local-auth/setup", {
+    method: "POST",
+    body: JSON.stringify({ password })
+  });
+}
+
+export function pairLocalAuth(code: string): Promise<UserSession> {
+  return apiRequest<UserSession>("/api/local-auth/pair", {
+    method: "POST",
+    body: JSON.stringify({ code })
+  });
+}
+
+export function createPairingCode(): Promise<PairingCodeResponse> {
+  return apiRequest<PairingCodeResponse>("/api/local-auth/pairing-code", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export function getLocalAuthSessions(): Promise<LocalAuthSessionsResponse> {
+  return apiRequest<LocalAuthSessionsResponse>("/api/local-auth/sessions");
+}
+
+export function revokeLocalAuthSession(sessionId: string): Promise<{ revoked: boolean }> {
+  return apiRequest<{ revoked: boolean }>(`/api/local-auth/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE"
+  });
+}
+
+export function logoutAllLocalAuthSessions(): Promise<UserSession> {
+  return apiRequest<UserSession>("/api/local-auth/logout-all", {
+    method: "POST",
+    body: JSON.stringify({})
   });
 }
 

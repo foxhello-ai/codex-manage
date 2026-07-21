@@ -1,71 +1,11 @@
-import cookie from "@fastify/cookie";
-import websocket from "@fastify/websocket";
-import Fastify from "fastify";
 import { loadConfig } from "./config";
-import { registerAuthHook } from "./auth/hooks";
-import { registerAuthRoutes } from "./routes/auth";
-import { registerConfigRoutes } from "./routes/config";
-import { registerModelRoutes } from "./routes/models";
-import { registerSessionRoutes } from "./routes/sessions";
-import { AppRuntime } from "./services/AppRuntime";
-import { SessionService } from "./services/SessionService";
-import { SessionMetadataStore } from "./services/SessionMetadataStore";
-import { JsonlSessionParser } from "./services/JsonlSessionParser";
-import { ModelCatalogService } from "./services/ModelCatalogService";
-import { SessionModelService } from "./services/SessionModelService";
-import { registerStaticClient } from "./staticClient";
+import { startLocalWebServer } from "./start";
 
 const config = loadConfig();
 
-const app = Fastify({
-  logger: true
-});
-const runtime = new AppRuntime(config);
-const metadataStore = new SessionMetadataStore(config.metadataFile);
-const modelCatalog = new ModelCatalogService(runtime.appServer);
-const jsonlSessionParser = new JsonlSessionParser(config.sessionsDir);
-const sessionService = new SessionService(
-  runtime.appServer,
-  metadataStore,
-  jsonlSessionParser,
-  modelCatalog,
-  runtime.runtimeManager
-);
-const sessionModelService = new SessionModelService(
-  modelCatalog,
-  metadataStore,
-  jsonlSessionParser,
-  runtime.runtimeManager
-);
-
-
-await app.register(cookie, {
-  secret: config.sessionSecret
-});
-await app.register(websocket);
-
-registerAuthHook(app);
-registerAuthRoutes(app, config);
-registerConfigRoutes(app, config, () => runtime.getSnapshot());
-registerModelRoutes(app, modelCatalog);
-registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager, sessionModelService);
-
-if (process.env.NODE_ENV === "production") {
-  await registerStaticClient(app, config.clientDir);
-}
-
 try {
-  try {
-    await runtime.start();
-  } catch (error) {
-    app.log.error({ err: error }, "Codex app-server startup failed");
-  }
-
-  await app.listen({
-    host: config.host,
-    port: config.port
-  });
+  await startLocalWebServer(config);
 } catch (error) {
-  app.log.error(error);
+  console.error(error);
   process.exit(1);
 }

@@ -5,6 +5,7 @@ import { registerConfigRoutes } from "./config";
 
 function testConfig(): AppConfig {
   return {
+    runtimeMode: "standalone",
     host: "0.0.0.0",
     port: 5902,
     password: "fmzh2026",
@@ -12,8 +13,15 @@ function testConfig(): AppConfig {
     sessionSecret: "test-secret-at-least-thirty-two-chars",
     codexCliPath: "/usr/local/bin/codex",
     sessionsDir: "/home/test/.codex/sessions",
+    userDataDir: "/tmp/codex-manage-config-test",
     metadataFile: "/tmp/codex-manage-test-session-metadata.json",
-    clientDir: "/tmp/codex-manage-test-client"
+    localDatabaseFile: ":memory:",
+    clientDir: "/tmp/codex-manage-test-client",
+    allowedHosts: ["localhost", "127.0.0.1"],
+    enforceHostCheck: true,
+    sessionTtlSeconds: 3600,
+    pairingCodeTtlSeconds: 300,
+    desktopControlToken: null
   };
 }
 

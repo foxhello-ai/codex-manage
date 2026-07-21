@@ -1,6 +1,25 @@
 export type UserSession = {
   authenticated: boolean;
   defaultPassword: boolean;
+  setupRequired: boolean;
+};
+
+export type LocalAuthSession = {
+  id: string;
+  source: "password" | "pairing" | "desktop";
+  userAgent: string | null;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+};
+
+export type LocalAuthSessionsResponse = {
+  sessions: LocalAuthSession[];
+};
+
+export type PairingCodeResponse = {
+  code: string;
+  expiresAt: string;
 };
 
 export type AppServerSnapshot = {

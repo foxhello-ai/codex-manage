@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
+import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, pairLocalAuth, resumeSession, sendSessionInput, setupLocalAuth, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, HealthStatus, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
 import { modelSwitchDisabledReason } from "./modelSelection";
@@ -39,19 +39,46 @@ type LiveErrorNotice = {
   createdAt: string;
 };
 
+function readPairingCodeFromHash(): string | null {
+  const hash = window.location.hash;
+  if (!hash.startsWith("#/pair")) return null;
+  const queryIndex = hash.indexOf("?");
+  if (queryIndex < 0) return null;
+  return new URLSearchParams(hash.slice(queryIndex + 1)).get("code");
+}
+
+function clearPairingHash(): void {
+  if (!window.location.hash.startsWith("#/pair")) return;
+  window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
+}
+
 
 export function App() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [session, setSession] = useState<UserSession | null>(null);
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pairingError, setPairingError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function bootstrap() {
       try {
-        const me = await getMe();
+        const pairingCode = readPairingCodeFromHash();
+        let me: UserSession;
+        if (pairingCode) {
+          try {
+            me = await pairLocalAuth(pairingCode);
+          } catch (caught) {
+            setPairingError(caught instanceof Error ? caught.message : "扫码授权失败");
+            me = await getMe();
+          } finally {
+            clearPairingHash();
+          }
+        } else {
+          me = await getMe();
+        }
         if (cancelled) return;
         setSession(me);
 
@@ -94,8 +121,18 @@ export function App() {
     return <Shell title="Codex Manage">{error}</Shell>;
   }
 
+  if (session?.setupRequired) {
+    return <SetupView onConfigured={handleLoggedIn} />;
+  }
+
   if (!session?.authenticated) {
-    return <LoginView defaultPassword={session?.defaultPassword ?? true} onLoggedIn={handleLoggedIn} />;
+    return (
+      <LoginView
+        defaultPassword={session?.defaultPassword ?? true}
+        initialError={pairingError}
+        onLoggedIn={handleLoggedIn}
+      />
+    );
   }
 
   return <Dashboard config={config} defaultPassword={session.defaultPassword} onLogout={handleLogout} />;
@@ -103,14 +140,16 @@ export function App() {
 
 function LoginView({
   defaultPassword,
+  initialError,
   onLoggedIn
 }: {
   defaultPassword: boolean;
+  initialError?: string | null;
   onLoggedIn: (session: UserSession) => Promise<void>;
 }) {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -156,6 +195,73 @@ function LoginView({
           {error ? <div className="errorText">{error}</div> : null}
           <button type="submit" disabled={submitting || password.length === 0}>
             {submitting ? "登录中" : "登录"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+function SetupView({ onConfigured }: { onConfigured: (session: UserSession) => Promise<void> }) {
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (password.length < 8) {
+      setError("密码至少需要 8 个字符");
+      return;
+    }
+    if (password !== confirmation) {
+      setError("两次输入的密码不一致");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onConfigured(await setupLocalAuth(password));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "密码设置失败");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="loginPage">
+      <section className="loginPanel" aria-labelledby="setup-title">
+        <div>
+          <p className="eyebrow">Codex Manage</p>
+          <h1 id="setup-title">设置本机访问密码</h1>
+          <p className="muted">启用远程访问前，请先为本机管理台设置独立密码。</p>
+        </div>
+
+        <form className="loginForm" onSubmit={handleSubmit}>
+          <label htmlFor="setup-password">访问密码</label>
+          <input
+            id="setup-password"
+            autoComplete="new-password"
+            autoFocus
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="至少 8 个字符"
+          />
+          <label htmlFor="setup-confirmation">确认密码</label>
+          <input
+            id="setup-confirmation"
+            autoComplete="new-password"
+            type="password"
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            placeholder="再次输入密码"
+          />
+          {error ? <div className="errorText">{error}</div> : null}
+          <button type="submit" disabled={submitting || password.length === 0 || confirmation.length === 0}>
+            {submitting ? "保存中" : "保存并进入"}
           </button>
         </form>
       </section>

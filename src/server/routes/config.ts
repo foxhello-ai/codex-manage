@@ -5,7 +5,8 @@ import type { RuntimeSnapshot } from "../services/AppRuntime";
 export function registerConfigRoutes(
   app: FastifyInstance,
   config: AppConfig,
-  getRuntimeSnapshot?: () => RuntimeSnapshot
+  getRuntimeSnapshot?: () => RuntimeSnapshot,
+  getDefaultPasswordState?: () => boolean
 ) {
   app.get("/api/config", async () => {
     const runtime = getRuntimeSnapshot?.();
@@ -14,7 +15,7 @@ export function registerConfigRoutes(
       port: config.port,
       codexCliPath: config.codexCliPath,
       sessionsDir: config.sessionsDir,
-      defaultPassword: config.defaultPassword,
+      defaultPassword: getDefaultPasswordState?.() ?? config.defaultPassword,
       codexCliVersion: runtime?.codexCliVersion ?? null,
       codexVersionError: runtime?.codexVersionError ?? null,
       appServer: runtime?.appServer ?? null
