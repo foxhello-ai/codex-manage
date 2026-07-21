@@ -1,0 +1,48 @@
+appId: cn.xmwefun.codexmanage
+productName: Codex Manage
+asar: true
+afterPack: apps/desktop/scripts/after-pack.mjs
+directories:
+  output: release
+files:
+  - dist/main/**/*
+  - dist/renderer/**/*
+  - package.json
+  - '!dist/**/*.map'
+extraResources:
+  - from: ../../dist/server/desktop-entry.cjs
+    to: local-server/desktop-entry.cjs
+  - from: ../../dist/client
+    to: local-client
+  - from: ../../resources/cloudflared
+    to: cloudflared
+mac:
+  icon: build/icon.png
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  extendInfo:
+    NSAppTransportSecurity:
+      NSAllowsArbitraryLoads: false
+      NSAllowsLocalNetworking: true
+      NSExceptionDomains:
+        localhost:
+          NSIncludesSubdomains: false
+          NSTemporaryExceptionAllowsInsecureHTTPLoads: true
+        127.0.0.1:
+          NSIncludesSubdomains: false
+          NSTemporaryExceptionAllowsInsecureHTTPLoads: true
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

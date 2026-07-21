@@ -1,0 +1,33 @@
+{
+  "name": "@codex-manage/desktop",
+  "version": "1.0.0",
+  "description": "Codex Manage desktop client with secure Cloudflare Tunnel access",
+  "author": "xmwefun.cn",
+  "private": true,
+  "type": "module",
+  "main": "dist/main/main/index.cjs",
+  "scripts": {
+    "build": "npm run build:main && npm run build:renderer",
+    "build:main": "esbuild src/main/index.ts src/preload/index.ts --bundle --platform=node --format=cjs --external:electron --sourcemap --outdir=dist/main --out-extension:.js=.cjs --outbase=src",
+    "build:renderer": "vite build",
+    "dev": "electron dist/main/index.cjs",
+    "dist": "electron-builder --config electron-builder.yml"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "electron": "43.1.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0",
+    "vitest": "^4.1.10"
+  }
+}

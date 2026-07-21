@@ -1,0 +1,8 @@
+{
+  "version": "set-in-release-pipeline",
+  "files": {
+    "cloudflared-darwin-arm64": "sha256-required",
+    "cloudflared-darwin-x64": "sha256-required",
+    "cloudflared-win32-x64.exe": "sha256-required"
+  }
+}
