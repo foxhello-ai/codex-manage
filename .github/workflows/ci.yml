@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+      - run: npm run typecheck:all
+      - run: npm test
+      - run: npm run build:all
+      - run: npm run test:e2e
+        env:
+          CODEX_E2E_CHROMIUM_PATH: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+      - run: npm run test:desktop:e2e
+        env:
+          CODEX_CLOUDFLARED_PATH: /usr/local/bin/cloudflared

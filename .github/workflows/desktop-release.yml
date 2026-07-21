@@ -1,0 +1,53 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version
+        required: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-15
+            command: npm --workspace @codex-manage/desktop exec electron-builder -- --config electron-builder.yml --mac dmg --x64 --arm64
+          - os: windows-2025
+            command: npm --workspace @codex-manage/desktop exec electron-builder -- --config electron-builder.yml --win nsis --x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply release version
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: npm version "$RELEASE_VERSION" --no-git-tag-version --workspaces --include-workspace-root
+      - name: Prepare cloudflared manifest
+        shell: bash
+        env:
+          CLOUDFLARED_MANIFEST_JSON: ${{ secrets.CLOUDFLARED_MANIFEST_JSON }}
+        run: echo "$CLOUDFLARED_MANIFEST_JSON" > resources/cloudflared/manifest.json
+      - run: npm run cloudflared:fetch
+      - run: npm run build:desktop
+      - name: Build installers
+        shell: bash
+        env:
+          CSC_LINK: ${{ runner.os == 'Windows' && secrets.WIN_CSC_LINK || secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'Windows' && secrets.WIN_CSC_KEY_PASSWORD || secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: ${{ matrix.command }}
+      - name: Generate SHA-256 checksums
+        run: node tooling/write-release-checksums.mjs apps/desktop/release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-manage-${{ runner.os }}-${{ inputs.version }}
+          path: apps/desktop/release/*

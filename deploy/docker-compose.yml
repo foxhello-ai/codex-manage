@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: codex_manage
+      POSTGRES_USER: codex_manage
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - codex-manage-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codex_manage -d codex_manage"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: ../apps/control-api
+    environment: &control-environment
+      DATABASE_URL: postgres://codex_manage:${POSTGRES_PASSWORD}@postgres:5432/codex_manage
+      CONTROL_HOST: 0.0.0.0
+      CONTROL_PORT: 4320
+      CONTROL_DEVICE_DOMAIN: xmwefun.cn
+      CONTROL_ADMIN_ORIGIN: https://codex-admin.xmwefun.cn
+      CONTROL_ALLOW_DEBUG_CODES: ${CONTROL_ALLOW_DEBUG_CODES:-false}
+      CONTROL_EMAIL_WEBHOOK_URL: ${CONTROL_EMAIL_WEBHOOK_URL:-}
+      CONTROL_SMS_WEBHOOK_URL: ${CONTROL_SMS_WEBHOOK_URL:-}
+      CONTROL_BOOTSTRAP_ADMIN_EMAIL: ${CONTROL_BOOTSTRAP_ADMIN_EMAIL:-}
+      CONTROL_BOOTSTRAP_ADMIN_PASSWORD: ${CONTROL_BOOTSTRAP_ADMIN_PASSWORD:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:-}
+    command: ["node", "dist/migrate.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  control-api:
+    build: ../apps/control-api
+    restart: unless-stopped
+    environment: *control-environment
+    ports:
+      - "127.0.0.1:4320:4320"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tunnel-worker:
+    build: ../apps/control-api
+    restart: unless-stopped
+    environment: *control-environment
+    command: ["node", "dist/worker.js"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  admin-web:
+    build:
+      context: ../apps/admin-web
+      args:
+        VITE_CONTROL_API_URL: https://codex-api.xmwefun.cn
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4321:80"
+
+volumes:
+  codex-manage-postgres:
