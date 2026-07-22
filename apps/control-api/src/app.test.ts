@@ -13,7 +13,7 @@ describe("control API", () => {
       host: "127.0.0.1",
       port: 4320,
       databaseUrl: "postgres://test",
-      adminOrigin: "https://codex-admin.xmwefun.cn",
+      adminOrigin: "https://codex-admin.xmwefun.cn,http://192.168.31.107",
       publicDomain: "xmwefun.cn",
       allowDebugCodes: true,
       emailWebhookUrl: null,
@@ -27,9 +27,17 @@ describe("control API", () => {
     const notifier: VerificationNotifier = { send: vi.fn(async () => undefined) };
     const { app } = await createControlApp(config, store, notifier, null);
 
+    const root = await app.inject({
+      method: "GET",
+      url: "/",
+      headers: { origin: "http://192.168.31.107" }
+    });
     const health = await app.inject({ method: "GET", url: "/health" });
     const payment = await app.inject({ method: "POST", url: "/v1/orders" });
 
+    expect(root.statusCode).toBe(200);
+    expect(root.json()).toMatchObject({ name: "codex-manage-control-api", ok: true, health: "/health" });
+    expect(root.headers["access-control-allow-origin"]).toBe("http://192.168.31.107");
     expect(health.statusCode).toBe(200);
     expect(health.json().ok).toBe(true);
     expect(payment.statusCode).toBe(503);

@@ -1,11 +1,16 @@
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { resolveApiBase } from "./apiBase";
 import "./styles.css";
 
 type Tab = "overview" | "users" | "devices" | "tunnels" | "domains" | "subscriptions" | "orders" | "payments" | "audit";
 type JsonRecord = Record<string, unknown>;
 
-const apiBase = import.meta.env.VITE_CONTROL_API_URL ?? "";
+const apiBase = resolveApiBase(
+  import.meta.env.VITE_CONTROL_API_URL,
+  window.location,
+  import.meta.env.VITE_CONTROL_API_PORT ?? "4320"
+);
 
 function AdminApp() {
   const [token, setToken] = useState(() => sessionStorage.getItem("codex-admin-token"));

@@ -64,7 +64,7 @@ export async function createControlApp(
   const rateLimiter = new ApiRateLimiter();
 
   await app.register(cors, {
-    origin: [config.adminOrigin],
+    origin: config.adminOrigin.split(",").map((origin) => origin.trim()).filter(Boolean),
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
   });
 
@@ -96,6 +96,11 @@ export async function createControlApp(
     });
   });
 
+  app.get("/", async () => ({
+    name: "codex-manage-control-api",
+    ok: true,
+    health: "/health"
+  }));
   app.get("/health", async () => ({ ok: true, checkedAt: new Date().toISOString() }));
 
   app.post("/v1/auth/email/codes", async (request) => {
