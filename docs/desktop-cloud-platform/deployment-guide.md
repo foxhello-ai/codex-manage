@@ -51,7 +51,7 @@ Webhook 返回任意 2xx 表示发送成功。
 ## 3. 启动服务
 
 ```bash
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml build
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml pull
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d
 ```
 

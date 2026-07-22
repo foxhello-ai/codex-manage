@@ -15,7 +15,7 @@ services:
       retries: 10
 
   migrate:
-    build: ../apps/control-api
+    image: ${CONTROL_API_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-control-api:20260722-b00da75}
     environment: &control-environment
       DATABASE_URL: postgres://codex_manage:${POSTGRES_PASSWORD}@postgres:5432/codex_manage
       CONTROL_HOST: 0.0.0.0
@@ -36,7 +36,7 @@ services:
         condition: service_healthy
 
   control-api:
-    build: ../apps/control-api
+    image: ${CONTROL_API_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-control-api:20260722-b00da75}
     restart: unless-stopped
     environment: *control-environment
     ports:
@@ -46,7 +46,7 @@ services:
         condition: service_completed_successfully
 
   tunnel-worker:
-    build: ../apps/control-api
+    image: ${CONTROL_API_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-control-api:20260722-b00da75}
     restart: unless-stopped
     environment: *control-environment
     command: ["node", "dist/worker.js"]
@@ -55,10 +55,7 @@ services:
         condition: service_completed_successfully
 
   admin-web:
-    build:
-      context: ../apps/admin-web
-      args:
-        VITE_CONTROL_API_URL: https://codex-api.xmwefun.cn
+    image: ${ADMIN_WEB_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-admin-web:20260722-b00da75}
     restart: unless-stopped
     ports:
       - "127.0.0.1:4321:80"

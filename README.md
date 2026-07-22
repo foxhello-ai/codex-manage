@@ -74,7 +74,8 @@ PATH="$PWD/node_modules/.bin:$PATH" npm run dist:desktop
 
 ```bash
 cp deploy/.env.example deploy/.env
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build -d
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml pull
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d
 ```
 
 主要服务：
