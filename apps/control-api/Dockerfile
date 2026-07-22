@@ -1,5 +1,6 @@
 FROM node:22-alpine AS build
 WORKDIR /app
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 COPY package.json ./
 RUN npm install
 COPY tsconfig.json ./
