@@ -15,13 +15,13 @@ services:
       retries: 10
 
   migrate:
-    image: ${CONTROL_API_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-control-api:20260722-b00da75}
+    image: ${CONTROL_API_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-control-api:20260722-8719275}
     environment: &control-environment
       DATABASE_URL: postgres://codex_manage:${POSTGRES_PASSWORD}@postgres:5432/codex_manage
       CONTROL_HOST: 0.0.0.0
       CONTROL_PORT: 4320
       CONTROL_DEVICE_DOMAIN: xmwefun.cn
-      CONTROL_ADMIN_ORIGIN: https://codex-admin.xmwefun.cn
+      CONTROL_ADMIN_ORIGIN: ${CONTROL_ADMIN_ORIGIN:-https://codex-admin.xmwefun.cn,http://192.168.31.107}
       CONTROL_ALLOW_DEBUG_CODES: ${CONTROL_ALLOW_DEBUG_CODES:-false}
       CONTROL_EMAIL_WEBHOOK_URL: ${CONTROL_EMAIL_WEBHOOK_URL:-}
       CONTROL_SMS_WEBHOOK_URL: ${CONTROL_SMS_WEBHOOK_URL:-}
@@ -36,17 +36,17 @@ services:
         condition: service_healthy
 
   control-api:
-    image: ${CONTROL_API_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-control-api:20260722-b00da75}
+    image: ${CONTROL_API_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-control-api:20260722-8719275}
     restart: unless-stopped
     environment: *control-environment
     ports:
-      - "127.0.0.1:4320:4320"
+      - "${CONTROL_API_BIND_ADDRESS:-0.0.0.0}:${CONTROL_API_PUBLISHED_PORT:-4320}:4320"
     depends_on:
       migrate:
         condition: service_completed_successfully
 
   tunnel-worker:
-    image: ${CONTROL_API_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-control-api:20260722-b00da75}
+    image: ${CONTROL_API_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-control-api:20260722-8719275}
     restart: unless-stopped
     environment: *control-environment
     command: ["node", "dist/worker.js"]
@@ -55,10 +55,10 @@ services:
         condition: service_completed_successfully
 
   admin-web:
-    image: ${ADMIN_WEB_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-admin-web:20260722-b00da75}
+    image: ${ADMIN_WEB_IMAGE:-registry.cn-hangzhou.aliyuncs.com/foxhello/codex-manage-admin-web:20260722-8719275}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:4321:80"
+      - "${ADMIN_WEB_BIND_ADDRESS:-0.0.0.0}:${ADMIN_WEB_PUBLISHED_PORT:-80}:80"
 
 volumes:
   codex-manage-postgres:

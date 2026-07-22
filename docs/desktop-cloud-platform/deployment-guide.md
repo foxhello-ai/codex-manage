@@ -61,10 +61,12 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d
 
 ```bash
 curl http://127.0.0.1:4320/health
-curl http://127.0.0.1:4321/
+curl http://127.0.0.1/
 ```
 
-生产环境应由 Nginx、Caddy、Cloudflare Tunnel 或云负载均衡器终止 HTTPS，再转发到两个 loopback 端口。
+局域网默认可通过 `http://服务器IP/` 打开管理后台，通过 `http://服务器IP:4320/health` 检查 API。可使用 `ADMIN_WEB_BIND_ADDRESS`、`ADMIN_WEB_PUBLISHED_PORT`、`CONTROL_API_BIND_ADDRESS` 和 `CONTROL_API_PUBLISHED_PORT` 覆盖监听地址及宿主机端口。
+
+公网生产环境仍建议由 Nginx、Caddy、Cloudflare Tunnel 或云负载均衡器终止 HTTPS；此时可将两个 `*_BIND_ADDRESS` 设为 `127.0.0.1`，只允许入口代理访问。
 
 ## 4. 首次管理员登录
 

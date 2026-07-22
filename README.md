@@ -80,8 +80,8 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d
 
 主要服务：
 
-- Control API：本机映射 `127.0.0.1:4320`，生产域名建议为 `codex-api.xmwefun.cn`。
-- Admin Web：本机映射 `127.0.0.1:4321`，生产域名建议为 `codex-admin.xmwefun.cn`。
+- Control API：默认映射到所有网卡的 `4320`，可通过 `http://服务器IP:4320/` 或生产域名访问。
+- Admin Web：默认映射到所有网卡的 `80`，可通过 `http://服务器IP/` 或生产域名访问；IP 访问时会自动请求同一 IP 的 `4320` API。
 - PostgreSQL：保存账号、设备、Tunnel、域名、套餐、订阅、订单、支付占位和审计日志。
 - Tunnel Worker：调用 Cloudflare API 创建、更新和撤销 Named Tunnel 与 DNS。
 
