@@ -16,6 +16,7 @@ import {
 import { CodexLocator, type CodexLocation } from "./CodexLocator";
 import { CloudClient, type CloudAuthResponse, type CloudSession } from "./CloudClient";
 import { CredentialVault } from "./CredentialVault";
+import { DeviceBindingVault } from "./DeviceBindingVault";
 import { DiagnosticLog } from "./DiagnosticLog";
 import { LocalServiceSupervisor } from "./LocalServiceSupervisor";
 import { resolveCloudflaredBinary, TunnelSupervisor } from "./TunnelSupervisor";
@@ -47,6 +48,7 @@ class DesktopController {
     process.env.CODEX_CONTROL_API_URL ?? "https://codex-api.xmwefun.cn"
   );
   private credentialVault: CredentialVault | null = null;
+  private deviceBindingVault: DeviceBindingVault | null = null;
   private cloudSession: CloudSession | null = null;
   private entitlements: Record<string, string | number | boolean> = {};
   private subscription: { planCode: string; planName: string; expiresAt: string | null } | null = null;
@@ -77,7 +79,9 @@ class DesktopController {
     this.createWindow();
     this.createTray();
     this.credentialVault = new CredentialVault(join(app.getPath("userData"), "cloud-credentials.json"));
+    this.deviceBindingVault = new DeviceBindingVault(join(app.getPath("userData"), "device-bindings.json"));
     this.cloudSession = this.credentialVault.load();
+    this.saveDeviceBinding();
 
     this.codex = await new CodexLocator().locate();
     this.diagnosticLog.write("codex", "detection_completed", {
@@ -319,6 +323,7 @@ class DesktopController {
 
   private async logoutCloudAccount(): Promise<DesktopStatus> {
     if (this.cloudSession) {
+      this.saveDeviceBinding();
       await this.cloudClient.logout(this.cloudSession.accessToken, this.cloudSession.refreshToken).catch(() => undefined);
     }
     await this.tunnel?.stop();
@@ -346,6 +351,7 @@ class DesktopController {
       throw error;
     }
     this.diagnosticLog?.write("account", "device_unbound");
+    this.deviceBindingVault?.clear(session.userId);
     this.entitlements = {};
     this.subscription = null;
     this.namedTunnelStatus = null;
@@ -436,6 +442,7 @@ class DesktopController {
   }
 
   private async acceptCloudAuthentication(response: CloudAuthResponse): Promise<void> {
+    const binding = this.deviceBindingVault?.load(response.user.id);
     this.cloudSession = {
       userId: response.user.id,
       identifier: response.user.identifier,
@@ -443,11 +450,14 @@ class DesktopController {
       refreshToken: response.refreshToken,
       accessExpiresAt: response.accessExpiresAt,
       refreshExpiresAt: response.refreshExpiresAt,
-      deviceId: null,
-      deviceCredential: null,
+      deviceId: binding?.deviceId ?? null,
+      deviceCredential: binding?.deviceCredential ?? null,
       deviceAccessToken: null,
       deviceAccessExpiresAt: null
     };
+    if (binding) {
+      this.diagnosticLog?.write("account", "device_binding_restored", { deviceId: binding.deviceId });
+    }
     await this.ensureDeviceSession();
     await this.refreshCloudState();
     this.saveCloudSession();
@@ -493,19 +503,7 @@ class DesktopController {
     if (!local?.port) throw new Error("本地服务尚未运行");
 
     if (!this.cloudSession.deviceCredential || !this.cloudSession.deviceId) {
-      const registered = await this.cloudClient.registerDevice(this.cloudSession.accessToken, {
-        name: hostname() || "Codex Manage Device",
-        os: process.platform,
-        arch: process.arch,
-        clientVersion: app.getVersion(),
-        codexCliVersion: this.codex.version,
-        originPort: local.port
-      });
-      this.cloudSession = {
-        ...this.cloudSession,
-        deviceId: registered.device.id,
-        deviceCredential: registered.credential
-      };
+      await this.registerCurrentDevice(local.port);
     }
 
     if (
@@ -513,7 +511,23 @@ class DesktopController {
       || !this.cloudSession.deviceAccessExpiresAt
       || Date.parse(this.cloudSession.deviceAccessExpiresAt) <= Date.now() + 60_000
     ) {
-      const exchanged = await this.cloudClient.exchangeDeviceCredential(this.cloudSession.deviceCredential!);
+      let exchanged;
+      try {
+        exchanged = await this.cloudClient.exchangeDeviceCredential(this.cloudSession.deviceCredential!);
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (code !== "DEVICE_CREDENTIAL_INVALID") throw error;
+        this.deviceBindingVault?.clear(this.cloudSession.userId);
+        this.cloudSession = {
+          ...this.cloudSession,
+          deviceId: null,
+          deviceCredential: null,
+          deviceAccessToken: null,
+          deviceAccessExpiresAt: null
+        };
+        await this.registerCurrentDevice(local.port);
+        exchanged = await this.cloudClient.exchangeDeviceCredential(this.cloudSession.deviceCredential!);
+      }
       this.cloudSession = {
         ...this.cloudSession,
         deviceId: exchanged.device.id,
@@ -522,6 +536,33 @@ class DesktopController {
       };
     }
     this.saveCloudSession();
+  }
+
+  private async registerCurrentDevice(originPort: number): Promise<void> {
+    if (!this.cloudSession) throw new Error("请先登录平台账号");
+    const registered = await this.cloudClient.registerDevice(this.cloudSession.accessToken, {
+      name: hostname() || "Codex Manage Device",
+      os: process.platform,
+      arch: process.arch,
+      clientVersion: app.getVersion(),
+      codexCliVersion: this.codex.version,
+      originPort
+    });
+    this.cloudSession = {
+      ...this.cloudSession,
+      deviceId: registered.device.id,
+      deviceCredential: registered.credential
+    };
+    this.saveDeviceBinding();
+  }
+
+  private saveDeviceBinding(): void {
+    if (!this.cloudSession?.deviceId || !this.cloudSession.deviceCredential) return;
+    this.deviceBindingVault?.save({
+      userId: this.cloudSession.userId,
+      deviceId: this.cloudSession.deviceId,
+      deviceCredential: this.cloudSession.deviceCredential
+    });
   }
 
   private async refreshEntitlements(): Promise<void> {
