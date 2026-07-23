@@ -25,9 +25,9 @@ export class CodexLocator {
     const homeDirectory = this.options.homeDirectory ?? homedir();
     const candidates = unique([
       environment.CODEX_CLI_PATH,
+      ...(platform === "win32" ? await findWindowsCandidates(environment) : []),
       "codex",
-      ...findKnownCandidates(platform, homeDirectory, environment),
-      ...(platform === "win32" ? await findWindowsCandidates(environment) : [])
+      ...findKnownCandidates(platform, homeDirectory, environment)
     ].filter((candidate): candidate is string => Boolean(candidate)));
 
     let lastError: string | null = null;
