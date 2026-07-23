@@ -225,6 +225,9 @@ class DesktopController {
       { label: "退出", click: () => app.quit() }
     ]));
     this.tray.on("click", () => this.showWindow());
+    if (process.platform === "win32") {
+      this.tray.on("double-click", () => this.showWindow());
+    }
   }
 
   private registerIpc(): void {
