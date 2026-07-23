@@ -15,11 +15,7 @@ export async function startLocalWebServer(
 ): Promise<StartedLocalWebServer> {
   const { app, runtime } = await createLocalWebApplication(config, options);
 
-  try {
-    await runtime.start();
-  } catch (error) {
-    app.log.error({ err: error }, "Codex app-server startup failed");
-  }
+  await runtime.start();
 
   try {
     const url = await app.listen({ host: config.host, port: config.port });
