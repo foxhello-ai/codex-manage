@@ -15,6 +15,7 @@
 | 故障编号 | 日期 | 严重程度 | 状态 | 摘要 | 详细记录 |
 | --- | --- | --- | --- | --- | --- |
 | `CM-INC-20260723-001` | 2026-07-23 | 高 | 待发布 | Finder 环境无法发现 NVM Codex，cloudflared 参数不兼容并以 code 0 退出 | [Desktop Codex 与 cloudflared 启动失败诊断](../implementation-notes/2026-07-23-desktop-startup-failure.md) |
+| `CM-INC-20260723-002` | 2026-07-23 | 高 | 待发布 | 普通退出删除本地设备凭据，重新登录重复注册并触发免费套餐设备上限 | [退出后重新登录触发设备数量上限](../implementation-notes/2026-07-23-device-limit-after-relogin.md) |
 
 ## 新增故障记录要求
 
