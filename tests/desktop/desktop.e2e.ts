@@ -26,6 +26,9 @@ test("packaged desktop application launches its embedded local service", async (
     const window = await application.firstWindow();
     await expect(window.getByRole("heading", { name: "从手机安全访问本机 Codex" })).toBeVisible();
     await expect(window.getByText("运行中", { exact: true })).toBeVisible({ timeout: 30_000 });
+    const codexStatus = window.locator("article").filter({ hasText: "Codex CLI" });
+    await expect(codexStatus).toContainText("可用");
+    await expect(codexStatus).toContainText("codex-cli");
     await expect(window.getByRole("heading", { name: "设置本机访问密码" })).toBeVisible();
   } finally {
     await application.close();
