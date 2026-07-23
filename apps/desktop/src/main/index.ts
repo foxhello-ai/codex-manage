@@ -286,6 +286,7 @@ class DesktopController {
     const local = this.localService?.getSnapshot();
     if (!local?.url) throw new Error("本地服务尚未运行");
     await this.ensureDeviceSession();
+    await this.refreshEntitlements();
     const config = await this.cloudClient.getTunnelConfig(
       this.cloudSession.deviceAccessToken!,
       this.cloudSession.deviceId!
@@ -294,6 +295,22 @@ class DesktopController {
     if (config.mode === "named" && config.token && config.hostname) {
       await this.tunnel?.startNamed(config.token, `https://${config.hostname}`);
     } else if (config.mode === "quick") {
+      if (this.entitlements.named_tunnel) {
+        const provisioned = await this.cloudClient.provisionNamedTunnel(
+          this.cloudSession.accessToken,
+          this.cloudSession.deviceId!
+        );
+        this.namedTunnelStatus = provisioned.tunnel.status;
+        const configAfter = await this.cloudClient.getTunnelConfig(
+          this.cloudSession.deviceAccessToken!,
+          this.cloudSession.deviceId!
+        );
+        if (configAfter.mode === "named" && configAfter.token && configAfter.hostname) {
+          await this.tunnel?.startNamed(configAfter.token, `https://${configAfter.hostname}`);
+          await this.sendHeartbeat();
+          return this.getStatus();
+        }
+      }
       await this.tunnel?.startQuick(local.url);
     } else {
       throw new Error("当前账号未开通远程访问权益");
