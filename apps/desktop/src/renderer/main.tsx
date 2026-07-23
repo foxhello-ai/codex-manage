@@ -312,6 +312,16 @@ function DesktopApp() {
             <code>{status.tunnel.publicUrl}</code>
             {pairingExpiresAt ? <p className="muted">有效期至：{new Date(pairingExpiresAt).toLocaleString()}</p> : null}
             <button onClick={() => navigator.clipboard.writeText(pairingUrl)}>复制授权链接</button>
+            <details role="note" className="pwaGuide">
+              <summary>💡 iPhone 扫码后如何添加到桌面？</summary>
+              <ol>
+                <li>用 <strong>Safari</strong> 打开二维码链接（微信/相机扫码后请点右上角选择在 Safari 打开）</li>
+                <li>点 Safari 底部中间的 <strong>分享按钮</strong>（<span aria-label="分享">⎋</span>）</li>
+                <li>向下滑动找到 <strong>「添加到主屏幕」</strong></li>
+                <li>点右上角「添加」即可在桌面生成 Codex 图标，后续一键打开</li>
+              </ol>
+              <p className="muted">Android 手机用 Chrome 扫码会自动弹出安装提示。</p>
+            </details>
           </div>
         </section>
       ) : null}
