@@ -116,6 +116,14 @@ while true; do sleep 1; done
     await window.getByRole("button", { name: "生成扫码二维码" }).click();
     await expect(window.getByRole("heading", { name: "使用手机扫码访问" })).toBeVisible();
     await expect(window.getByAltText("手机扫码访问二维码")).toBeVisible();
+
+    await window.getByRole("button", { name: "退出平台账号" }).click();
+    await expect(window.getByRole("heading", { name: "登录设备管理平台" })).toBeVisible();
+    await window.getByLabel("邮箱或手机号").fill("owner@example.com");
+    await window.getByLabel("密码", { exact: true }).fill("account-password");
+    await window.getByRole("button", { name: "登录平台" }).click();
+    await expect(window.getByRole("heading", { name: "owner@example.com" })).toBeVisible();
+    expect(mockControl.deviceRegistrations()).toBe(1);
   } finally {
     await application.close();
     await mockControl.close();
@@ -126,8 +134,13 @@ while true; do sleep 1; done
   }
 });
 
-async function startMockControlApi(): Promise<{ url: string; close: () => Promise<void> }> {
+async function startMockControlApi(): Promise<{
+  url: string;
+  close: () => Promise<void>;
+  deviceRegistrations: () => number;
+}> {
   const deviceId = "019f829c-e97e-7be3-82fa-7968ca730301";
+  let deviceRegistrations = 0;
   const server = createServer((request, response) => {
     response.setHeader("content-type", "application/json");
     const now = Date.now();
@@ -142,7 +155,10 @@ async function startMockControlApi(): Promise<{ url: string; close: () => Promis
       accessExpiresAt: future,
       refreshExpiresAt: refreshFuture
     });
-    if (path === "/v1/devices") return sendJson(response, { device: { id: deviceId }, credential: "cm_device_test" });
+    if (path === "/v1/devices") {
+      deviceRegistrations += 1;
+      return sendJson(response, { device: { id: deviceId }, credential: "cm_device_test" });
+    }
     if (path === "/v1/devices/credential/exchange") return sendJson(response, { accessToken: "cm_device_access_test", expiresAt: future, device: { id: deviceId } });
     if (path === "/v1/entitlements") return sendJson(response, { entitlements: { "tunnel.quick": true, "tunnel.named": false, "device.max_count": 1 } });
     if (path === "/v1/subscriptions/current") return sendJson(response, {
@@ -159,7 +175,8 @@ async function startMockControlApi(): Promise<{ url: string; close: () => Promis
   if (!address || typeof address === "string") throw new Error("mock server did not expose a TCP port");
   return {
     url: `http://127.0.0.1:${address.port}`,
-    close: () => new Promise((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose()))
+    close: () => new Promise((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose())),
+    deviceRegistrations: () => deviceRegistrations
   };
 }
 
