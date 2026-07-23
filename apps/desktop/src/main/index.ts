@@ -160,6 +160,7 @@ class DesktopController {
     if (this.localStableTimer) clearTimeout(this.localStableTimer);
     await this.tunnel?.stop();
     await this.localService?.stop();
+    this.diagnosticLog?.write("desktop", "application_stopped");
   }
 
   showWindow(): void {
@@ -617,6 +618,7 @@ class DesktopController {
     if (!this.cloudSession) return;
     try {
       await this.ensureDeviceSession();
+      if (!this.cloudSession) return;
       const local = this.localService?.getSnapshot();
       const tunnel = this.tunnel?.getSnapshot();
       if (!local?.port || !tunnel) return;

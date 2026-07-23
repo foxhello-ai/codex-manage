@@ -30,6 +30,7 @@ export async function startLocalWebServer(
       }
     };
   } catch (error) {
+    await runtime.stop();
     await app.close();
     throw error;
   }

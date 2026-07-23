@@ -40,6 +40,11 @@ export class LocalServiceSupervisor extends EventEmitter {
     if (this.child && this.snapshot.state === "running") return this.getSnapshot();
     this.update({ state: "starting", url: null, port: null, error: null });
 
+    if (this.child) {
+      this.child.kill("SIGKILL");
+      this.child = null;
+    }
+
     return new Promise((resolve, reject) => {
       const childEnvironment = withExecutableDirectory(process.env, this.options.codexCliPath);
       const child = spawn(this.options.electronExecutable, [this.options.serverEntry], {
