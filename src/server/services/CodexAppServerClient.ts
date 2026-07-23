@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { createInterface, type Interface } from "node:readline";
+import { delimiter, dirname, isAbsolute } from "node:path";
 
 export type JsonRpcId = number;
 
@@ -44,12 +45,16 @@ export type CodexAppServerClientOptions = {
   codexCliPath: string;
   spawnProcess?: typeof spawn;
   requestTimeoutMs?: number;
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
 };
 
 export class CodexAppServerClient extends EventEmitter {
   private readonly codexCliPath: string;
   private readonly spawnProcess: typeof spawn;
   private readonly requestTimeoutMs: number;
+  private readonly platform: NodeJS.Platform;
+  private readonly env: NodeJS.ProcessEnv;
   private process: ChildProcessWithoutNullStreams | null = null;
   private stdoutLines: Interface | null = null;
   private nextRequestId = 1;
@@ -63,6 +68,8 @@ export class CodexAppServerClient extends EventEmitter {
     this.codexCliPath = options.codexCliPath;
     this.spawnProcess = options.spawnProcess ?? spawn;
     this.requestTimeoutMs = options.requestTimeoutMs ?? 60000;
+    this.platform = options.platform ?? process.platform;
+    this.env = options.env ?? process.env;
   }
 
   getSnapshot(): CodexAppServerSnapshot {
@@ -83,7 +90,10 @@ export class CodexAppServerClient extends EventEmitter {
 
     try {
       this.process = this.spawnProcess(this.codexCliPath, ["app-server"], {
-        stdio: ["pipe", "pipe", "pipe"]
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+        shell: this.platform === "win32" && this.codexCliPath.toLowerCase().endsWith(".cmd"),
+        env: this.injectCodexDirectoryIntoPath()
       });
     } catch (error) {
       this.fail(error);
@@ -260,5 +270,18 @@ export class CodexAppServerClient extends EventEmitter {
 
   private toError(error: unknown): Error {
     return error instanceof Error ? error : new Error(String(error));
+  }
+
+  private injectCodexDirectoryIntoPath(): NodeJS.ProcessEnv {
+    if (!isAbsolute(this.codexCliPath) && !this.codexCliPath.includes("/") && !this.codexCliPath.includes("\\")) {
+      return { ...this.env };
+    }
+    const pathKey = Object.keys(this.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+    const currentPath = this.env[pathKey] ?? "";
+    const executableDirectory = dirname(this.codexCliPath);
+    const separator = this.platform === "win32" ? ";" : delimiter;
+    const entries = currentPath.split(separator).filter(Boolean);
+    const nextPath = [executableDirectory, ...entries.filter((entry) => entry !== executableDirectory)].join(separator);
+    return { ...this.env, [pathKey]: nextPath };
   }
 }
