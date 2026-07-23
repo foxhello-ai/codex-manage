@@ -5,6 +5,7 @@ dist/
 !.env.example
 !**/.env.example
 *.log
+logs/
 .codex-manage/
 test-results/
 playwright-report/
