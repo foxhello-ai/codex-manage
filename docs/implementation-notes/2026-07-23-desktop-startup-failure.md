@@ -1,7 +1,16 @@
 # Desktop Codex 与 cloudflared 启动失败诊断
 
-日期：2026-07-23  
-分支：`feature/f-20260721-desktop`
+| 跟踪项 | 内容 |
+| --- | --- |
+| 故障编号 | `CM-INC-20260723-001` |
+| 日期 | 2026-07-23 |
+| 状态 | 已修复、已验证、待发布签名版 |
+| 严重程度 | 高：桌面端核心能力不可用，但未造成数据丢失 |
+| 影响范围 | macOS Finder 启动、NVM Codex、Quick Tunnel、桌面安装包构建 |
+| 修复分支 | `feature/f-20260721-desktop` |
+| 文档提交 | `2e8af3b` |
+| 修复提交 | `499c39a` |
+| 测试提交 | `9684a49` |
 
 ## 现象
 
@@ -92,3 +101,39 @@ Incorrect Usage. flag provided but not defined: -logformat
 ## 已知发布事项
 
 当前机器没有有效的 `Developer ID Application` 证书，因此 DMG 为未签名构建。功能验证不受影响，但对外分发前仍需配置有效证书并完成 Apple notarization。
+
+## 快速排查索引
+
+后续遇到相同或相近现象时，按以下顺序查询：
+
+1. 查看桌面诊断日志：`~/Library/Application Support/@codex-manage/desktop/logs/desktop-diagnostics.jsonl`。
+2. 搜索 `detection_completed`，确认 Codex 是否可用以及实际错误。
+3. 执行 `which codex` 和 `codex --version`，确认 CLI 安装位置及版本。
+4. 在最小 PATH 下运行 Codex，确认同目录 Node 是否可解析。
+5. 执行打包内 `cloudflared --version`，确认二进制版本。
+6. 搜索 `Incorrect Usage`、`flag provided but not defined`、`code=0`，判断是否为参数兼容问题。
+7. 检查对应架构安装包内是否存在 `cloudflared-darwin-arm64` 或 `cloudflared-darwin-x64`。
+
+### 关键错误与结论映射
+
+| 错误特征 | 优先检查 | 本次结论 |
+| --- | --- | --- |
+| `spawn codex ENOENT` | Finder PATH、NVM 安装目录 | Finder 环境未加载 NVM PATH |
+| `env: node: No such file or directory` | Codex 所在目录是否进入 PATH | 绝对 Codex 路径仍依赖同目录 Node |
+| `Codex app-server is not ready` | 上游 Codex 进程是否启动 | Codex 启动失败的下游症状 |
+| `cloudflared code=0` 并持续重连 | stderr 中的 usage/flag 信息 | 不兼容参数导致帮助输出后退出 |
+| arm64 安装后找不到 cloudflared | 安装包资源架构 | 发布资源缺少 arm64 二进制 |
+
+## 跟踪与关闭条件
+
+- [x] 根因已复现并留存证据。
+- [x] 修复代码和回归测试已提交。
+- [x] 全仓 112 项测试通过。
+- [x] 开发版和打包版 Electron E2E 通过。
+- [x] macOS x64、arm64 安装包构建通过。
+- [x] 真实 Quick Tunnel 创建成功。
+- [ ] 配置有效 Apple Developer ID 证书。
+- [ ] 完成签名与 notarization。
+- [ ] 发布签名安装包并在干净的 Intel/Apple Silicon 设备各验收一次。
+
+代码层故障已关闭；发布签名和干净设备验收作为发布事项继续跟踪。
