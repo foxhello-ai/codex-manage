@@ -25,6 +25,8 @@ export class TunnelSupervisor extends EventEmitter {
   private retryAttempt = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private tokenCleanupTimer: ReturnType<typeof setTimeout> | null = null;
+  private recentDiagnostic: string | null = null;
+  private failureDiagnostic: string | null = null;
   private snapshot: TunnelSnapshot = {
     state: "idle",
     mode: "quick",
@@ -107,6 +109,8 @@ export class TunnelSupervisor extends EventEmitter {
       publicUrl: null,
       error: null
     });
+    this.recentDiagnostic = null;
+    this.failureDiagnostic = null;
 
     let tokenFile: string | null = null;
     if (this.desiredMode === "named") {
@@ -115,8 +119,8 @@ export class TunnelSupervisor extends EventEmitter {
       writeFileSync(tokenFile, this.namedToken!, { encoding: "utf8", mode: 0o600 });
     }
     const args = this.desiredMode === "quick"
-      ? ["--no-autoupdate", "tunnel", "--logformat", "json", "--url", this.originUrl!]
-      : ["--no-autoupdate", "tunnel", "--logformat", "json", "run", "--token-file", tokenFile!];
+      ? ["--no-autoupdate", "tunnel", "--url", this.originUrl!]
+      : ["--no-autoupdate", "tunnel", "run", "--token-file", tokenFile!];
     const child = spawn(this.options.binaryPath, args, {
       env: {
         ...process.env,
@@ -151,7 +155,8 @@ export class TunnelSupervisor extends EventEmitter {
     child.on("exit", (code, signal) => {
       if (this.child === child) this.child = null;
       if (!this.desiredRunning) return;
-      const message = `cloudflared 已退出（code=${code ?? "null"}, signal=${signal ?? "null"}）`;
+      const diagnostic = this.failureDiagnostic ?? this.recentDiagnostic;
+      const message = `cloudflared 已退出（code=${code ?? "null"}, signal=${signal ?? "null"}）${diagnostic ? `：${diagnostic}` : ""}`;
       this.scheduleReconnect(message);
     });
     if (this.desiredMode === "named" && this.namedPublicUrl) {
@@ -160,7 +165,14 @@ export class TunnelSupervisor extends EventEmitter {
   }
 
   private processLogLine(line: string): void {
-    const match = line.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
+    const diagnostic = stripTerminalFormatting(line).trim();
+    if (!diagnostic) return;
+    this.recentDiagnostic = diagnostic.slice(0, 500);
+    if (/incorrect usage|\b(?:error|fatal|failed)\b/i.test(diagnostic)) {
+      this.failureDiagnostic = this.recentDiagnostic;
+    }
+
+    const match = diagnostic.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
     if (match) {
       this.retryAttempt = 0;
       this.update({ state: "online", publicUrl: match[0], error: null });
@@ -168,7 +180,7 @@ export class TunnelSupervisor extends EventEmitter {
     }
 
     try {
-      const payload = JSON.parse(line) as Record<string, unknown>;
+      const payload = JSON.parse(diagnostic) as Record<string, unknown>;
       const message = [payload.message, payload.msg, payload.url].filter((value) => typeof value === "string").join(" ");
       const jsonMatch = message.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
       if (jsonMatch) {
@@ -229,6 +241,10 @@ export class TunnelSupervisor extends EventEmitter {
     this.snapshot = { ...this.snapshot, ...patch };
     this.emit("status", this.getSnapshot());
   }
+}
+
+function stripTerminalFormatting(value: string): string {
+  return value.replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, "");
 }
 
 export function resolveCloudflaredBinary(resourcesPath: string, developmentRoot: string): string {

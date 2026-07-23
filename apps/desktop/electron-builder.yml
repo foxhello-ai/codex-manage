@@ -1,7 +1,7 @@
 appId: cn.xmwefun.codexmanage
 productName: Codex Manage
 asar: true
-afterPack: apps/desktop/scripts/after-pack.mjs
+afterPack: scripts/after-pack.mjs
 directories:
   output: release
 files:

@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { withExecutableDirectory } from "./CodexLocator";
 
 export type LocalServiceSnapshot = {
   state: "idle" | "starting" | "running" | "stopped" | "failed";
@@ -40,9 +41,10 @@ export class LocalServiceSupervisor extends EventEmitter {
     this.update({ state: "starting", url: null, port: null, error: null });
 
     return new Promise((resolve, reject) => {
+      const childEnvironment = withExecutableDirectory(process.env, this.options.codexCliPath);
       const child = spawn(this.options.electronExecutable, [this.options.serverEntry], {
         env: {
-          ...process.env,
+          ...childEnvironment,
           ELECTRON_RUN_AS_NODE: "1",
           NODE_ENV: "production",
           CODEX_MANAGE_RUNTIME_MODE: "desktop",

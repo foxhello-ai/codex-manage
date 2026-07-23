@@ -676,13 +676,13 @@ async function canListen(port: number): Promise<boolean> {
   });
 }
 
-const hasLock = app.requestSingleInstanceLock();
-let controller: DesktopController | null = null;
-let isQuitting = false;
-
 if (process.env.CODEX_DESKTOP_USER_DATA_DIR) {
   app.setPath("userData", process.env.CODEX_DESKTOP_USER_DATA_DIR);
 }
+
+const hasLock = app.requestSingleInstanceLock();
+let controller: DesktopController | null = null;
+let isQuitting = false;
 
 if (!hasLock) {
   app.quit();

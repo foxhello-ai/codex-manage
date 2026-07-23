@@ -34,24 +34,29 @@ for (const target of targets) {
   try {
     const downloaded = join(temporaryDirectory, target.asset);
     await downloadWithRetry(`${releaseBase}/${target.asset}`, downloaded, target.asset);
-    const actual = createHash("sha256").update(await readFile(downloaded)).digest("hex");
-    if (actual.toLowerCase() !== expected.toLowerCase()) {
-      throw new Error(`SHA-256 mismatch for ${target.asset}: expected ${expected}, received ${actual}`);
-    }
-
     const output = join(outputDirectory, target.output);
     if (target.archive) {
       const extracted = join(temporaryDirectory, "extracted");
       await mkdir(extracted);
       await run("tar", ["-xzf", downloaded, "-C", extracted]);
-      await cp(join(extracted, "cloudflared"), output);
+      const extractedBinary = join(extracted, "cloudflared");
+      await verifySha256(extractedBinary, expected, target.output);
+      await cp(extractedBinary, output);
     } else {
+      await verifySha256(downloaded, expected, target.output);
       await cp(downloaded, output);
     }
     if (!target.output.endsWith(".exe")) await chmod(output, 0o755);
     console.info(`Prepared ${basename(output)} (${version})`);
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+}
+
+async function verifySha256(path, expected, label) {
+  const actual = createHash("sha256").update(await readFile(path)).digest("hex");
+  if (actual.toLowerCase() !== expected.toLowerCase()) {
+    throw new Error(`SHA-256 mismatch for ${label}: expected ${expected}, received ${actual}`);
   }
 }
 
