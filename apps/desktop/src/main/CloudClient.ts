@@ -140,7 +140,9 @@ export class CloudClient {
   }
 
   private async request<T>(path: string, options: { method?: string; token?: string; body?: unknown } = {}): Promise<T> {
-    const response = await fetch(new URL(path, this.baseUrl), {
+    const maxRetries = 2;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const response = await fetch(new URL(path, this.baseUrl), {
       method: options.method ?? "GET",
       signal: AbortSignal.timeout(15_000),
       headers: {
@@ -154,8 +156,14 @@ export class CloudClient {
       const error = new Error(payload?.error?.message ?? `云端请求失败：${response.status}`) as Error & { code?: string; statusCode?: number };
       error.code = payload?.error?.code;
       error.statusCode = response.status;
+      if ((response.status === 503 || response.status === 500) && attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
       throw error;
     }
     return payload as T;
+    }
+    throw new Error("云端请求失败");
   }
 }

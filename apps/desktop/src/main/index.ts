@@ -284,6 +284,9 @@ class DesktopController {
   }
 
   private async startTunnel(): Promise<DesktopStatus> {
+    const MAX_RETRIES = 2;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
     await this.refreshAuthStatus();
     if (this.auth.setupRequired) throw new Error("请先设置本机访问密码");
     if (!this.cloudSession) throw new Error("请先注册或登录平台账号");
@@ -321,6 +324,17 @@ class DesktopController {
     }
     await this.sendHeartbeat();
     return this.getStatus();
+    } catch (error) {
+      const statusCode = (error as { statusCode?: number }).statusCode;
+      if ((statusCode === 500 || statusCode === 503) && attempt < MAX_RETRIES && !isQuitting) {
+        this.diagnosticLog?.write("tunnel", "start_retry", { attempt: attempt + 1, error: (error as Error).message });
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      throw error;
+    }
+    }
+    throw new Error("远程通道启动失败，请稍后重试");
   }
 
   private async stopTunnel(): Promise<DesktopStatus> {
