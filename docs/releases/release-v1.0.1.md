@@ -23,9 +23,11 @@
 
 | 平台 | 文件 | SHA-256 |
 | --- | --- | --- |
-| macOS Intel x64 | `Codex Manage-1.0.1.dmg` | `30d8e2f2a8547acbfe96196c1ec677c100893a97236bc5a512b2449e09bfce78` |
-| macOS Apple Silicon arm64 | `Codex Manage-1.0.1-arm64.dmg` | `2cac7aebb320376a91a0830eea7247dbbe7c3b1cb1bfa6482a3c3c510f45767f` |
-| Windows x64 NSIS | `Codex Manage Setup 1.0.1.exe` | `585e72f252e7eb566baefc4b7e6c44da89af6a6ba371a1ccbfebc1bd45f4196e` |
+| macOS Intel x64 | `Codex Manage-1.0.1.dmg` | `ee79936f9b58a544c082515f74e60870b823add0b720cdac475021c8d7d14c2f` |
+| macOS Apple Silicon arm64 | `Codex Manage-1.0.1-arm64.dmg` | `3e3821596a133f4a3af59473b5864159b2735b5f5f93e3c5c13c97b160969bf5` |
+| Windows x64 NSIS | `Codex Manage Setup 1.0.1.exe` | `a00f63e56f2c232b370a9345874ed2c9835734d78870e8340452f6dae1218990` |
+
+> 2026-07-25 复核：`apps/desktop/release` 中同名 `1.0.1` 产物 SHA-256 如上。由于 2026-07-24 又合入 `fbc4c24` 和 `2243b00`，最终对客户交付前必须重新打包并再次更新本节哈希。
 
 ## 验证结果
 
@@ -56,3 +58,30 @@
 ## 已知恢复事项
 
 如果用户已经在旧版中执行过退出并丢失原设备凭据，安装 1.0.1 后仍需先在管理后台停用旧活动设备，释放设备名额。新设备成功绑定后，后续退出再登录将复用设备，不再重复占用名额。
+
+## 2026-07-23 至 2026-07-24 后续补丁
+
+这些补丁已合入 `feature/f-20260721-desktop`，用于下一次重新打包和回归：
+
+| 提交 | 类型 | 变更 | 状态 |
+| --- | --- | --- | --- |
+| `07cd4de` | Windows 兼容 | `CodexAppServerClient` 支持 Windows `.cmd` 启动 app-server | 已合入 |
+| `2d5a927` | 启动诊断 | 本地服务启动失败时向上抛出 app-server 原始错误 | 已合入 |
+| `808d0c8` | Named Tunnel | 正式权益存在时自动 provision 专属 Tunnel，避免继续使用 Quick Tunnel 随机域名 | 已合入 |
+| `5df9aec` | 托盘 | Windows 托盘增加双击打开主窗口 | 已合入 |
+| `8a36c10` | iPhone 入口 | 扫码面板增加 iPhone 添加到主屏幕操作指引 | 已合入 |
+| `3ff7faa` | 进程治理 | 启动失败与退出路径清理 app-server，降低孤儿进程导致的后续启动失败 | 已合入 |
+| `9805d6d` | Windows 兼容 | Windows Codex 定位优先完整路径，避免裸 `codex` 命中错误入口 | 已合入 |
+| `0c3856f` | Windows 兼容 | 版本检测使用 `execFile`，Windows `.cmd` 走 shell 兼容启动 | 已合入 |
+| `fbc4c24` | 远程通道 | 云端 `500`、`503` 和 `desktop:start-tunnel` 首次临时失败增加短重试 | 已合入，需重新打包 |
+| `2243b00` | 会话展示 | `thread/list` 分页扫描并兼容 `id`/`sessionId`，修复部分会话不展示 | 已合入，需重新打包 |
+
+详细记录见：
+
+- `docs/implementation-notes/2026-07-24-windows-session-and-tunnel-stability.md`
+- `docs/implementation-notes/2026-07-25-provider-switch-app-server-reload.md`
+
+## 当前未关闭事项
+
+- `cc switch` 外部切换服务商后，应用内长生命周期 `codex app-server` 不会自动重载；当前需要重启 Codex Manage。该问题已登记为 `CM-INC-20260725-005`，尚待代码修复。
+- 本地已有 `1.0.1` 安装包文件时间早于 2026-07-24 的部分补丁，不能作为“包含全部修复”的最终客户包。

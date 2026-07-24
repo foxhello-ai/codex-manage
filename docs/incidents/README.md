@@ -16,6 +16,9 @@
 | --- | --- | --- | --- | --- | --- |
 | `CM-INC-20260723-001` | 2026-07-23 | 高 | 待发布 | Finder 环境无法发现 NVM Codex，cloudflared 参数不兼容并以 code 0 退出 | [Desktop Codex 与 cloudflared 启动失败诊断](../implementation-notes/2026-07-23-desktop-startup-failure.md) |
 | `CM-INC-20260723-002` | 2026-07-23 | 高 | 待发布 | 普通退出删除本地设备凭据，重新登录重复注册并触发免费套餐设备上限 | [退出后重新登录触发设备数量上限](../implementation-notes/2026-07-23-device-limit-after-relogin.md) |
+| `CM-INC-20260724-003` | 2026-07-24 | 高 | 待发布 | Windows Codex `.ps1`/`.cmd` 解析差异导致 app-server 启动失败，远程通道首次启动遇到临时 500/503 时直接失败 | [Windows 启动、远程通道与会话展示补丁记录](../implementation-notes/2026-07-24-windows-session-and-tunnel-stability.md) |
+| `CM-INC-20260724-004` | 2026-07-24 | 高 | 待发布 | 会话列表只读取第一页且只认 `id` 字段，导致部分 Windows 会话无法展示或打开详情 | [Windows 启动、远程通道与会话展示补丁记录](../implementation-notes/2026-07-24-windows-session-and-tunnel-stability.md) |
+| `CM-INC-20260725-005` | 2026-07-25 | 中 | 待修复 | 外部执行 `cc switch` 后，应用内长生命周期 app-server 不重新读取服务商配置，必须重启应用才生效 | [cc switch 切换服务商后应用内模型不刷新诊断](../implementation-notes/2026-07-25-provider-switch-app-server-reload.md) |
 
 ## 新增故障记录要求
 

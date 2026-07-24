@@ -2,11 +2,11 @@
 
 ## 1. 文档信息
 
-- 记录日期：2026-07-21
+- 记录日期：2026-07-25
 - 对应需求版本：V1.1
 - 对应架构版本：V1.0
 - 对应实施计划版本：V1.0
-- 当前结论：核心代码已完成，进入外部环境与多平台发布验收阶段
+- 当前结论：核心代码已完成，Windows 启动、远程通道和会话展示补丁已合入；`cc switch` 服务商热切换仍需新增 app-server 重载能力
 
 ## 2. 阶段状态
 
@@ -24,7 +24,25 @@
 | P9 多平台发布 | 部分完成 | electron-builder、三平台 CI、cloudflared SHA 校验、版本注入、校验和生成、macOS x64 DMG | arm64/Windows 构建与实机、Developer ID、公证、Windows 签名 |
 | P10 正式发布 | 未开始 | 已具备内部 Alpha 基础 | 安全审查、备份恢复、告警、灰度、客服与运维流程 |
 
-## 3. 本次收尾补强
+## 3. 2026-07-23 至 2026-07-24 桌面补丁
+
+- Windows Codex CLI 定位优先完整 `.cmd` 路径，并兼容 Node/Electron 对 `.cmd` 的启动差异。
+- 本地服务启动失败时保留并抛出原始错误，减少只有 `Codex app-server is not ready` 的模糊诊断。
+- 启动失败和退出路径补充 app-server 清理，降低孤儿进程导致的下次启动失败。
+- 正式权益用户启动远程通道时，如果云端仍返回 Quick Tunnel，会自动 provision Named Tunnel 后再使用专属域名。
+- 云端控制 API `500`、`503` 临时错误和 `desktop:start-tunnel` 首次启动失败增加短重试。
+- Windows 托盘增加双击恢复主窗口；macOS 托盘行为保持不变。
+- iPhone 扫码面板增加“添加到主屏幕”指引，用于生成桌面入口标签。
+- 会话列表增加 `thread/list` 分页扫描，搜索覆盖后续页；会话详情和前端选中逻辑兼容 `id` 与 `sessionId`。
+
+## 4. 当前已知缺口
+
+- 外部执行 `cc switch` 后，当前应用内已运行的 `codex app-server` 不会自动读取新的服务商配置，必须重启应用。后续需新增 app-server reload API、模型目录缓存失效和前端强制刷新入口。
+- 本地 `apps/desktop/release` 中已有 `1.0.1` 安装包文件时间早于 2026-07-24 的部分补丁，最终客户交付前必须重新打包并更新哈希。
+- Windows 31.50 已用于复现启动问题，仍需用包含全部补丁的新 Windows 安装包执行完整安装回归。
+- macOS 和 Windows 都需要验证开机自动启动、静默进入托盘、托盘单击/双击恢复窗口。
+
+## 5. 本次收尾补强
 
 - Refresh Token 轮换改为 PostgreSQL 事务内锁定、撤销和双 Token 原子写入，阻止并发重放。
 - 设备数量判断改为用户级事务锁，阻止并发注册绕过套餐上限。
@@ -35,15 +53,15 @@
 - originPort 变化时自动重新排队更新 Named Tunnel ingress。
 - 二维码刷新会立即撤销旧配对码。
 - Named Tunnel Token 改用权限受限的临时文件传给 cloudflared，不进入进程命令行。
-- 桌面端增加开机启动、托盘复制地址、设备解绑、本地服务有限重启和脱敏诊断日志导出。
+- 桌面端增加开机启动、托盘复制地址、设备解绑、本地服务有限重启、托盘双击恢复和脱敏诊断日志导出。
 - 云端认证失效时，桌面客户端会停止仍在运行的 Tunnel。
 - 管理后台增加域名、支付和审计页面，用户邮箱和手机号默认脱敏。
 - 桌面和本地 Web 增加 CSP；macOS 包关闭任意网络加载，只保留 loopback HTTP 例外。
 
-## 4. 关键代码位置
+## 6. 关键代码位置
 
 - 本地服务：`src/server/app.ts`、`src/server/start.ts`、`src/server/auth/LocalAuthService.ts`
-- 桌面端：`apps/desktop/src/main/index.ts`、`TunnelSupervisor.ts`、`DiagnosticLog.ts`
+- 桌面端：`apps/desktop/src/main/index.ts`、`TunnelSupervisor.ts`、`DiagnosticLog.ts`、`CodexLocator.ts`、`CloudClient.ts`、`LocalServiceSupervisor.ts`
 - 控制 API：`apps/control-api/src/ControlService.ts`、`db/PgControlStore.ts`
 - Cloudflare：`apps/control-api/src/cloudflare/CloudflareAdapter.ts`、`provisioner.ts`
 - 管理后台：`apps/admin-web/src/main.tsx`
@@ -51,11 +69,11 @@
 - 部署：`deploy/docker-compose.yml`
 - 发布：`.github/workflows/desktop-release.yml`
 
-## 5. 当前不应对外宣称的内容
+## 7. 当前不应对外宣称的内容
 
 - 未签名 DMG 不是正式公开发行包。
 - Named Tunnel 代码完成不等于已通过真实 Cloudflare 生产验证。
 - PGlite 集成测试不能替代目标 PostgreSQL 17 环境的上线前迁移演练。
-- macOS arm64 和 Windows x64 尚无本次机器上的实机安装记录。
+- macOS arm64 和 Windows x64 尚无包含全部 2026-07-24 补丁的新安装包实机安装记录。
 - 当前没有真实支付、自动扣款或已支付订单能力。
 - 当前 API 限流器为单实例内存实现；水平扩容前必须换成 Redis 或网关级共享限流。
