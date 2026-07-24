@@ -329,8 +329,8 @@ function Dashboard({
   const appServerStatus = currentConfig?.appServer
     ? `${currentConfig.appServer.status}${currentConfig.appServer.initialized ? " / initialized" : ""}`
     : "未连接";
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId)
-    ?? (sessionDetail?.id === selectedSessionId ? sessionDetail : null);
+  const selectedSession = sessions.find((session) => isSameSession(session, selectedSessionId))
+    ?? (isSameSession(sessionDetail, selectedSessionId) ? sessionDetail : null);
   const currentModelState = runtime && runtime.status !== "history"
     ? runtime.modelSelection
     : sessionDetail?.modelState ?? runtime?.modelSelection ?? emptyModelState();
@@ -2894,6 +2894,10 @@ function upsertById<T extends { id: string }>(items: T[], item: T): T[] {
   const next = [...items];
   next[index] = { ...next[index], ...item };
   return next;
+}
+
+function isSameSession(session: Pick<SessionSummary, "id" | "sessionId"> | null | undefined, sessionId: string | null): boolean {
+  return Boolean(session && sessionId && (session.id === sessionId || session.sessionId === sessionId));
 }
 
 function appendLiveMessage(messages: LiveMessage[], nextMessage: LiveMessage): LiveMessage[] {

@@ -50,7 +50,8 @@ describe("SessionService", () => {
       {
         method: "thread/list",
         params: {
-          limit: 20,
+          cursor: null,
+          limit: 100,
           sortDirection: "desc",
           sortKey: "updated_at",
           archived: false,
@@ -72,6 +73,46 @@ describe("SessionService", () => {
         status: "history",
         cliVersion: "codex-cli 0.144.3",
         source: "cli"
+      }
+    ]);
+  });
+
+  it("paginates app-server sessions and searches beyond the first page", async () => {
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready" as const, pid: 1, lastError: null, initialized: true }),
+      request: async <T = unknown>(method: string, params?: unknown) => {
+        calls.push({ method, params });
+        const cursor = (params as { cursor?: string | null }).cursor;
+        return (cursor === "page-2"
+          ? {
+              data: [
+                {
+                  sessionId: "session-2",
+                  preview: "deep match",
+                  cwd: "/workspace/deep",
+                  createdAt: 2,
+                  updatedAt: 3
+                }
+              ],
+              nextCursor: null
+            }
+          : {
+              data: [{ id: "thread-1", preview: "first page", cwd: "/workspace/first", createdAt: 1, updatedAt: 2 }],
+              nextCursor: "page-2"
+            }) as T;
+      }
+    });
+
+    const sessions = await service.listSessions({ search: "deep" });
+
+    expect(calls.map((call) => (call.params as { cursor?: string | null }).cursor)).toEqual([null, "page-2"]);
+    expect(sessions).toMatchObject([
+      {
+        id: "session-2",
+        sessionId: "session-2",
+        title: "deep match",
+        workspace: "/workspace/deep"
       }
     ]);
   });

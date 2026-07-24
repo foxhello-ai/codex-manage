@@ -68,6 +68,9 @@ type ListSessionsParams = {
   limit?: number;
 };
 
+const DEFAULT_SESSION_SCAN_LIMIT = 1000;
+const SESSION_PAGE_SIZE = 100;
+
 type MetadataStore = {
   getAll(): Promise<Record<string, { remarkTitle: string | null }>>;
   get?(sessionId: string): Promise<{
@@ -94,23 +97,37 @@ export class SessionService {
   async listSessions(params: ListSessionsParams = {}): Promise<SessionSummary[]> {
     this.assertReady();
 
-    const response = await this.appServer.request<ThreadListResponse>("thread/list", {
-      limit: params.limit ?? 100,
-      sortDirection: "desc",
-      sortKey: "updated_at",
-      archived: false,
-      searchTerm: null
-    });
+    const scanLimit = params.search ? DEFAULT_SESSION_SCAN_LIMIT : params.limit ?? DEFAULT_SESSION_SCAN_LIMIT;
+    const threads: unknown[] = [];
+    const seenCursors = new Set<string>();
+    let cursor: string | null = null;
+
+    while (threads.length < scanLimit) {
+      const response = await this.appServer.request<ThreadListResponse>("thread/list", {
+        cursor,
+        limit: Math.min(SESSION_PAGE_SIZE, scanLimit - threads.length),
+        sortDirection: "desc",
+        sortKey: "updated_at",
+        archived: false,
+        searchTerm: null
+      });
+
+      threads.push(...(response.data ?? []));
+      cursor = readString(response.nextCursor);
+      if (!cursor || seenCursors.has(cursor)) break;
+      seenCursors.add(cursor);
+    }
 
     const metadata = await this.readMetadata();
     const searchTerm = params.search?.trim().toLocaleLowerCase() ?? "";
-    const sessions = (response.data ?? [])
+    const sessions = threads
       .map((thread) => this.toSummary(thread, metadata))
       .filter((session) => session !== null);
 
-    if (!searchTerm) return sessions;
+    if (!searchTerm) return params.limit ? sessions.slice(0, params.limit) : sessions;
 
-    return sessions.filter((session) => matchesSearch(session, searchTerm));
+    const matched = sessions.filter((session) => matchesSearch(session, searchTerm));
+    return params.limit ? matched.slice(0, params.limit) : matched;
   }
 
   async getSessionDetail(sessionId: string): Promise<SessionDetail> {
@@ -219,7 +236,7 @@ export class SessionService {
   private toSummary(thread: unknown, metadata: Record<string, { remarkTitle: string | null }>): SessionSummary | null {
     if (!thread || typeof thread !== "object") return null;
     const source = thread as Record<string, unknown>;
-    const id = readString(source.id);
+    const id = readString(source.id) ?? readString(source.sessionId);
     if (!id) return null;
 
     const sessionId = readString(source.sessionId) ?? id;
