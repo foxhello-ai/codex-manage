@@ -2591,8 +2591,31 @@ textarea {
 }
 
 @media (max-width: 767px) {
+  html,
+  body,
+  #root {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .appShell.reserveFloatingStatus {
+    min-height: 100dvh;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .appShell.reserveFloatingStatus .content {
+    min-height: 0;
+    height: calc(100dvh - 58px);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 10px;
+    overflow: hidden;
+  }
+
   .mobileRuntimeStatus {
     min-width: 0;
+    max-height: min(34dvh, 260px);
     display: grid;
     overflow: hidden;
     border: 1px solid #8ec5ff;
@@ -2680,8 +2703,10 @@ textarea {
 
   .mobileRuntimeDetails {
     min-width: 0;
+    min-height: 0;
     display: grid;
     gap: 7px;
+    overflow: auto;
     border-top: 1px solid #e3e8ed;
     padding: 9px 12px 11px;
     background: #f8fafb;
@@ -2710,15 +2735,16 @@ textarea {
   }
 
   .appShell.reserveFloatingStatus .sessionDetail {
-    height: calc(100dvh - 224px);
-    min-height: 420px;
+    min-width: 0;
+    min-height: 0;
+    height: auto;
     overflow: hidden;
     padding: 12px;
   }
 
   .mobileRuntimeStatus.expanded + .sessionDetail {
-    height: calc(100dvh - 304px);
-    min-height: 340px;
+    min-height: 0;
+    height: auto;
   }
 
   .appShell.reserveFloatingStatus .detailStack {
