@@ -35,6 +35,19 @@
 
 ## 修改方案
 
+### 审核补充（2026-07-25）
+
+桌面端不能只依赖用户在设置页点击“刷新 Codex 运行时”。`cc switch` 是用户在桌面环境里执行的外部配置变更，桌面应用长期驻留托盘，理论上应自动感知 Codex 配置变化并自动重载 app-server。
+
+审核结论：
+
+1. 设置页“刷新 Codex 运行时”仅保留为兜底和诊断入口，不作为主流程。
+2. 桌面主进程需要监听 Codex 配置目录变更，重点覆盖 `config.toml`、`auth.json` 以及同目录顶层 `*.toml`、`*.json`。
+3. 检测到配置变更后，桌面端应自动调用本地 runtime reload API。
+4. 若存在运行中会话、等待审批或模型切换中的会话，自动重载不得强行中断，应记录 pending 状态并退避重试。
+5. 自动重载成功后，打开中的本地 Web/H5 页面应自动清空旧模型缓存并刷新模型列表，不要求用户手动进入设置页。
+6. 桌面 control token 应允许调用 runtime reload API，但范围应限制在必要的本地运行时控制路径，不能泛化为所有 API 管理权限。
+
 ### 后端
 
 1. 在 `AppRuntime` 增加 `restart()` 或 `reloadCodexAppServer()`：
@@ -70,6 +83,14 @@
 - `src/server/services/RuntimeManager.ts`：新增 reload blocker 检查，运行中、审批中、模型切换中或排队操作中拒绝重载。
 - `src/client/App.tsx`：设置页新增“刷新 Codex 运行时”，成功后强制刷新模型目录。
 - `src/server/services/RuntimeManager.test.ts`：覆盖运行中阻断、等待输入允许重载和重载后状态重置。
+
+自动化补充实现点：
+
+- `apps/desktop/src/main/CodexConfigWatcher.ts`：监听 Codex 配置目录变更，结合 fs watch 和轮询兜底。
+- `apps/desktop/src/main/index.ts`：配置变更后自动调用 `/api/runtime/reload`，遇到阻断自动退避重试。
+- `src/server/auth/hooks.ts`：允许桌面 control token 调用 `/api/runtime/reload`。
+- `src/shared/models.ts`、`src/server/routes/config.ts`：暴露运行时重载 generation，让前端能识别自动重载。
+- `src/client/App.tsx`：轮询配置 generation，发现自动重载后清理模型缓存并强制刷新。
 
 ## 验证方案
 

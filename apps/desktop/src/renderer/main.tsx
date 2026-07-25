@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import QRCode from "qrcode";
-import type { DesktopStatus, IssueReportCategory, UpdateStatus } from "../shared/types";
+import type { DesktopStatus, IssueReportCategory, RuntimeReloadStatus, UpdateStatus } from "../shared/types";
 import "./styles.css";
 
 function DesktopApp() {
@@ -345,6 +345,11 @@ function DesktopApp() {
           {issueNotice ? <p className="notice">{issueNotice}</p> : null}
           {status.update.error ? <p className="warningText">更新：{status.update.error}</p> : null}
           {status.issueReporting.lastError ? <p className="warningText">问题上报：{status.issueReporting.lastError}</p> : null}
+          {status.runtimeReload.state !== "idle" ? (
+            <p className={status.runtimeReload.state === "succeeded" ? "notice" : "warningText"}>
+              {runtimeReloadMessage(status.runtimeReload)}
+            </p>
+          ) : null}
         </div>
         <div className="settingsActions">
           <label className="toggleRow">
@@ -513,6 +518,18 @@ function updateMessage(update: UpdateStatus): string {
   if (update.state === "downloaded") return "新版本已下载，可立即重启安装";
   if (update.state === "error") return update.error ?? "更新检查失败";
   return updateDetail(update);
+}
+
+function runtimeReloadMessage(status: RuntimeReloadStatus): string {
+  if (status.state === "succeeded") {
+    return `Codex 运行时已自动刷新：${status.lastReloadedAt ? new Date(status.lastReloadedAt).toLocaleString() : "刚刚"}`;
+  }
+  if (status.state === "blocked") {
+    return `Codex 配置已变化，当前会话忙，稍后自动刷新${status.nextRetryAt ? `（下次 ${new Date(status.nextRetryAt).toLocaleTimeString()}）` : ""}`;
+  }
+  if (status.state === "reloading") return "检测到 Codex 配置变化，正在自动刷新运行时";
+  if (status.state === "failed") return `Codex 运行时自动刷新失败：${status.error ?? "未知错误"}`;
+  return "检测到 Codex 配置变化，等待自动刷新运行时";
 }
 
 createRoot(document.getElementById("root")!).render(<DesktopApp />);

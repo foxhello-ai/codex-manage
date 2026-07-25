@@ -31,7 +31,8 @@ describe("config and health routes", () => {
     registerConfigRoutes(app, testConfig(), () => ({
       codexCliVersion: "codex-cli 0.144.3",
       codexVersionError: null,
-      appServer: { status: "ready", pid: 1234, lastError: null, initialized: true }
+      appServer: { status: "ready", pid: 1234, lastError: null, initialized: true },
+      runtimeReload: { generation: 1, reloadedAt: "2026-07-25T00:00:00.000Z", trigger: "desktop_auto", reason: "test", lastError: null }
     }));
 
     const configResponse = await app.inject({ method: "GET", url: "/api/config" });
@@ -58,7 +59,8 @@ describe("config and health routes", () => {
     registerConfigRoutes(app, testConfig(), () => ({
       codexCliVersion: null,
       codexVersionError: "codex executable not found",
-      appServer: { status: "failed", pid: null, lastError: "spawn codex ENOENT", initialized: false }
+      appServer: { status: "failed", pid: null, lastError: "spawn codex ENOENT", initialized: false },
+      runtimeReload: { generation: 0, reloadedAt: null, trigger: null, reason: null, lastError: null }
     }));
 
     const response = await app.inject({ method: "GET", url: "/api/health" });

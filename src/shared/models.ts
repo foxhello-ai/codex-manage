@@ -29,6 +29,14 @@ export type AppServerSnapshot = {
   initialized: boolean;
 };
 
+export type RuntimeReloadSnapshot = {
+  generation: number;
+  reloadedAt: string | null;
+  trigger: "manual" | "desktop_auto" | null;
+  reason: string | null;
+  lastError: string | null;
+};
+
 export type PublicConfig = {
   host: string;
   port: number;
@@ -38,6 +46,7 @@ export type PublicConfig = {
   codexCliVersion: string | null;
   codexVersionError: string | null;
   appServer: AppServerSnapshot | null;
+  runtimeReload: RuntimeReloadSnapshot | null;
 };
 
 export type HealthStatus = {
@@ -53,7 +62,10 @@ export type HealthStatus = {
 
 export type RuntimeReloadResponse = {
   runtime: {
+    generation: number;
     reloadedAt: string;
+    trigger: "manual" | "desktop_auto";
+    reason: string | null;
     codexCliVersion: string | null;
     appServer: AppServerSnapshot;
   };

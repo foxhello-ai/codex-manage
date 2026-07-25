@@ -4,14 +4,28 @@ import { CodexAppServerClient, type CodexAppServerSnapshot } from "./CodexAppSer
 import { detectCodexVersion } from "./codexVersion";
 import { RuntimeManager, type RuntimeReloadBlocker } from "./RuntimeManager";
 
+export type RuntimeReloadTrigger = "manual" | "desktop_auto";
+
+export type RuntimeReloadSnapshot = {
+  generation: number;
+  reloadedAt: string | null;
+  trigger: RuntimeReloadTrigger | null;
+  reason: string | null;
+  lastError: string | null;
+};
+
 export type RuntimeSnapshot = {
   codexCliVersion: string | null;
   codexVersionError: string | null;
   appServer: CodexAppServerSnapshot;
+  runtimeReload: RuntimeReloadSnapshot;
 };
 
 export type RuntimeReloadResult = {
+  generation: number;
   reloadedAt: string;
+  trigger: RuntimeReloadTrigger;
+  reason: string | null;
   codexCliVersion: string | null;
   appServer: CodexAppServerSnapshot;
 };
@@ -21,6 +35,13 @@ export class AppRuntime {
   readonly runtimeManager: RuntimeManager;
   private codexCliVersion: string | null = null;
   private codexVersionError: string | null = null;
+  private runtimeReload: RuntimeReloadSnapshot = {
+    generation: 0,
+    reloadedAt: null,
+    trigger: null,
+    reason: null,
+    lastError: null
+  };
 
   constructor(private readonly config: AppConfig) {
     this.appServer = new CodexAppServerClient({
@@ -44,25 +65,42 @@ export class AppRuntime {
     await this.appServer.stop();
   }
 
-  async reloadAppServer(): Promise<RuntimeReloadResult> {
+  async reloadAppServer(input: { trigger?: RuntimeReloadTrigger; reason?: string | null } = {}): Promise<RuntimeReloadResult> {
     const blockers = this.runtimeManager.prepareForAppServerReload();
     if (blockers.length > 0) {
       throw new RuntimeReloadBlockedError(blockers);
     }
 
+    const trigger = input.trigger ?? "manual";
+    const reason = input.reason?.trim() ? input.reason.trim().slice(0, 200) : null;
     try {
       await this.detectVersion();
       await this.appServer.stop();
       await this.appServer.start();
       this.runtimeManager.finishAppServerReload(true);
+      const reloadedAt = new Date().toISOString();
+      this.runtimeReload = {
+        generation: this.runtimeReload.generation + 1,
+        reloadedAt,
+        trigger,
+        reason,
+        lastError: null
+      };
       return {
-        reloadedAt: new Date().toISOString(),
+        generation: this.runtimeReload.generation,
+        reloadedAt,
+        trigger,
+        reason,
         codexCliVersion: this.codexCliVersion,
         appServer: this.appServer.getSnapshot()
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.runtimeManager.finishAppServerReload(false, message);
+      this.runtimeReload = {
+        ...this.runtimeReload,
+        lastError: message
+      };
       throw error;
     }
   }
@@ -71,7 +109,8 @@ export class AppRuntime {
     return {
       codexCliVersion: this.codexCliVersion,
       codexVersionError: this.codexVersionError,
-      appServer: this.appServer.getSnapshot()
+      appServer: this.appServer.getSnapshot(),
+      runtimeReload: { ...this.runtimeReload }
     };
   }
 

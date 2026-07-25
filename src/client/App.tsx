@@ -323,6 +323,7 @@ function Dashboard({
   const selectedSessionIdRef = useRef<string | null>(initialRoute.kind === "detail" ? initialRoute.sessionId : null);
   const liveMessagesRef = useRef<LiveMessage[]>([]);
   const retryMessageRef = useRef<string | null>(null);
+  const runtimeReloadGenerationRef = useRef<number | null>(null);
 
   const listenAddress = useMemo(() => {
     if (!currentConfig) return "读取中";
@@ -372,6 +373,7 @@ function Dashboard({
     setRuntimeReloadNotice(null);
     try {
       const response = await reloadRuntime();
+      runtimeReloadGenerationRef.current = response.runtime.generation;
       setModelCatalog(null);
       setModelCatalogError(null);
       setRuntime((current) => current ? { ...current, status: "history", activeTurnId: null, lastError: null } : current);
@@ -388,6 +390,45 @@ function Dashboard({
   useEffect(() => {
     if (config) setCurrentConfig(config);
   }, [config]);
+
+  useEffect(() => {
+    const generation = currentConfig?.runtimeReload?.generation ?? 0;
+    if (runtimeReloadGenerationRef.current === null) {
+      runtimeReloadGenerationRef.current = generation;
+      return;
+    }
+    if (generation <= runtimeReloadGenerationRef.current) return;
+    runtimeReloadGenerationRef.current = generation;
+    setModelCatalog(null);
+    setModelCatalogError(null);
+    setRuntime((current) => current ? { ...current, status: "history", activeTurnId: null, lastError: null } : current);
+    const reloadedAt = currentConfig?.runtimeReload?.reloadedAt;
+    const trigger = currentConfig?.runtimeReload?.trigger;
+    setRuntimeReloadNotice(
+      `Codex 运行时已${trigger === "desktop_auto" ? "自动" : ""}刷新${reloadedAt ? `：${formatDateTime(reloadedAt)}` : ""}`
+    );
+    void loadModelCatalog(true);
+    if (selectedSessionIdRef.current) {
+      void loadRuntime(selectedSessionIdRef.current, { silent: true });
+    }
+  }, [currentConfig?.runtimeReload?.generation]);
+
+  useEffect(() => {
+    let active = true;
+    async function pollRuntimeConfig() {
+      try {
+        const nextConfig = await getPublicConfig();
+        if (active) setCurrentConfig(nextConfig);
+      } catch {
+        // Runtime reload detection is best-effort; visible errors stay in diagnostics.
+      }
+    }
+    const timer = setInterval(() => void pollRuntimeConfig(), 10_000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     void loadSessions("");

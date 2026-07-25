@@ -34,6 +34,17 @@ export type IssueReportingStatus = {
   lastError: string | null;
 };
 
+export type RuntimeReloadStatus = {
+  state: "idle" | "pending" | "reloading" | "blocked" | "failed" | "succeeded";
+  trigger: "desktop_auto" | null;
+  reason: string | null;
+  lastDetectedAt: string | null;
+  lastAttemptAt: string | null;
+  lastReloadedAt: string | null;
+  nextRetryAt: string | null;
+  error: string | null;
+};
+
 export type DesktopStatus = {
   version: string;
   platform: NodeJS.Platform;
@@ -58,6 +69,7 @@ export type DesktopStatus = {
     launchAtLogin: boolean;
   };
   issueReporting: IssueReportingStatus;
+  runtimeReload: RuntimeReloadStatus;
   account: {
     authenticated: boolean;
     identifier: string | null;

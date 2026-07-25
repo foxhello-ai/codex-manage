@@ -20,7 +20,7 @@ export function registerAuthHook(
     const pathname = new URL(request.url, "http://local").pathname;
     if (PUBLIC_PATHS.has(pathname)) return;
     if (
-      pathname.startsWith("/api/desktop/")
+      isDesktopControlPath(pathname)
       && desktopControlToken
       && request.headers["x-codex-desktop-token"] === desktopControlToken
     ) return;
@@ -28,4 +28,9 @@ export function registerAuthHook(
 
     return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
   });
+}
+
+function isDesktopControlPath(pathname: string): boolean {
+  return pathname.startsWith("/api/desktop/")
+    || pathname === "/api/runtime/reload";
 }

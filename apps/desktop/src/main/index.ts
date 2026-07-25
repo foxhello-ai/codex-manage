@@ -14,6 +14,7 @@ import {
   Tray
 } from "electron";
 import { CodexLocator, type CodexLocation } from "./CodexLocator";
+import { CodexConfigWatcher, type CodexConfigChange } from "./CodexConfigWatcher";
 import { CloudClient, type CloudAuthResponse, type CloudSession } from "./CloudClient";
 import { CredentialVault } from "./CredentialVault";
 import { DeviceBindingVault } from "./DeviceBindingVault";
@@ -69,6 +70,19 @@ class DesktopController {
   private localStableTimer: ReturnType<typeof setTimeout> | null = null;
   private localRestartAttempts = 0;
   private updateManager: UpdateManager | null = null;
+  private codexConfigWatcher: CodexConfigWatcher | null = null;
+  private runtimeReloadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private runtimeReloadRetryAttempt = 0;
+  private runtimeReload: DesktopStatus["runtimeReload"] = {
+    state: "idle",
+    trigger: null,
+    reason: null,
+    lastDetectedAt: null,
+    lastAttemptAt: null,
+    lastReloadedAt: null,
+    nextRetryAt: null,
+    error: null
+  };
   private issueReporting: DesktopStatus["issueReporting"] = {
     autoEnabled: true,
     queuedCount: 0,
@@ -201,6 +215,14 @@ class DesktopController {
       void this.sendHeartbeat();
     });
 
+    this.codexConfigWatcher = new CodexConfigWatcher({
+      onChange: (change) => this.handleCodexConfigChange(change)
+    });
+    this.codexConfigWatcher.start();
+    this.diagnosticLog.write("codex", "config_watcher_started", {
+      directory: this.codexConfigWatcher.directory
+    });
+
     try {
       await this.localService.start();
       await this.refreshAuthStatus();
@@ -217,6 +239,9 @@ class DesktopController {
   async shutdown(): Promise<void> {
     this.diagnosticLog?.write("desktop", "application_stopping");
     this.updateManager?.stop();
+    this.codexConfigWatcher?.stop();
+    if (this.runtimeReloadRetryTimer) clearTimeout(this.runtimeReloadRetryTimer);
+    this.runtimeReloadRetryTimer = null;
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     if (this.localRestartTimer) clearTimeout(this.localRestartTimer);
     if (this.localStableTimer) clearTimeout(this.localStableTimer);
@@ -390,6 +415,116 @@ class DesktopController {
   private async installDownloadedUpdate() {
     if (!this.updateManager) throw new Error("更新服务尚未初始化");
     return await this.updateManager.installDownloadedUpdate();
+  }
+
+  private handleCodexConfigChange(change: CodexConfigChange): void {
+    const reason = `codex_config_changed:${change.signature.slice(0, 12)}`;
+    this.runtimeReloadRetryAttempt = 0;
+    this.setRuntimeReloadStatus({
+      state: "pending",
+      trigger: "desktop_auto",
+      reason,
+      lastDetectedAt: change.changedAt,
+      error: null
+    });
+    this.diagnosticLog?.write("codex", "config_changed", {
+      directory: change.directory,
+      signature: change.signature.slice(0, 12)
+    });
+    this.scheduleRuntimeReload(reason, 1500);
+  }
+
+  private scheduleRuntimeReload(reason: string, delayMs: number): void {
+    if (this.runtimeReloadRetryTimer) clearTimeout(this.runtimeReloadRetryTimer);
+    const nextRetryAt = new Date(Date.now() + delayMs).toISOString();
+    this.setRuntimeReloadStatus({
+      state: this.runtimeReload.state === "blocked" ? "blocked" : "pending",
+      trigger: "desktop_auto",
+      reason,
+      nextRetryAt
+    });
+    this.runtimeReloadRetryTimer = setTimeout(() => {
+      this.runtimeReloadRetryTimer = null;
+      void this.reloadRuntimeAfterCodexConfigChange(reason);
+    }, delayMs);
+  }
+
+  private async reloadRuntimeAfterCodexConfigChange(reason: string): Promise<void> {
+    const local = this.localService?.getSnapshot();
+    if (!local?.url) {
+      this.runtimeReloadRetryAttempt += 1;
+      this.setRuntimeReloadStatus({
+        state: "pending",
+        trigger: "desktop_auto",
+        reason,
+        error: "本地服务尚未运行"
+      });
+      this.scheduleRuntimeReload(reason, runtimeReloadRetryDelayMs(this.runtimeReloadRetryAttempt));
+      return;
+    }
+
+    this.setRuntimeReloadStatus({
+      state: "reloading",
+      trigger: "desktop_auto",
+      reason,
+      lastAttemptAt: new Date().toISOString(),
+      nextRetryAt: null,
+      error: null
+    });
+
+    try {
+      const response = await this.controlRequest<{
+        runtime: {
+          generation: number;
+          reloadedAt: string;
+          trigger: "manual" | "desktop_auto";
+          reason: string | null;
+        };
+      }>("/api/runtime/reload", {
+        method: "POST",
+        body: {
+          trigger: "desktop_auto",
+          reason
+        }
+      });
+      this.runtimeReloadRetryAttempt = 0;
+      this.codex = await new CodexLocator().locate().catch(() => this.codex);
+      this.setRuntimeReloadStatus({
+        state: "succeeded",
+        trigger: "desktop_auto",
+        reason: response.runtime.reason ?? reason,
+        lastReloadedAt: response.runtime.reloadedAt,
+        nextRetryAt: null,
+        error: null
+      });
+      this.diagnosticLog?.write("codex", "runtime_auto_reloaded", {
+        generation: response.runtime.generation,
+        reloadedAt: response.runtime.reloadedAt
+      });
+    } catch (error) {
+      this.runtimeReloadRetryAttempt += 1;
+      const statusCode = (error as { statusCode?: number }).statusCode;
+      const code = (error as { code?: string }).code;
+      const blocked = statusCode === 409 || code === "RUNTIME_RELOAD_BLOCKED";
+      this.setRuntimeReloadStatus({
+        state: blocked ? "blocked" : "failed",
+        trigger: "desktop_auto",
+        reason,
+        error: errorMessage(error)
+      });
+      this.diagnosticLog?.write("codex", blocked ? "runtime_auto_reload_blocked" : "runtime_auto_reload_failed", {
+        attempt: this.runtimeReloadRetryAttempt,
+        statusCode,
+        code,
+        error: errorMessage(error)
+      });
+      this.scheduleRuntimeReload(reason, runtimeReloadRetryDelayMs(this.runtimeReloadRetryAttempt, blocked));
+    }
+  }
+
+  private setRuntimeReloadStatus(patch: Partial<DesktopStatus["runtimeReload"]>): void {
+    this.runtimeReload = { ...this.runtimeReload, ...patch };
+    this.emitStatus();
   }
 
   private async submitIssueReport(input: unknown): Promise<IssueReportSubmissionResult> {
@@ -1003,8 +1138,16 @@ class DesktopController {
       body: options.body === undefined ? undefined : JSON.stringify(options.body)
     });
     if (!response.ok) {
-      const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-      throw new Error(payload?.error?.message ?? `本地服务请求失败：${response.status}`);
+      const payload = await response.json().catch(() => null) as { error?: { code?: string; message?: string; details?: unknown } } | null;
+      const error = new Error(payload?.error?.message ?? `本地服务请求失败：${response.status}`) as Error & {
+        code?: string;
+        statusCode?: number;
+        details?: unknown;
+      };
+      error.code = payload?.error?.code;
+      error.statusCode = response.status;
+      error.details = payload?.error?.details;
+      throw error;
     }
     return await response.json() as T;
   }
@@ -1039,6 +1182,7 @@ class DesktopController {
         ...this.issueReporting,
         queuedCount: this.issueReportQueue?.count() ?? this.issueReporting.queuedCount
       },
+      runtimeReload: { ...this.runtimeReload },
       account: {
         authenticated: this.cloudSession !== null,
         identifier: this.cloudSession?.identifier ?? null,
@@ -1080,6 +1224,11 @@ function isIssueReportCategory(value: unknown): value is IssueReportCategory {
 function shouldQueueIssueReport(error: unknown): boolean {
   const statusCode = (error as { statusCode?: number }).statusCode;
   return statusCode === undefined || statusCode === 408 || statusCode === 429 || statusCode >= 500;
+}
+
+function runtimeReloadRetryDelayMs(attempt: number, blocked = false): number {
+  const baseDelay = blocked ? 15_000 : 5_000;
+  return Math.min(60_000, baseDelay * 2 ** Math.min(Math.max(0, attempt - 1), 3));
 }
 
 function errorMessage(error: unknown): string {

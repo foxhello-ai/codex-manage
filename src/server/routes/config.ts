@@ -18,7 +18,8 @@ export function registerConfigRoutes(
       defaultPassword: getDefaultPasswordState?.() ?? config.defaultPassword,
       codexCliVersion: runtime?.codexCliVersion ?? null,
       codexVersionError: runtime?.codexVersionError ?? null,
-      appServer: runtime?.appServer ?? null
+      appServer: runtime?.appServer ?? null,
+      runtimeReload: runtime?.runtimeReload ?? null
     };
   });
 
