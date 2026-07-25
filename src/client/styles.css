@@ -725,6 +725,14 @@ h2 {
   background: #fff5f5;
 }
 
+.successBanner {
+  border: 1px solid #b8dec6;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #17623d;
+  background: #f1faf5;
+}
+
 .routeErrorState {
   display: grid;
   justify-items: start;
@@ -826,6 +834,26 @@ h2 {
   min-width: 0;
   overflow-wrap: anywhere;
   text-align: right;
+}
+
+.settingsSectionActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid #edf0f2;
+  padding: 14px 16px;
+}
+
+.settingsSectionActions strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.settingsSectionActions p {
+  margin: 0;
+  color: #5f6f7a;
+  font-size: 0.88rem;
 }
 
 .monospaceValue {

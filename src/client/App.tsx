@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, pairLocalAuth, resumeSession, sendSessionInput, setupLocalAuth, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
+import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, pairLocalAuth, reloadRuntime, resumeSession, sendSessionInput, setupLocalAuth, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, HealthStatus, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
 import { modelSwitchDisabledReason } from "./modelSelection";
@@ -283,6 +283,8 @@ function Dashboard({
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loadingDiagnostics, setLoadingDiagnostics] = useState(initialRoute.kind === "settings");
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
+  const [runtimeReloading, setRuntimeReloading] = useState(false);
+  const [runtimeReloadNotice, setRuntimeReloadNotice] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [search, setSearch] = useState("");
@@ -361,6 +363,25 @@ function Dashboard({
       setDiagnosticsError(caught instanceof Error ? caught.message : "诊断信息加载失败");
     } finally {
       setLoadingDiagnostics(false);
+    }
+  }
+
+  async function handleReloadRuntime() {
+    setRuntimeReloading(true);
+    setDiagnosticsError(null);
+    setRuntimeReloadNotice(null);
+    try {
+      const response = await reloadRuntime();
+      setModelCatalog(null);
+      setModelCatalogError(null);
+      setRuntime((current) => current ? { ...current, status: "history", activeTurnId: null, lastError: null } : current);
+      setRuntimeReloadNotice(`Codex 运行时已刷新：${formatDateTime(response.runtime.reloadedAt)}`);
+      await loadDiagnostics();
+      await loadModelCatalog(true);
+    } catch (caught) {
+      setDiagnosticsError(caught instanceof Error ? caught.message : "Codex 运行时刷新失败");
+    } finally {
+      setRuntimeReloading(false);
     }
   }
 
@@ -1099,6 +1120,9 @@ function Dashboard({
           error={diagnosticsError}
           onBack={handleBackToList}
           onRefresh={loadDiagnostics}
+          onReloadRuntime={handleReloadRuntime}
+          reloadNotice={runtimeReloadNotice}
+          reloadingRuntime={runtimeReloading}
         />
       ) : (
         <>
@@ -1194,7 +1218,10 @@ function SettingsPage({
   loading,
   error,
   onBack,
-  onRefresh
+  onRefresh,
+  onReloadRuntime,
+  reloadNotice,
+  reloadingRuntime
 }: {
   config: PublicConfig | null;
   health: HealthStatus | null;
@@ -1202,6 +1229,9 @@ function SettingsPage({
   error: string | null;
   onBack: () => void;
   onRefresh: () => Promise<void>;
+  onReloadRuntime: () => Promise<void>;
+  reloadNotice: string | null;
+  reloadingRuntime: boolean;
 }) {
   const appServer = health?.appServer ?? config?.appServer ?? null;
   const cliAvailable = health?.codexCli.available ?? Boolean(config?.codexCliVersion);
@@ -1236,6 +1266,7 @@ function SettingsPage({
       </section>
 
       {error ? <div className="errorBanner">{error}</div> : null}
+      {reloadNotice ? <div className="successBanner">{reloadNotice}</div> : null}
       {config?.codexVersionError ? <div className="errorBanner">Codex CLI：{config.codexVersionError}</div> : null}
       {appServer?.lastError ? <div className="errorBanner">App Server：{appServer.lastError}</div> : null}
 
@@ -1265,6 +1296,15 @@ function SettingsPage({
           <SettingsRow label="App Server 状态" value={appServer ? appServerStatusLabel(appServer.status) : "未连接"} />
           <SettingsRow label="初始化" value={appServer?.initialized ? "已完成" : "未完成"} />
           <SettingsRow label="进程 ID" value={appServer?.pid ? String(appServer.pid) : "无"} monospace />
+        </div>
+        <div className="settingsSectionActions">
+          <div>
+            <strong>刷新 Codex 运行时</strong>
+            <p>执行 `cc switch` 后可在不重启应用的情况下重载 app-server 并刷新模型列表。</p>
+          </div>
+          <button className="ghostButton" type="button" onClick={() => void onReloadRuntime()} disabled={loading || reloadingRuntime}>
+            {reloadingRuntime ? "刷新中" : "刷新运行时"}
+          </button>
         </div>
       </section>
     </>

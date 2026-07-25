@@ -51,6 +51,14 @@ export type HealthStatus = {
   appServer: AppServerSnapshot | null;
 };
 
+export type RuntimeReloadResponse = {
+  runtime: {
+    reloadedAt: string;
+    codexCliVersion: string | null;
+    appServer: AppServerSnapshot;
+  };
+};
+
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
 
 export type SessionSummary = {
@@ -155,7 +163,8 @@ export type ModelErrorCode =
   | "MODEL_SWITCH_MISMATCH"
   | "MODEL_PREFERENCE_PERSIST_FAILED"
   | "MODEL_PROVIDER_UNAVAILABLE"
-  | "MODEL_REQUEST_TIMEOUT";
+  | "MODEL_REQUEST_TIMEOUT"
+  | "RUNTIME_RELOAD_BLOCKED";
 
 
 export type SessionDetailResponse = {

@@ -4,7 +4,7 @@
 | --- | --- |
 | 故障编号 | `CM-INC-20260725-005` |
 | 日期 | 2026-07-25 |
-| 状态 | 已定位、待修复 |
+| 状态 | 已实现，待 macOS/Windows 真实包回归 |
 | 严重程度 | 中：不影响既有会话数据，但会导致服务商或模型切换后必须重启应用 |
 | 影响范围 | macOS、Windows 桌面端；本地 Web 与远程 H5 共享同一后端运行时 |
 | 关联代码 | `src/server/services/AppRuntime.ts`、`src/server/services/CodexAppServerClient.ts`、`src/server/services/ModelCatalogService.ts`、`src/server/services/RuntimeManager.ts`、`src/client/App.tsx` |
@@ -62,14 +62,14 @@
 
 ## 修改的代码点
 
-当前仅完成根因定位，尚未实现代码修复。预计改动点如下：
+已实现代码修复：
 
-- `src/server/services/AppRuntime.ts`：新增 app-server restart/reload 方法。
-- `src/server/services/ModelCatalogService.ts`：将 `invalidate()` 接入 runtime reload 流程。
-- `src/server/app.ts` 或相关 route：新增本地 API。
-- `src/client/App.tsx`：新增操作入口、状态提示和强制刷新。
-- `src/server/services/RuntimeManager.ts`：提供运行中会话检查，避免重载中断活跃会话。
-- `src/server/services/*.test.ts`：补充 app-server reload、缓存失效、运行中拒绝重载测试。
+- `src/server/services/AppRuntime.ts`：新增 `reloadAppServer()`，执行版本重检、app-server stop/start 和失败回写。
+- `src/server/routes/runtime.ts`：新增 `POST /api/runtime/reload`，成功后清空模型目录缓存。
+- `src/server/app.ts`：注册 runtime reload 路由。
+- `src/server/services/RuntimeManager.ts`：新增 reload blocker 检查，运行中、审批中、模型切换中或排队操作中拒绝重载。
+- `src/client/App.tsx`：设置页新增“刷新 Codex 运行时”，成功后强制刷新模型目录。
+- `src/server/services/RuntimeManager.test.ts`：覆盖运行中阻断、等待输入允许重载和重载后状态重置。
 
 ## 验证方案
 

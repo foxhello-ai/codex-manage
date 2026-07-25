@@ -8,6 +8,7 @@ import { registerAuthRoutes } from "./routes/auth";
 import { registerConfigRoutes } from "./routes/config";
 import { registerDesktopRoutes } from "./routes/desktop";
 import { registerModelRoutes } from "./routes/models";
+import { registerRuntimeRoutes } from "./routes/runtime";
 import { registerSessionRoutes } from "./routes/sessions";
 import { AppRuntime } from "./services/AppRuntime";
 import { JsonlSessionParser } from "./services/JsonlSessionParser";
@@ -81,6 +82,7 @@ export async function createLocalWebApplication(
   }
   registerConfigRoutes(app, config, () => runtime.getSnapshot(), () => authService.isDefaultPassword());
   registerModelRoutes(app, modelCatalog);
+  registerRuntimeRoutes(app, runtime, modelCatalog);
   registerSessionRoutes(
     app,
     sessionService,
