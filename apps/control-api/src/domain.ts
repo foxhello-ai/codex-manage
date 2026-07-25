@@ -34,6 +34,62 @@ export type AuthTokenRecord = {
 
 export type EntitlementMap = Record<string, string | number | boolean>;
 
+export type IssueReportSource =
+  | "manual"
+  | "auto_crash"
+  | "auto_unavailable"
+  | "auto_defect"
+  | "auto_optimization"
+  | "auto_requirement";
+
+export type IssueReportLevel =
+  | "P0_MANUAL"
+  | "P1_CRASH"
+  | "P2_UNAVAILABLE"
+  | "P3_DEFECT"
+  | "P4_OPTIMIZATION"
+  | "P5_REQUIREMENT";
+
+export type IssueReportCategory =
+  | "crash"
+  | "unavailable"
+  | "defect"
+  | "optimization"
+  | "requirement";
+
+export type IssueReportStatus =
+  | "new"
+  | "triaged"
+  | "in_progress"
+  | "waiting_user"
+  | "resolved"
+  | "closed"
+  | "ignored";
+
+export type IssueReportRecord = {
+  id: string;
+  source: IssueReportSource;
+  level: IssueReportLevel;
+  category: IssueReportCategory;
+  title: string;
+  description: string;
+  userId: string | null;
+  deviceId: string | null;
+  clientVersion: string;
+  platform: string;
+  arch: string;
+  osVersion: string | null;
+  channel: string;
+  fingerprint: string | null;
+  status: IssueReportStatus;
+  assignee: string | null;
+  linkedIncidentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  duplicateCount?: number;
+  deduplicated?: boolean;
+};
+
 export type NamedTunnelRecord = {
   id: string;
   deviceId: string;

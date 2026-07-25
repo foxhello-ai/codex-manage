@@ -16,6 +16,10 @@ const api: CodexDesktopApi = {
   openLocalManage: () => ipcRenderer.invoke("desktop:open-local-manage"),
   setLaunchAtLogin: (enabled) => ipcRenderer.invoke("desktop:set-launch-at-login", enabled),
   exportDiagnosticLogs: () => ipcRenderer.invoke("desktop:export-diagnostic-logs"),
+  checkForUpdates: () => ipcRenderer.invoke("desktop:check-for-updates"),
+  installUpdate: () => ipcRenderer.invoke("desktop:install-update"),
+  submitIssueReport: (input) => ipcRenderer.invoke("desktop:submit-issue-report", input),
+  setIssueAutoReportEnabled: (enabled) => ipcRenderer.invoke("desktop:set-issue-auto-report-enabled", enabled),
   onStatus: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, status: DesktopStatus) => listener(status);
     ipcRenderer.on("desktop:status", handler);

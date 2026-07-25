@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
-import { hostname } from "node:os";
+import { hostname, release } from "node:os";
 import { join, resolve } from "node:path";
 import {
   app,
@@ -18,9 +18,12 @@ import { CloudClient, type CloudAuthResponse, type CloudSession } from "./CloudC
 import { CredentialVault } from "./CredentialVault";
 import { DeviceBindingVault } from "./DeviceBindingVault";
 import { DiagnosticLog } from "./DiagnosticLog";
+import { DesktopSettingsStore } from "./DesktopSettingsStore";
+import { IssueReportQueue, type PendingIssueReport } from "./IssueReportQueue";
 import { LocalServiceSupervisor } from "./LocalServiceSupervisor";
 import { resolveCloudflaredBinary, TunnelSupervisor } from "./TunnelSupervisor";
-import type { DesktopStatus } from "../shared/types";
+import { UpdateManager } from "./UpdateManager";
+import type { DesktopStatus, IssueReportCategory, IssueReportSubmissionResult } from "../shared/types";
 
 type DesktopAuthStatus = {
   setupRequired: boolean;
@@ -49,6 +52,8 @@ class DesktopController {
   );
   private credentialVault: CredentialVault | null = null;
   private deviceBindingVault: DeviceBindingVault | null = null;
+  private desktopSettingsStore: DesktopSettingsStore | null = null;
+  private issueReportQueue: IssueReportQueue | null = null;
   private cloudSession: CloudSession | null = null;
   private entitlements: Record<string, string | number | boolean> = {};
   private subscription: { planCode: string; planName: string; expiresAt: string | null } | null = null;
@@ -63,11 +68,28 @@ class DesktopController {
   private localRestartTimer: ReturnType<typeof setTimeout> | null = null;
   private localStableTimer: ReturnType<typeof setTimeout> | null = null;
   private localRestartAttempts = 0;
+  private updateManager: UpdateManager | null = null;
+  private issueReporting: DesktopStatus["issueReporting"] = {
+    autoEnabled: true,
+    queuedCount: 0,
+    lastSubmittedAt: null,
+    lastError: null
+  };
+  private readonly reportedAutomaticFingerprints = new Set<string>();
+  private flushingIssueReports = false;
 
   constructor(private readonly startHidden = false) {}
 
   async initialize(): Promise<void> {
     this.diagnosticLog = new DiagnosticLog(join(app.getPath("userData"), "logs", "desktop-diagnostics.jsonl"));
+    this.desktopSettingsStore = new DesktopSettingsStore(join(app.getPath("userData"), "desktop-settings.json"));
+    this.issueReportQueue = new IssueReportQueue(join(app.getPath("userData"), "issue-report-queue.json"));
+    const desktopSettings = this.desktopSettingsStore.load();
+    this.issueReporting = {
+      ...this.issueReporting,
+      autoEnabled: desktopSettings.issueAutoReportEnabled,
+      queuedCount: this.issueReportQueue.count()
+    };
     this.launchAtLogin = app.getLoginItemSettings().openAtLogin;
     this.diagnosticLog.write("desktop", "application_started", {
       version: app.getVersion(),
@@ -78,6 +100,27 @@ class DesktopController {
     this.registerIpc();
     this.createWindow();
     this.createTray();
+    this.updateManager = new UpdateManager({
+      diagnosticLog: this.diagnosticLog,
+      beforeInstall: async () => {
+        isQuitting = true;
+        await this.shutdown();
+      }
+    });
+    this.updateManager.on("status", () => {
+      const updateStatus = this.updateManager?.getStatus();
+      if (updateStatus?.state === "error" && updateStatus.error) {
+        void this.reportAutomaticIssue(
+          "auto_defect",
+          "defect",
+          "Electron 更新失败",
+          updateStatus.error,
+          `update:${updateStatus.error}`
+        );
+      }
+      this.updateTrayMenu();
+      this.emitStatus();
+    });
     this.credentialVault = new CredentialVault(join(app.getPath("userData"), "cloud-credentials.json"));
     this.deviceBindingVault = new DeviceBindingVault(join(app.getPath("userData"), "device-bindings.json"));
     this.cloudSession = this.credentialVault.load();
@@ -122,6 +165,13 @@ class DesktopController {
           this.localStableTimer = null;
         }, 60_000);
       } else if (snapshot.state === "failed") {
+        void this.reportAutomaticIssue(
+          "auto_unavailable",
+          "unavailable",
+          "本地服务不可用",
+          snapshot.error ?? "本地服务启动或运行失败",
+          `local-service:${snapshot.error ?? "failed"}`
+        );
         this.scheduleLocalServiceRestart();
       }
       this.emitStatus();
@@ -138,6 +188,15 @@ class DesktopController {
         mode: snapshot.mode,
         error: snapshot.error
       });
+      if (snapshot.state === "failed") {
+        void this.reportAutomaticIssue(
+          "auto_unavailable",
+          "unavailable",
+          "远程通道不可用",
+          snapshot.error ?? "cloudflared 启动或运行失败",
+          `tunnel:${snapshot.mode}:${snapshot.error ?? "failed"}`
+        );
+      }
       this.emitStatus();
       void this.sendHeartbeat();
     });
@@ -146,15 +205,18 @@ class DesktopController {
       await this.localService.start();
       await this.refreshAuthStatus();
       await this.restoreCloudSession();
+      await this.flushIssueReportQueue();
     } catch {
       // The status snapshot already contains a user-facing startup error.
     }
     this.emitStatus();
     this.heartbeatTimer = setInterval(() => void this.sendHeartbeat(), 60_000);
+    this.updateManager.startAutomaticChecks();
   }
 
   async shutdown(): Promise<void> {
     this.diagnosticLog?.write("desktop", "application_stopping");
+    this.updateManager?.stop();
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     if (this.localRestartTimer) clearTimeout(this.localRestartTimer);
     if (this.localStableTimer) clearTimeout(this.localStableTimer);
@@ -199,6 +261,15 @@ class DesktopController {
       return { action: "deny" };
     });
     this.window.webContents.on("will-navigate", (event) => event.preventDefault());
+    this.window.webContents.on("render-process-gone", (_event, details) => {
+      void this.reportAutomaticIssue(
+        "auto_crash",
+        "crash",
+        "桌面渲染进程崩溃",
+        `reason=${details.reason}; exitCode=${details.exitCode}`,
+        `renderer-crash:${details.reason}:${details.exitCode}`
+      );
+    });
   }
 
   private createTray(): void {
@@ -209,6 +280,16 @@ class DesktopController {
     );
     this.tray = new Tray(icon.resize({ width: 18, height: 18 }));
     this.tray.setToolTip("Codex Manage");
+    this.updateTrayMenu();
+    this.tray.on("click", () => this.showWindow());
+    if (process.platform === "win32") {
+      this.tray.on("double-click", () => this.showWindow());
+    }
+  }
+
+  private updateTrayMenu(): void {
+    if (!this.tray) return;
+    const updateStatus = this.updateManager?.getStatus();
     this.tray.setContextMenu(Menu.buildFromTemplate([
       { label: "打开 Codex Manage", click: () => this.showWindow() },
       { label: "打开本机管理台", click: () => void this.openLocalManage() },
@@ -223,12 +304,17 @@ class DesktopController {
       { label: "启动远程通道", click: () => void this.startTunnel() },
       { label: "停止远程通道", click: () => void this.stopTunnel() },
       { type: "separator" },
+      { label: "上报问题", click: () => this.showWindow() },
+      { type: "separator" },
+      {
+        label: updateStatus?.state === "downloaded" ? "安装已下载更新" : "检查更新",
+        click: () => updateStatus?.state === "downloaded"
+          ? void this.installDownloadedUpdate()
+          : void this.checkForUpdates()
+      },
+      { type: "separator" },
       { label: "退出", click: () => app.quit() }
     ]));
-    this.tray.on("click", () => this.showWindow());
-    if (process.platform === "win32") {
-      this.tray.on("double-click", () => this.showWindow());
-    }
   }
 
   private registerIpc(): void {
@@ -273,6 +359,7 @@ class DesktopController {
       if (typeof enabled !== "boolean") throw new Error("开机启动设置格式不正确");
       app.setLoginItemSettings({
         openAtLogin: enabled,
+        openAsHidden: process.platform === "darwin" ? enabled : undefined,
         args: enabled ? ["--hidden"] : []
       });
       this.launchAtLogin = app.getLoginItemSettings().openAtLogin;
@@ -281,58 +368,119 @@ class DesktopController {
       return this.getStatus();
     });
     ipcMain.handle("desktop:export-diagnostic-logs", async () => this.exportDiagnosticLogs());
+    ipcMain.handle("desktop:check-for-updates", async () => this.checkForUpdates());
+    ipcMain.handle("desktop:install-update", async () => this.installDownloadedUpdate());
+    ipcMain.handle("desktop:submit-issue-report", async (_event, input: unknown) => this.submitIssueReport(input));
+    ipcMain.handle("desktop:set-issue-auto-report-enabled", async (_event, enabled: unknown) => {
+      if (typeof enabled !== "boolean") throw new Error("自动上报设置格式不正确");
+      this.issueReporting = { ...this.issueReporting, autoEnabled: enabled };
+      this.desktopSettingsStore?.save({ issueAutoReportEnabled: enabled });
+      this.diagnosticLog?.write("issue-report", "auto_setting_changed", { enabled });
+      if (enabled) void this.flushIssueReportQueue();
+      this.emitStatus();
+      return this.getStatus();
+    });
+  }
+
+  private async checkForUpdates() {
+    if (!this.updateManager) throw new Error("更新服务尚未初始化");
+    return await this.updateManager.checkForUpdates(true);
+  }
+
+  private async installDownloadedUpdate() {
+    if (!this.updateManager) throw new Error("更新服务尚未初始化");
+    return await this.updateManager.installDownloadedUpdate();
+  }
+
+  private async submitIssueReport(input: unknown): Promise<IssueReportSubmissionResult> {
+    if (!input || typeof input !== "object") throw new Error("问题上报内容格式不正确");
+    const record = input as Partial<{ category: IssueReportCategory; title: string; description: string }>;
+    if (!isIssueReportCategory(record.category) || typeof record.title !== "string" || typeof record.description !== "string") {
+      throw new Error("问题上报内容格式不正确");
+    }
+    const title = record.title.trim();
+    const description = record.description.trim();
+    if (!title || !description) throw new Error("请填写问题标题和描述");
+    if (!this.cloudSession) throw new Error("请先登录平台账号再上报问题");
+
+    const payload = this.buildIssueReportPayload({
+      category: record.category,
+      title,
+      description,
+      fingerprint: `manual:${record.category}:${title.slice(0, 80)}`
+    });
+    try {
+      await this.ensureUserAccess();
+      const response = await this.cloudClient.submitManualIssueReport(this.cloudSession.accessToken, payload);
+      this.markIssueReportSubmitted();
+      return {
+        queued: false,
+        reportId: response.report.id,
+        duplicateCount: response.report.duplicateCount ?? null
+      };
+    } catch (error) {
+      if (!shouldQueueIssueReport(error)) throw error;
+      this.issueReportQueue?.enqueue("manual", payload, errorMessage(error));
+      this.issueReporting = {
+        ...this.issueReporting,
+        queuedCount: this.issueReportQueue?.count() ?? 0,
+        lastError: errorMessage(error)
+      };
+      this.emitStatus();
+      return { queued: true, reportId: null, duplicateCount: null };
+    }
   }
 
   private async startTunnel(): Promise<DesktopStatus> {
     const MAX_RETRIES = 2;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-    await this.refreshAuthStatus();
-    if (this.auth.setupRequired) throw new Error("请先设置本机访问密码");
-    if (!this.cloudSession) throw new Error("请先注册或登录平台账号");
-    const local = this.localService?.getSnapshot();
-    if (!local?.url) throw new Error("本地服务尚未运行");
-    await this.ensureDeviceSession();
-    await this.refreshEntitlements();
-    const config = await this.cloudClient.getTunnelConfig(
-      this.cloudSession.deviceAccessToken!,
-      this.cloudSession.deviceId!
-    );
-    this.namedTunnelStatus = config.namedTunnelStatus ?? (config.mode === "named" ? "active" : null);
-    if (config.mode === "named" && config.token && config.hostname) {
-      await this.tunnel?.startNamed(config.token, `https://${config.hostname}`);
-    } else if (config.mode === "quick") {
-      if (this.entitlements.named_tunnel) {
-        const provisioned = await this.cloudClient.provisionNamedTunnel(
-          this.cloudSession.accessToken,
-          this.cloudSession.deviceId!
-        );
-        this.namedTunnelStatus = provisioned.tunnel.status;
-        const configAfter = await this.cloudClient.getTunnelConfig(
+      try {
+        await this.refreshAuthStatus();
+        if (this.auth.setupRequired) throw new Error("请先设置本机访问密码");
+        if (!this.cloudSession) throw new Error("请先注册或登录平台账号");
+        const local = this.localService?.getSnapshot();
+        if (!local?.url) throw new Error("本地服务尚未运行");
+        await this.ensureDeviceSession();
+        await this.refreshEntitlements();
+        const config = await this.cloudClient.getTunnelConfig(
           this.cloudSession.deviceAccessToken!,
           this.cloudSession.deviceId!
         );
-        if (configAfter.mode === "named" && configAfter.token && configAfter.hostname) {
-          await this.tunnel?.startNamed(configAfter.token, `https://${configAfter.hostname}`);
-          await this.sendHeartbeat();
-          return this.getStatus();
+        this.namedTunnelStatus = config.namedTunnelStatus ?? (config.mode === "named" ? "active" : null);
+        if (config.mode === "named" && config.token && config.hostname) {
+          await this.tunnel?.startNamed(config.token, `https://${config.hostname}`);
+        } else if (config.mode === "quick") {
+          if (this.entitlements["tunnel.named"] === true) {
+            const provisioned = await this.cloudClient.provisionNamedTunnel(
+              this.cloudSession.accessToken,
+              this.cloudSession.deviceId!
+            );
+            this.namedTunnelStatus = provisioned.tunnel.status;
+            const configAfter = await this.cloudClient.getTunnelConfig(
+              this.cloudSession.deviceAccessToken!,
+              this.cloudSession.deviceId!
+            );
+            if (configAfter.mode === "named" && configAfter.token && configAfter.hostname) {
+              await this.tunnel?.startNamed(configAfter.token, `https://${configAfter.hostname}`);
+              await this.sendHeartbeat();
+              return this.getStatus();
+            }
+          }
+          await this.tunnel?.startQuick(local.url);
+        } else {
+          throw new Error("当前账号未开通远程访问权益");
         }
+        await this.sendHeartbeat();
+        return this.getStatus();
+      } catch (error) {
+        const statusCode = (error as { statusCode?: number }).statusCode;
+        if ((statusCode === 500 || statusCode === 503) && attempt < MAX_RETRIES && !isQuitting) {
+          this.diagnosticLog?.write("tunnel", "start_retry", { attempt: attempt + 1, error: errorMessage(error) });
+          await new Promise((resolveRetry) => setTimeout(resolveRetry, 1000 * (attempt + 1)));
+          continue;
+        }
+        throw error;
       }
-      await this.tunnel?.startQuick(local.url);
-    } else {
-      throw new Error("当前账号未开通远程访问权益");
-    }
-    await this.sendHeartbeat();
-    return this.getStatus();
-    } catch (error) {
-      const statusCode = (error as { statusCode?: number }).statusCode;
-      if ((statusCode === 500 || statusCode === 503) && attempt < MAX_RETRIES && !isQuitting) {
-        this.diagnosticLog?.write("tunnel", "start_retry", { attempt: attempt + 1, error: (error as Error).message });
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        continue;
-      }
-      throw error;
-    }
     }
     throw new Error("远程通道启动失败，请稍后重试");
   }
@@ -409,6 +557,173 @@ class DesktopController {
     this.diagnosticLog?.write("desktop", "diagnostics_exported");
     this.diagnosticLog?.exportTo(result.filePath);
     return result.filePath;
+  }
+
+  private async reportAutomaticIssue(
+    source: "auto_crash" | "auto_unavailable" | "auto_defect" | "auto_optimization" | "auto_requirement",
+    category: IssueReportCategory,
+    title: string,
+    description: string,
+    fingerprint: string
+  ): Promise<void> {
+    if (!this.issueReporting.autoEnabled || !this.cloudSession) return;
+    const normalizedFingerprint = fingerprint.slice(0, 180);
+    if (this.reportedAutomaticFingerprints.has(normalizedFingerprint)) return;
+    this.reportedAutomaticFingerprints.add(normalizedFingerprint);
+
+    const payload = {
+      ...this.buildIssueReportPayload({
+        category,
+        title,
+        description,
+        fingerprint: normalizedFingerprint
+      }),
+      source
+    };
+
+    try {
+      await this.ensureDeviceSession();
+      if (!this.cloudSession?.deviceAccessToken || !this.cloudSession.deviceId) return;
+      await this.cloudClient.submitAutoIssueReport(
+        this.cloudSession.deviceAccessToken,
+        this.cloudSession.deviceId,
+        payload
+      );
+      this.markIssueReportSubmitted();
+    } catch (error) {
+      if (shouldQueueIssueReport(error)) {
+        this.issueReportQueue?.enqueue("auto", payload, errorMessage(error));
+      }
+      this.issueReporting = {
+        ...this.issueReporting,
+        queuedCount: this.issueReportQueue?.count() ?? 0,
+        lastError: errorMessage(error)
+      };
+      this.emitStatus();
+    }
+  }
+
+  private async flushIssueReportQueue(): Promise<void> {
+    if (this.flushingIssueReports || !this.cloudSession || !this.issueReportQueue) return;
+    this.flushingIssueReports = true;
+    try {
+      for (const report of this.issueReportQueue.list()) {
+        try {
+          await this.submitQueuedIssueReport(report);
+          this.issueReportQueue.remove(report.id);
+          this.markIssueReportSubmitted(false);
+        } catch (error) {
+          this.issueReportQueue.update({
+            ...report,
+            attempts: report.attempts + 1,
+            lastError: errorMessage(error)
+          });
+          this.issueReporting = {
+            ...this.issueReporting,
+            queuedCount: this.issueReportQueue.count(),
+            lastError: errorMessage(error)
+          };
+          break;
+        }
+      }
+    } finally {
+      this.flushingIssueReports = false;
+      this.issueReporting = {
+        ...this.issueReporting,
+        queuedCount: this.issueReportQueue.count()
+      };
+      this.emitStatus();
+    }
+  }
+
+  private async submitQueuedIssueReport(report: PendingIssueReport): Promise<void> {
+    if (!this.cloudSession) throw new Error("请先登录平台账号");
+    if (report.kind === "manual") {
+      await this.ensureUserAccess();
+      await this.cloudClient.submitManualIssueReport(this.cloudSession.accessToken, report.payload);
+      return;
+    }
+    if (!this.issueReporting.autoEnabled) return;
+    await this.ensureDeviceSession();
+    if (!this.cloudSession?.deviceAccessToken || !this.cloudSession.deviceId) {
+      throw new Error("设备凭证尚未就绪");
+    }
+    await this.cloudClient.submitAutoIssueReport(
+      this.cloudSession.deviceAccessToken,
+      this.cloudSession.deviceId,
+      report.payload
+    );
+  }
+
+  private buildIssueReportPayload(input: {
+    category: IssueReportCategory;
+    title: string;
+    description: string;
+    fingerprint: string | null;
+  }): Record<string, unknown> {
+    return {
+      category: input.category,
+      title: input.title.slice(0, 160),
+      description: input.description.slice(0, 4000),
+      deviceId: this.cloudSession?.deviceId ?? null,
+      clientVersion: app.getVersion(),
+      platform: process.platform,
+      arch: process.arch,
+      osVersion: release(),
+      channel: process.env.CODEX_RELEASE_CHANNEL ?? "stable",
+      fingerprint: input.fingerprint,
+      runtimeSnapshot: this.buildRuntimeSnapshot(),
+      diagnosticExcerpt: this.diagnosticLog?.recentEntries(80) ?? [],
+      redactionVersion: "v1"
+    };
+  }
+
+  private buildRuntimeSnapshot(): Record<string, unknown> {
+    const local = this.localService?.getSnapshot() ?? null;
+    const tunnel = this.tunnel?.getSnapshot() ?? null;
+    return {
+      capturedAt: new Date().toISOString(),
+      app: {
+        version: app.getVersion(),
+        packaged: app.isPackaged,
+        platform: process.platform,
+        arch: process.arch,
+        osVersion: release()
+      },
+      codex: {
+        available: this.codex.available,
+        version: this.codex.version,
+        error: this.codex.error
+      },
+      localService: local ? {
+        state: local.state,
+        port: local.port,
+        error: local.error
+      } : null,
+      tunnel: tunnel ? {
+        state: tunnel.state,
+        mode: tunnel.mode,
+        hostname: tunnel.publicUrl ? safeHostname(tunnel.publicUrl) : null,
+        error: tunnel.error
+      } : null,
+      update: this.updateManager?.getStatus() ?? null,
+      account: {
+        authenticated: this.cloudSession !== null,
+        deviceId: this.cloudSession?.deviceId ?? null,
+        namedTunnelStatus: this.namedTunnelStatus,
+        error: this.cloudError
+      }
+    };
+  }
+
+  private markIssueReportSubmitted(clearError = true): void {
+    this.issueReporting = {
+      ...this.issueReporting,
+      queuedCount: this.issueReportQueue?.count() ?? 0,
+      lastSubmittedAt: new Date().toISOString(),
+      lastError: clearError ? null : this.issueReporting.lastError
+    };
+    this.emitStatus();
   }
 
   private async createPairingUrl(): Promise<{ url: string; expiresAt: string }> {
@@ -497,6 +812,7 @@ class DesktopController {
     await this.refreshCloudState();
     this.saveCloudSession();
     this.cloudError = null;
+    await this.flushIssueReportQueue();
     this.emitStatus();
   }
 
@@ -649,9 +965,17 @@ class DesktopController {
         }
       );
       this.cloudError = null;
+      void this.flushIssueReportQueue();
     } catch (error) {
       this.cloudError = error instanceof Error ? error.message : String(error);
       this.diagnosticLog?.write("cloud", "heartbeat_failed", { error: this.cloudError });
+      void this.reportAutomaticIssue(
+        "auto_unavailable",
+        "unavailable",
+        "云端心跳失败",
+        this.cloudError,
+        `heartbeat:${(error as { statusCode?: number }).statusCode ?? "network"}:${this.cloudError}`
+      );
       const statusCode = (error as { statusCode?: number }).statusCode;
       if (statusCode === 401 || statusCode === 403 || statusCode === 404) {
         await this.tunnel?.stop();
@@ -711,6 +1035,10 @@ class DesktopController {
       settings: {
         launchAtLogin: this.launchAtLogin
       },
+      issueReporting: {
+        ...this.issueReporting,
+        queuedCount: this.issueReportQueue?.count() ?? this.issueReporting.queuedCount
+      },
       account: {
         authenticated: this.cloudSession !== null,
         identifier: this.cloudSession?.identifier ?? null,
@@ -720,7 +1048,16 @@ class DesktopController {
         namedTunnelStatus: this.namedTunnelStatus,
         error: this.cloudError
       },
-      tunnel
+      tunnel,
+      update: this.updateManager?.getStatus() ?? {
+        state: "idle",
+        currentVersion: app.getVersion(),
+        targetVersion: null,
+        lastCheckedAt: null,
+        progressPercent: null,
+        error: null,
+        manual: false
+      }
     };
   }
 
@@ -729,6 +1066,31 @@ class DesktopController {
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send("desktop:status", status);
     }
+  }
+}
+
+function isIssueReportCategory(value: unknown): value is IssueReportCategory {
+  return value === "crash"
+    || value === "unavailable"
+    || value === "defect"
+    || value === "optimization"
+    || value === "requirement";
+}
+
+function shouldQueueIssueReport(error: unknown): boolean {
+  const statusCode = (error as { statusCode?: number }).statusCode;
+  return statusCode === undefined || statusCode === 408 || statusCode === 429 || statusCode >= 500;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function safeHostname(value: string): string | null {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return null;
   }
 }
 

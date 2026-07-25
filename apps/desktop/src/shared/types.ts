@@ -1,6 +1,38 @@
 export type ComponentState = "idle" | "starting" | "running" | "stopped" | "failed";
 
 export type TunnelState = "idle" | "starting" | "online" | "reconnecting" | "stopped" | "failed";
+export type UpdateState = "idle" | "checking" | "not_available" | "available" | "downloading" | "downloaded" | "installing" | "error";
+
+export type UpdateStatus = {
+  state: UpdateState;
+  currentVersion: string;
+  targetVersion: string | null;
+  lastCheckedAt: string | null;
+  progressPercent: number | null;
+  error: string | null;
+  manual: boolean;
+};
+
+export type IssueReportCategory = "crash" | "unavailable" | "defect" | "optimization" | "requirement";
+
+export type IssueReportSubmission = {
+  category: IssueReportCategory;
+  title: string;
+  description: string;
+};
+
+export type IssueReportSubmissionResult = {
+  queued: boolean;
+  reportId: string | null;
+  duplicateCount: number | null;
+};
+
+export type IssueReportingStatus = {
+  autoEnabled: boolean;
+  queuedCount: number;
+  lastSubmittedAt: string | null;
+  lastError: string | null;
+};
 
 export type DesktopStatus = {
   version: string;
@@ -25,6 +57,7 @@ export type DesktopStatus = {
   settings: {
     launchAtLogin: boolean;
   };
+  issueReporting: IssueReportingStatus;
   account: {
     authenticated: boolean;
     identifier: string | null;
@@ -44,6 +77,7 @@ export type DesktopStatus = {
     publicUrl: string | null;
     error: string | null;
   };
+  update: UpdateStatus;
 };
 
 export type CodexDesktopApi = {
@@ -61,5 +95,9 @@ export type CodexDesktopApi = {
   openLocalManage(): Promise<void>;
   setLaunchAtLogin(enabled: boolean): Promise<DesktopStatus>;
   exportDiagnosticLogs(): Promise<string | null>;
+  checkForUpdates(): Promise<UpdateStatus>;
+  installUpdate(): Promise<UpdateStatus>;
+  submitIssueReport(input: IssueReportSubmission): Promise<IssueReportSubmissionResult>;
+  setIssueAutoReportEnabled(enabled: boolean): Promise<DesktopStatus>;
   onStatus(listener: (status: DesktopStatus) => void): () => void;
 };

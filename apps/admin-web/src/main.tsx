@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { resolveApiBase } from "./apiBase";
 import "./styles.css";
 
-type Tab = "overview" | "users" | "devices" | "tunnels" | "domains" | "subscriptions" | "orders" | "payments" | "audit";
+type Tab = "overview" | "users" | "devices" | "tunnels" | "domains" | "subscriptions" | "orders" | "payments" | "issue-reports" | "audit";
 type JsonRecord = Record<string, unknown>;
 
 const apiBase = resolveApiBase(
@@ -62,7 +62,7 @@ function AdminApp() {
       <aside>
         <div className="brand"><span>CM</span><strong>运营后台</strong></div>
         <nav>
-          {(["overview", "users", "devices", "tunnels", "domains", "subscriptions", "orders", "payments", "audit"] as Tab[]).map((item) => (
+          {(["overview", "users", "devices", "tunnels", "domains", "subscriptions", "orders", "payments", "issue-reports", "audit"] as Tab[]).map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => void load(item)}>
               {tabLabel(item)}
             </button>
@@ -140,7 +140,9 @@ function Overview({ data }: { data: JsonRecord }) {
     ["Quick Tunnel", data.quick_tunnels],
     ["Named Tunnel", data.named_tunnels],
     ["固定域名", data.fixed_domains],
-    ["正式权益用户", data.formal_users]
+    ["正式权益用户", data.formal_users],
+    ["未关闭问题", data.open_issue_reports],
+    ["主动反馈", data.manual_issue_reports]
   ];
   return <section className="overview">{cards.map(([label, value]) => <article key={String(label)}><span>{String(label)}</span><strong>{String(value ?? 0)}</strong></article>)}</section>;
 }
@@ -151,16 +153,58 @@ function DataTable({ rows, token, onChanged, tab }: { rows: JsonRecord[]; token:
   return (
     <div className="tableWrap">
       <table>
-        <thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}{tab === "users" || tab === "devices" || tab === "tunnels" ? <th>操作</th> : null}</tr></thead>
+        <thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}{tab === "users" || tab === "devices" || tab === "tunnels" || tab === "issue-reports" ? <th>操作</th> : null}</tr></thead>
         <tbody>{rows.map((row, index) => (
           <tr key={String(row.id ?? index)}>
             {columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}
             {tab === "users" ? <td className="rowActions"><GrantButton userId={String(row.id)} token={token} onChanged={onChanged} /><StatusButton kind="users" id={String(row.id)} current={String(row.status)} token={token} onChanged={onChanged} /></td> : null}
             {tab === "devices" ? <td><StatusButton kind="devices" id={String(row.id)} current={String(row.status)} token={token} onChanged={onChanged} /></td> : null}
             {tab === "tunnels" ? <td><RebuildTunnelButton id={String(row.id)} mode={String(row.mode)} token={token} onChanged={onChanged} /></td> : null}
+            {tab === "issue-reports" ? <td><IssueReportActions id={String(row.id)} status={String(row.status)} token={token} onChanged={onChanged} /></td> : null}
           </tr>
         ))}</tbody>
       </table>
+    </div>
+  );
+}
+
+function IssueReportActions({ id, status, token, onChanged }: { id: string; status: string; token: string; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+
+  async function viewDetail() {
+    setBusy(true);
+    try {
+      const detail = await request(`/v1/admin/issue-reports/${encodeURIComponent(id)}`, {}, token);
+      window.alert(JSON.stringify(detail, null, 2));
+    } catch (caught) {
+      window.alert(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateStatus() {
+    const next = window.prompt("请输入新状态：new / triaged / in_progress / waiting_user / resolved / closed / ignored", status);
+    if (!next) return;
+    const note = window.prompt("请输入处理备注", "");
+    setBusy(true);
+    try {
+      await request(`/v1/admin/issue-reports/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: next, note: note || null })
+      }, token);
+      onChanged();
+    } catch (caught) {
+      window.alert(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rowActions">
+      <button className="small" disabled={busy} onClick={() => void viewDetail()}>详情</button>
+      <button className="small" disabled={busy} onClick={() => void updateStatus()}>分诊</button>
     </div>
   );
 }
@@ -248,7 +292,7 @@ async function request(path: string, init: RequestInit = {}, token?: string): Pr
 
 function extractRows(tab: Tab, data: unknown): JsonRecord[] {
   if (!data || typeof data !== "object") return [];
-  const key = tab === "audit" ? "auditLogs" : tab;
+  const key = tab === "audit" ? "auditLogs" : tab === "issue-reports" ? "issueReports" : tab;
   const value = (data as Record<string, unknown>)[key];
   return Array.isArray(value) ? value as JsonRecord[] : [];
 }
@@ -269,6 +313,7 @@ function tabLabel(tab: Tab): string {
     subscriptions: "订阅与权益",
     orders: "订单",
     payments: "支付记录",
+    "issue-reports": "问题反馈",
     audit: "审计日志"
   })[tab];
 }

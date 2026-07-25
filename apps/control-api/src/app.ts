@@ -52,6 +52,36 @@ const StatusRequest = z.object({
   status: z.enum(["active", "blocked"]),
   reason: z.string().trim().min(1).max(500)
 });
+const IssueReportCategorySchema = z.enum(["crash", "unavailable", "defect", "optimization", "requirement"]);
+const IssueReportLevelSchema = z.enum(["P0_MANUAL", "P1_CRASH", "P2_UNAVAILABLE", "P3_DEFECT", "P4_OPTIMIZATION", "P5_REQUIREMENT"]);
+const IssueReportStatusSchema = z.enum(["new", "triaged", "in_progress", "waiting_user", "resolved", "closed", "ignored"]);
+const IssueReportSnapshotSchema = z.record(z.string(), z.unknown()).default({});
+const IssueReportDiagnosticSchema = z.array(z.unknown()).max(200).default([]);
+const ManualIssueReportRequest = z.object({
+  category: IssueReportCategorySchema.default("defect"),
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(4000),
+  deviceId: z.string().uuid().nullable().default(null),
+  clientVersion: z.string().trim().min(1).max(40),
+  platform: z.string().trim().min(1).max(40),
+  arch: z.string().trim().min(1).max(40),
+  osVersion: z.string().trim().max(120).nullable().default(null),
+  channel: z.string().trim().min(1).max(40).default("stable"),
+  fingerprint: z.string().trim().max(200).nullable().default(null),
+  runtimeSnapshot: IssueReportSnapshotSchema,
+  diagnosticExcerpt: IssueReportDiagnosticSchema,
+  redactionVersion: z.string().trim().min(1).max(20).default("v1")
+});
+const AutomaticIssueReportRequest = ManualIssueReportRequest.omit({ deviceId: true }).extend({
+  source: z.enum(["auto_crash", "auto_unavailable", "auto_defect", "auto_optimization", "auto_requirement"])
+});
+const IssueReportUpdateRequest = z.object({
+  status: IssueReportStatusSchema.optional(),
+  level: IssueReportLevelSchema.optional(),
+  assignee: z.string().trim().max(120).nullable().optional(),
+  note: z.string().trim().max(1000).nullable().optional(),
+  linkedIncidentId: z.string().trim().max(120).nullable().optional()
+}).refine((value) => Object.keys(value).length > 0, "至少需要一个更新字段");
 
 export async function createControlApp(
   config: ControlConfig,
@@ -225,6 +255,12 @@ export async function createControlApp(
     if (authenticatedDeviceId !== params.deviceId) throw new ControlError("DEVICE_FORBIDDEN", "设备无权上报该记录", 403);
     return await service.recordHeartbeat(params.deviceId, parseBody(HeartbeatRequest, request.body));
   });
+  app.post("/v1/devices/:deviceId/issue-reports/auto", async (request) => {
+    const authenticatedDeviceId = await service.authenticateDevice(readBearerToken(request));
+    const params = parseBody(DeviceParams, request.params);
+    if (authenticatedDeviceId !== params.deviceId) throw new ControlError("DEVICE_FORBIDDEN", "设备无权上报该问题", 403);
+    return await service.createAutomaticIssueReport(params.deviceId, parseBody(AutomaticIssueReportRequest, request.body));
+  });
   app.post("/v1/devices/:deviceId/named-tunnel/provision", async (request, reply) => {
     const userId = await service.authenticateUser(readBearerToken(request));
     const params = parseBody(DeviceParams, request.params);
@@ -246,6 +282,10 @@ export async function createControlApp(
   app.get("/v1/subscriptions/current", async (request) => {
     const userId = await service.authenticateUser(readBearerToken(request));
     return { subscription: await store.getCurrentSubscription(userId) };
+  });
+  app.post("/v1/issue-reports/manual", async (request) => {
+    const userId = await service.authenticateUser(readBearerToken(request));
+    return await service.createManualIssueReport(userId, parseBody(ManualIssueReportRequest, request.body));
   });
   app.get("/v1/orders", async (request) => {
     const userId = await service.authenticateUser(readBearerToken(request));
@@ -304,6 +344,22 @@ export async function createControlApp(
   app.get("/v1/admin/audit-logs", async (request) => {
     await service.authenticateAdmin(readBearerToken(request));
     return { auditLogs: await store.listAdminAuditLogs() };
+  });
+  app.get("/v1/admin/issue-reports", async (request) => {
+    await service.authenticateAdmin(readBearerToken(request));
+    return { issueReports: await store.listAdminIssueReports() };
+  });
+  app.get("/v1/admin/issue-reports/:reportId", async (request) => {
+    await service.authenticateAdmin(readBearerToken(request));
+    const params = parseBody(z.object({ reportId: z.string().uuid() }), request.params);
+    const report = await store.getAdminIssueReport(params.reportId);
+    if (!report) throw new ControlError("ISSUE_REPORT_NOT_FOUND", "问题记录不存在", 404);
+    return { report };
+  });
+  app.patch("/v1/admin/issue-reports/:reportId", async (request) => {
+    const adminId = await service.authenticateAdmin(readBearerToken(request), true);
+    const params = parseBody(z.object({ reportId: z.string().uuid() }), request.params);
+    return await service.updateIssueReport(adminId, params.reportId, parseBody(IssueReportUpdateRequest, request.body));
   });
   app.post("/v1/admin/users/:userId/formal-subscription", async (request) => {
     const adminId = await service.authenticateAdmin(readBearerToken(request), true);

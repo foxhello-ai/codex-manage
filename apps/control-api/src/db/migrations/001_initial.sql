@@ -212,6 +212,67 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS issue_reports (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL,
+  level TEXT NOT NULL,
+  category TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  device_id TEXT REFERENCES devices(id) ON DELETE SET NULL,
+  client_version TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  arch TEXT NOT NULL,
+  os_version TEXT,
+  channel TEXT NOT NULL DEFAULT 'stable',
+  fingerprint TEXT,
+  status TEXT NOT NULL DEFAULT 'new',
+  assignee TEXT,
+  linked_incident_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS issue_reports_lookup_idx
+  ON issue_reports(status, level, created_at DESC);
+CREATE INDEX IF NOT EXISTS issue_reports_device_idx
+  ON issue_reports(device_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS issue_report_snapshots (
+  id TEXT PRIMARY KEY,
+  issue_report_id TEXT NOT NULL REFERENCES issue_reports(id) ON DELETE CASCADE,
+  runtime_snapshot_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  diagnostic_excerpt_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  redaction_version TEXT NOT NULL DEFAULT 'v1',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS issue_report_events (
+  id TEXT PRIMARY KEY,
+  issue_report_id TEXT NOT NULL REFERENCES issue_reports(id) ON DELETE CASCADE,
+  actor_type TEXT NOT NULL,
+  actor_id TEXT,
+  action TEXT NOT NULL,
+  before_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  after_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS issue_report_events_report_idx
+  ON issue_report_events(issue_report_id, created_at ASC);
+
+CREATE TABLE IF NOT EXISTS issue_report_dedup (
+  fingerprint TEXT NOT NULL,
+  client_version TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  arch TEXT NOT NULL,
+  first_report_id TEXT NOT NULL REFERENCES issue_reports(id) ON DELETE CASCADE,
+  last_report_id TEXT NOT NULL REFERENCES issue_reports(id) ON DELETE CASCADE,
+  count INTEGER NOT NULL DEFAULT 1,
+  first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (fingerprint, client_version, platform, arch)
+);
+
 INSERT INTO plans (id, code, name, description, price_cents, billing_period)
 VALUES
   ('plan-free', 'free', '体验版', 'Quick Tunnel 体验通道', 0, 'none'),

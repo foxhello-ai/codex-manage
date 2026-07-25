@@ -1,4 +1,4 @@
-import type { AuthTokenRecord, DeviceRecord, EntitlementMap, IdentityType, NamedTunnelRecord, SubjectType, TokenType, UserRecord } from "./domain";
+import type { AuthTokenRecord, DeviceRecord, EntitlementMap, IdentityType, IssueReportCategory, IssueReportLevel, IssueReportRecord, IssueReportSource, IssueReportStatus, NamedTunnelRecord, SubjectType, TokenType, UserRecord } from "./domain";
 
 export type CreatedDevice = {
   device: DeviceRecord;
@@ -110,6 +110,35 @@ export interface ControlStore {
   listAdminOrders(): Promise<Array<Record<string, unknown>>>;
   listAdminPayments(): Promise<Array<Record<string, unknown>>>;
   listAdminAuditLogs(): Promise<Array<Record<string, unknown>>>;
+  createIssueReport(input: {
+    source: IssueReportSource;
+    level: IssueReportLevel;
+    category: IssueReportCategory;
+    title: string;
+    description: string;
+    userId: string | null;
+    deviceId: string | null;
+    clientVersion: string;
+    platform: string;
+    arch: string;
+    osVersion: string | null;
+    channel: string;
+    fingerprint: string | null;
+    runtimeSnapshot: unknown;
+    diagnosticExcerpt: unknown;
+    redactionVersion: string;
+  }): Promise<IssueReportRecord>;
+  listAdminIssueReports(): Promise<Array<Record<string, unknown>>>;
+  getAdminIssueReport(reportId: string): Promise<Record<string, unknown> | null>;
+  updateIssueReport(input: {
+    adminId: string;
+    reportId: string;
+    status?: IssueReportStatus;
+    level?: IssueReportLevel;
+    assignee?: string | null;
+    note?: string | null;
+    linkedIncidentId?: string | null;
+  }): Promise<IssueReportRecord | null>;
   getAdminOverview(): Promise<Record<string, number>>;
   grantFormalSubscription(input: {
     adminId: string;

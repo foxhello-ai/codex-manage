@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import QRCode from "qrcode";
-import type { DesktopStatus } from "../shared/types";
+import type { DesktopStatus, IssueReportCategory, UpdateStatus } from "../shared/types";
 import "./styles.css";
 
 function DesktopApp() {
@@ -20,6 +20,11 @@ function DesktopApp() {
   const [verificationCode, setVerificationCode] = useState("");
   const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
   const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
+  const [updateNotice, setUpdateNotice] = useState<string | null>(null);
+  const [issueCategory, setIssueCategory] = useState<IssueReportCategory>("defect");
+  const [issueTitle, setIssueTitle] = useState("");
+  const [issueDescription, setIssueDescription] = useState("");
+  const [issueNotice, setIssueNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -146,6 +151,55 @@ function DesktopApp() {
     try {
       const file = await window.codexDesktop.exportDiagnosticLogs();
       if (file) setDiagnosticNotice(`诊断日志已导出：${file}`);
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function checkForUpdates() {
+    setBusy(true);
+    setError(null);
+    setUpdateNotice(null);
+    try {
+      const update = await window.codexDesktop.checkForUpdates();
+      setUpdateNotice(updateMessage(update));
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function installUpdate() {
+    if (!window.confirm("确认立即重启并安装更新？本地服务和远程通道会先停止。")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await window.codexDesktop.installUpdate();
+    } catch (caught) {
+      setError(errorMessage(caught));
+      setBusy(false);
+    }
+  }
+
+  async function submitIssueReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    setIssueNotice(null);
+    try {
+      const result = await window.codexDesktop.submitIssueReport({
+        category: issueCategory,
+        title: issueTitle,
+        description: issueDescription
+      });
+      setIssueNotice(result.queued
+        ? "当前网络不可用，问题已进入本地队列，恢复后自动补发"
+        : `问题已上报，编号：${result.reportId}`);
+      setIssueTitle("");
+      setIssueDescription("");
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -287,6 +341,10 @@ function DesktopApp() {
           <h2>启动和故障排查</h2>
           <p>诊断日志只记录组件状态和脱敏错误摘要，不包含 Codex 会话与命令内容。</p>
           {diagnosticNotice ? <p className="notice">{diagnosticNotice}</p> : null}
+          {updateNotice ? <p className="notice">{updateNotice}</p> : null}
+          {issueNotice ? <p className="notice">{issueNotice}</p> : null}
+          {status.update.error ? <p className="warningText">更新：{status.update.error}</p> : null}
+          {status.issueReporting.lastError ? <p className="warningText">问题上报：{status.issueReporting.lastError}</p> : null}
         </div>
         <div className="settingsActions">
           <label className="toggleRow">
@@ -298,8 +356,60 @@ function DesktopApp() {
             />
             开机自动启动并静默进入托盘
           </label>
+          <label className="toggleRow">
+            <input
+              type="checkbox"
+              checked={status.issueReporting.autoEnabled}
+              disabled={busy}
+              onChange={(event) => void run(() => window.codexDesktop.setIssueAutoReportEnabled(event.target.checked))}
+            />
+            自动上报崩溃和不可用问题
+          </label>
+          {status.issueReporting.queuedCount > 0 ? <span className="queueHint">待补发 {status.issueReporting.queuedCount} 条</span> : null}
+          <div className="updateBox">
+            <strong>{updateLabel(status.update)}</strong>
+            <span>{updateDetail(status.update)}</span>
+          </div>
+          {status.update.state === "downloaded" ? (
+            <button className="primary" onClick={() => void installUpdate()} disabled={busy}>重启安装更新</button>
+          ) : (
+            <button onClick={() => void checkForUpdates()} disabled={busy || status.update.state === "checking" || status.update.state === "downloading"}>
+              {status.update.state === "downloading" ? "下载中" : "检查并更新"}
+            </button>
+          )}
           <button onClick={() => void exportDiagnostics()} disabled={busy}>导出脱敏诊断日志</button>
         </div>
+      </section>
+
+      <section className="panel issuePanel">
+        <div>
+          <p className="sectionTag">问题反馈</p>
+          <h2>主动上报问题</h2>
+          <p>主动上报按最高优先级处理，会附带脱敏运行快照和最近诊断摘要，不上传 Codex 会话正文、命令输出或项目文件内容。</p>
+        </div>
+        <form onSubmit={submitIssueReport}>
+          <label>
+            问题类型
+            <select value={issueCategory} onChange={(event) => setIssueCategory(event.target.value as IssueReportCategory)}>
+              <option value="defect">功能缺陷</option>
+              <option value="unavailable">服务不可用</option>
+              <option value="optimization">体验优化</option>
+              <option value="requirement">功能需求</option>
+              <option value="crash">崩溃</option>
+            </select>
+          </label>
+          <label>
+            标题
+            <input value={issueTitle} onChange={(event) => setIssueTitle(event.target.value)} maxLength={160} placeholder="例如：Windows 首次启动本地服务失败" />
+          </label>
+          <label>
+            问题描述
+            <textarea value={issueDescription} onChange={(event) => setIssueDescription(event.target.value)} maxLength={4000} rows={5} placeholder="请描述复现步骤、期望结果和实际现象" />
+          </label>
+          <button className="primary" disabled={busy || !status.account.authenticated || !issueTitle.trim() || !issueDescription.trim()}>
+            {status.account.authenticated ? "上报问题" : "登录后可上报"}
+          </button>
+        </form>
       </section>
 
       {qrCode && pairingUrl ? (
@@ -375,6 +485,34 @@ function StatusCard({
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function updateLabel(update: UpdateStatus): string {
+  const labels: Record<UpdateStatus["state"], string> = {
+    idle: "更新：待检查",
+    checking: "更新：检查中",
+    not_available: "更新：已是最新",
+    available: "更新：发现新版本",
+    downloading: "更新：下载中",
+    downloaded: "更新：已下载",
+    installing: "更新：安装中",
+    error: "更新：失败"
+  };
+  return labels[update.state];
+}
+
+function updateDetail(update: UpdateStatus): string {
+  if (update.state === "downloading") return `进度 ${update.progressPercent ?? 0}%`;
+  if (update.targetVersion) return `目标版本 ${update.targetVersion}`;
+  if (update.lastCheckedAt) return `上次检查 ${new Date(update.lastCheckedAt).toLocaleString()}`;
+  return `当前版本 ${update.currentVersion}`;
+}
+
+function updateMessage(update: UpdateStatus): string {
+  if (update.state === "not_available") return "当前已是最新版本";
+  if (update.state === "downloaded") return "新版本已下载，可立即重启安装";
+  if (update.state === "error") return update.error ?? "更新检查失败";
+  return updateDetail(update);
 }
 
 createRoot(document.getElementById("root")!).render(<DesktopApp />);

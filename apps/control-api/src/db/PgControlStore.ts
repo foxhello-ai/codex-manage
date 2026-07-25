@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
-import type { AuthTokenRecord, DeviceRecord, EntitlementMap, IdentityType, NamedTunnelRecord, SubjectType, TokenType, UserRecord } from "../domain";
+import type { AuthTokenRecord, DeviceRecord, EntitlementMap, IdentityType, IssueReportRecord, NamedTunnelRecord, SubjectType, TokenType, UserRecord } from "../domain";
 import type { ControlStore, ProvisioningJob } from "../store";
 
 export class PgControlStore implements ControlStore {
@@ -773,6 +773,167 @@ export class PgControlStore implements ControlStore {
     }));
   }
 
+  async createIssueReport(input: Parameters<ControlStore["createIssueReport"]>[0]): Promise<IssueReportRecord> {
+    return this.transaction(async (client) => {
+      if (input.source !== "manual" && input.fingerprint) {
+        const existing = await client.query(`
+          SELECT d.first_report_id, d.count, r.*
+          FROM issue_report_dedup d
+          JOIN issue_reports r ON r.id = d.first_report_id
+          WHERE d.fingerprint = $1 AND d.client_version = $2 AND d.platform = $3 AND d.arch = $4
+            AND d.last_seen_at > now() - interval '30 minutes'
+          FOR UPDATE OF d
+        `, [input.fingerprint, input.clientVersion, input.platform, input.arch]);
+        const row = existing.rows[0];
+        if (row) {
+          const reportId = randomUUID();
+          await insertIssueReport(client, reportId, input);
+          await insertIssueReportSnapshot(client, reportId, input);
+          await insertIssueReportEvent(client, reportId, "system", null, "deduplicated", {}, {
+            firstReportId: row.first_report_id
+          });
+          await client.query(`
+            UPDATE issue_report_dedup
+            SET last_report_id = $5, count = count + 1, last_seen_at = now()
+            WHERE fingerprint = $1 AND client_version = $2 AND platform = $3 AND arch = $4
+          `, [input.fingerprint, input.clientVersion, input.platform, input.arch, reportId]);
+          return {
+            ...mapIssueReport(row),
+            duplicateCount: Number(row.count) + 1,
+            deduplicated: true
+          };
+        }
+      }
+
+      const reportId = randomUUID();
+      const created = await insertIssueReport(client, reportId, input);
+      await insertIssueReportSnapshot(client, reportId, input);
+      await insertIssueReportEvent(client, reportId, input.source === "manual" ? "user" : "device", input.userId ?? input.deviceId, "created", {}, {
+        source: input.source,
+        level: input.level,
+        category: input.category
+      });
+
+      if (input.source !== "manual" && input.fingerprint) {
+        await client.query(`
+          INSERT INTO issue_report_dedup (
+            fingerprint, client_version, platform, arch, first_report_id, last_report_id
+          ) VALUES ($1,$2,$3,$4,$5,$5)
+          ON CONFLICT (fingerprint, client_version, platform, arch) DO UPDATE
+            SET last_report_id = EXCLUDED.last_report_id,
+              count = issue_report_dedup.count + 1,
+              last_seen_at = now()
+        `, [input.fingerprint, input.clientVersion, input.platform, input.arch, reportId]);
+      }
+
+      return created;
+    });
+  }
+
+  async listAdminIssueReports(): Promise<Array<Record<string, unknown>>> {
+    const result = await this.pool.query(`
+      SELECT r.*,
+        COALESCE(d.count, 1)::int AS duplicate_count,
+        i.identifier AS user_identifier
+      FROM issue_reports r
+      LEFT JOIN issue_report_dedup d ON d.first_report_id = r.id
+      LEFT JOIN LATERAL (
+        SELECT identity_type, identifier FROM user_identities
+        WHERE user_id = r.user_id
+        ORDER BY created_at ASC LIMIT 1
+      ) i ON true
+      ORDER BY
+        CASE r.status
+          WHEN 'new' THEN 0
+          WHEN 'triaged' THEN 1
+          WHEN 'in_progress' THEN 2
+          WHEN 'waiting_user' THEN 3
+          ELSE 4
+        END,
+        r.created_at DESC
+      LIMIT 500
+    `);
+    return result.rows.map((row) => ({
+      ...mapIssueReport(row),
+      duplicateCount: Number(row.duplicate_count ?? 1),
+      userIdentifier: row.user_identifier ? maskIdentifier(String(row.user_identifier).includes("@") ? "email" : "phone", String(row.user_identifier)) : null
+    }));
+  }
+
+  async getAdminIssueReport(reportId: string): Promise<Record<string, unknown> | null> {
+    const report = await this.pool.query(`
+      SELECT r.*, COALESCE(d.count, 1)::int AS duplicate_count
+      FROM issue_reports r
+      LEFT JOIN issue_report_dedup d ON d.first_report_id = r.id
+      WHERE r.id = $1
+    `, [reportId]);
+    const row = report.rows[0];
+    if (!row) return null;
+
+    const snapshots = await this.pool.query(`
+      SELECT id, runtime_snapshot_json, diagnostic_excerpt_json, redaction_version, created_at
+      FROM issue_report_snapshots
+      WHERE issue_report_id = $1
+      ORDER BY created_at DESC
+      LIMIT 20
+    `, [reportId]);
+    const events = await this.pool.query(`
+      SELECT id, actor_type, actor_id, action, before_json, after_json, created_at
+      FROM issue_report_events
+      WHERE issue_report_id = $1
+      ORDER BY created_at ASC
+      LIMIT 200
+    `, [reportId]);
+
+    return {
+      ...mapIssueReport(row),
+      duplicateCount: Number(row.duplicate_count ?? 1),
+      snapshots: snapshots.rows,
+      events: events.rows
+    };
+  }
+
+  async updateIssueReport(input: Parameters<ControlStore["updateIssueReport"]>[0]): Promise<IssueReportRecord | null> {
+    return this.transaction(async (client) => {
+      const current = await client.query("SELECT * FROM issue_reports WHERE id = $1 FOR UPDATE", [input.reportId]);
+      const before = current.rows[0];
+      if (!before) return null;
+
+      const nextStatus = input.status ?? before.status;
+      const nextLevel = input.level ?? before.level;
+      const nextAssignee = input.assignee !== undefined ? input.assignee : before.assignee;
+      const nextIncident = input.linkedIncidentId !== undefined ? input.linkedIncidentId : before.linked_incident_id;
+      const updated = await client.query(`
+        UPDATE issue_reports
+        SET status = $2, level = $3, assignee = $4, linked_incident_id = $5, updated_at = now()
+        WHERE id = $1
+        RETURNING *
+      `, [input.reportId, nextStatus, nextLevel, nextAssignee, nextIncident]);
+      const after = updated.rows[0];
+
+      await insertIssueReportEvent(client, input.reportId, "admin", input.adminId, "updated", {
+        status: before.status,
+        level: before.level,
+        assignee: before.assignee,
+        linkedIncidentId: before.linked_incident_id
+      }, {
+        status: after.status,
+        level: after.level,
+        assignee: after.assignee,
+        linkedIncidentId: after.linked_incident_id,
+        note: input.note ?? null
+      });
+      await insertAudit(client, input.adminId, "issue_report.update", "issue_report", input.reportId, {
+        status: after.status,
+        level: after.level,
+        assignee: after.assignee,
+        linkedIncidentId: after.linked_incident_id,
+        note: input.note ?? null
+      });
+      return mapIssueReport(after);
+    });
+  }
+
   async getAdminOverview(): Promise<Record<string, number>> {
     const result = await this.pool.query(`
       SELECT
@@ -787,6 +948,8 @@ export class PgControlStore implements ControlStore {
         (SELECT count(*) FROM tunnels WHERE mode = 'named' AND status = 'active')::int AS named_tunnels,
         (SELECT count(*) FROM domains WHERE status = 'active')::int AS active_domains,
         (SELECT count(*) FROM domains WHERE domain_type = 'managed_subdomain' AND status = 'active')::int AS fixed_domains,
+        (SELECT count(*) FROM issue_reports WHERE status IN ('new','triaged','in_progress','waiting_user'))::int AS open_issue_reports,
+        (SELECT count(*) FROM issue_reports WHERE source = 'manual' AND status IN ('new','triaged','in_progress','waiting_user'))::int AS manual_issue_reports,
         (SELECT count(DISTINCT user_id) FROM entitlements
           WHERE entitlement_key = 'tunnel.named' AND entitlement_value = 'true'::jsonb
             AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now()))::int AS formal_users
@@ -961,6 +1124,70 @@ async function insertAudit(
   `, [randomUUID(), adminId, action, targetType, targetId, JSON.stringify(summary)]);
 }
 
+async function insertIssueReport(
+  client: PoolClient,
+  reportId: string,
+  input: Parameters<ControlStore["createIssueReport"]>[0]
+): Promise<IssueReportRecord> {
+  const result = await client.query(`
+    INSERT INTO issue_reports (
+      id, source, level, category, title, description, user_id, device_id,
+      client_version, platform, arch, os_version, channel, fingerprint
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+    RETURNING *
+  `, [
+    reportId,
+    input.source,
+    input.level,
+    input.category,
+    input.title,
+    input.description,
+    input.userId,
+    input.deviceId,
+    input.clientVersion,
+    input.platform,
+    input.arch,
+    input.osVersion,
+    input.channel,
+    input.fingerprint
+  ]);
+  return mapIssueReport(result.rows[0]);
+}
+
+async function insertIssueReportSnapshot(
+  client: PoolClient,
+  reportId: string,
+  input: Parameters<ControlStore["createIssueReport"]>[0]
+): Promise<void> {
+  await client.query(`
+    INSERT INTO issue_report_snapshots (
+      id, issue_report_id, runtime_snapshot_json, diagnostic_excerpt_json, redaction_version
+    ) VALUES ($1,$2,$3::jsonb,$4::jsonb,$5)
+  `, [
+    randomUUID(),
+    reportId,
+    JSON.stringify(input.runtimeSnapshot ?? {}),
+    JSON.stringify(input.diagnosticExcerpt ?? []),
+    input.redactionVersion
+  ]);
+}
+
+async function insertIssueReportEvent(
+  client: PoolClient,
+  reportId: string,
+  actorType: string,
+  actorId: string | null,
+  action: string,
+  before: Record<string, unknown>,
+  after: Record<string, unknown>
+): Promise<void> {
+  await client.query(`
+    INSERT INTO issue_report_events (
+      id, issue_report_id, actor_type, actor_id, action, before_json, after_json
+    ) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb)
+  `, [randomUUID(), reportId, actorType, actorId, action, JSON.stringify(before), JSON.stringify(after)]);
+}
+
 function mapUser(row: Record<string, unknown>): UserRecord {
   return {
     id: String(row.id),
@@ -995,6 +1222,30 @@ function mapTunnel(row: Record<string, unknown>): NamedTunnelRecord {
     hostname: String(row.hostname),
     status: String(row.status),
     lastErrorCode: row.last_error_code ? String(row.last_error_code) : null
+  };
+}
+
+function mapIssueReport(row: Record<string, unknown>): IssueReportRecord {
+  return {
+    id: String(row.id),
+    source: row.source as IssueReportRecord["source"],
+    level: row.level as IssueReportRecord["level"],
+    category: row.category as IssueReportRecord["category"],
+    title: String(row.title),
+    description: String(row.description),
+    userId: row.user_id ? String(row.user_id) : null,
+    deviceId: row.device_id ? String(row.device_id) : null,
+    clientVersion: String(row.client_version),
+    platform: String(row.platform),
+    arch: String(row.arch),
+    osVersion: row.os_version ? String(row.os_version) : null,
+    channel: String(row.channel),
+    fingerprint: row.fingerprint ? String(row.fingerprint) : null,
+    status: row.status as IssueReportRecord["status"],
+    assignee: row.assignee ? String(row.assignee) : null,
+    linkedIncidentId: row.linked_incident_id ? String(row.linked_incident_id) : null,
+    createdAt: new Date(String(row.created_at)).toISOString(),
+    updatedAt: new Date(String(row.updated_at)).toISOString()
   };
 }
 

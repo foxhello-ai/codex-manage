@@ -189,3 +189,12 @@ idle
 - `apps/desktop/src/preload/index.ts`：暴露更新状态与操作接口。
 - `apps/desktop/src/renderer/main.tsx`：增加设置页更新 UI。
 - `.github/workflows/desktop-release.yml`：上传安装包、`latest*.yml`、`.blockmap` 和校验文件到更新源。
+
+## 10. 实现状态（2026-07-25）
+
+- 已在 `apps/desktop/package.json` 接入 `electron-updater`。
+- 已在 `apps/desktop/electron-builder.yml` 配置 generic publish 源，并为 macOS 增加 ZIP 更新产物。
+- 已新增 `apps/desktop/src/main/UpdateManager.ts`，支持自动检查、手动立即检查/下载、下载完成后立即安装。
+- 已在桌面主进程、preload、Renderer 和托盘菜单接入更新状态、检查更新和安装入口。
+- 安装前会停止本地服务和 Tunnel，避免升级过程遗留孤儿进程。
+- 已通过 `npm run typecheck:all` 和 `npm run build:all`；真实自动更新仍需发布更新源和签名包后做安装包级验收。

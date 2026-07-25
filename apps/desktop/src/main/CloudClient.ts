@@ -139,6 +139,26 @@ export class CloudClient {
     );
   }
 
+  submitManualIssueReport(accessToken: string, input: Record<string, unknown>) {
+    return this.request<{
+      report: { id: string; duplicateCount?: number; deduplicated?: boolean };
+    }>("/v1/issue-reports/manual", {
+      method: "POST",
+      token: accessToken,
+      body: input
+    });
+  }
+
+  submitAutoIssueReport(deviceAccessToken: string, deviceId: string, input: Record<string, unknown>) {
+    return this.request<{
+      report: { id: string; duplicateCount?: number; deduplicated?: boolean };
+    }>(`/v1/devices/${encodeURIComponent(deviceId)}/issue-reports/auto`, {
+      method: "POST",
+      token: deviceAccessToken,
+      body: input
+    });
+  }
+
   private async request<T>(path: string, options: { method?: string; token?: string; body?: unknown } = {}): Promise<T> {
     const maxRetries = 2;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {

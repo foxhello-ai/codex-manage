@@ -82,6 +82,73 @@ describe("PgControlStore", () => {
       })).toBe(true);
 
       await store.ensureAdmin({ id: "admin-1", email: "admin@example.com", passwordHash: "hash", role: "admin" });
+      const manualIssue = await store.createIssueReport({
+        source: "manual",
+        level: "P0_MANUAL",
+        category: "defect",
+        title: "Manual issue",
+        description: "Submitted by user",
+        userId: user.id,
+        deviceId: "device-1",
+        clientVersion: "1.0.1",
+        platform: "darwin",
+        arch: "arm64",
+        osVersion: null,
+        channel: "stable",
+        fingerprint: null,
+        runtimeSnapshot: { localService: { state: "running" } },
+        diagnosticExcerpt: [],
+        redactionVersion: "v1"
+      });
+      expect(manualIssue.level).toBe("P0_MANUAL");
+      const firstAutoIssue = await store.createIssueReport({
+        source: "auto_unavailable",
+        level: "P2_UNAVAILABLE",
+        category: "unavailable",
+        title: "Tunnel failed",
+        description: "cloudflared failed",
+        userId: user.id,
+        deviceId: "device-1",
+        clientVersion: "1.0.1",
+        platform: "darwin",
+        arch: "arm64",
+        osVersion: null,
+        channel: "stable",
+        fingerprint: "tunnel:failed",
+        runtimeSnapshot: {},
+        diagnosticExcerpt: [],
+        redactionVersion: "v1"
+      });
+      const duplicateAutoIssue = await store.createIssueReport({
+        source: "auto_unavailable",
+        level: "P2_UNAVAILABLE",
+        category: "unavailable",
+        title: "Tunnel failed again",
+        description: "same failure",
+        userId: user.id,
+        deviceId: "device-1",
+        clientVersion: "1.0.1",
+        platform: "darwin",
+        arch: "arm64",
+        osVersion: null,
+        channel: "stable",
+        fingerprint: "tunnel:failed",
+        runtimeSnapshot: {},
+        diagnosticExcerpt: [],
+        redactionVersion: "v1"
+      });
+      expect(duplicateAutoIssue.id).toBe(firstAutoIssue.id);
+      expect(duplicateAutoIssue.deduplicated).toBe(true);
+      expect(duplicateAutoIssue.duplicateCount).toBe(2);
+      expect(await store.updateIssueReport({
+        adminId: "admin-1",
+        reportId: manualIssue.id,
+        status: "triaged",
+        note: "accepted"
+      })).toMatchObject({ status: "triaged" });
+      expect(await store.listAdminIssueReports()).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: manualIssue.id, status: "triaged" })
+      ]));
       await store.grantFormalSubscription({
         adminId: "admin-1",
         userId: user.id,

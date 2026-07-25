@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { CloudflareAdapter } from "./cloudflare/CloudflareAdapter";
 import type { ControlConfig } from "./config";
-import { ControlError, type EntitlementMap, type IdentityType } from "./domain";
+import { ControlError, type EntitlementMap, type IdentityType, type IssueReportCategory, type IssueReportLevel, type IssueReportSource, type IssueReportStatus } from "./domain";
 import type { VerificationNotifier } from "./notifier";
 import {
   hashPassword,
@@ -226,6 +226,108 @@ export class ControlService {
     return { accepted: true, serverTime: new Date().toISOString() };
   }
 
+  async createManualIssueReport(userId: string, input: {
+    category: IssueReportCategory;
+    title: string;
+    description: string;
+    deviceId: string | null;
+    clientVersion: string;
+    platform: string;
+    arch: string;
+    osVersion: string | null;
+    channel: string;
+    fingerprint: string | null;
+    runtimeSnapshot: unknown;
+    diagnosticExcerpt: unknown;
+    redactionVersion: string;
+  }) {
+    if (input.deviceId) {
+      const device = await this.store.getDevice(input.deviceId);
+      if (!device || device.userId !== userId) {
+        throw new ControlError("DEVICE_NOT_FOUND", "设备不存在", 404);
+      }
+    }
+    const report = await this.store.createIssueReport({
+      source: "manual",
+      level: "P0_MANUAL",
+      category: input.category,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      userId,
+      deviceId: input.deviceId,
+      clientVersion: input.clientVersion,
+      platform: input.platform,
+      arch: input.arch,
+      osVersion: input.osVersion,
+      channel: input.channel,
+      fingerprint: input.fingerprint,
+      runtimeSnapshot: input.runtimeSnapshot,
+      diagnosticExcerpt: input.diagnosticExcerpt,
+      redactionVersion: input.redactionVersion
+    });
+    return { report };
+  }
+
+  async createAutomaticIssueReport(deviceId: string, input: {
+    source: Exclude<IssueReportSource, "manual">;
+    category: IssueReportCategory;
+    title: string;
+    description: string;
+    clientVersion: string;
+    platform: string;
+    arch: string;
+    osVersion: string | null;
+    channel: string;
+    fingerprint: string | null;
+    runtimeSnapshot: unknown;
+    diagnosticExcerpt: unknown;
+    redactionVersion: string;
+  }) {
+    const device = await this.store.getDevice(deviceId);
+    if (!device || device.status !== "active") {
+      throw new ControlError("DEVICE_NOT_FOUND", "设备不存在或已停用", 404);
+    }
+    const report = await this.store.createIssueReport({
+      source: input.source,
+      level: levelForIssueSource(input.source),
+      category: input.category,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      userId: device.userId,
+      deviceId,
+      clientVersion: input.clientVersion,
+      platform: input.platform,
+      arch: input.arch,
+      osVersion: input.osVersion,
+      channel: input.channel,
+      fingerprint: input.fingerprint,
+      runtimeSnapshot: input.runtimeSnapshot,
+      diagnosticExcerpt: input.diagnosticExcerpt,
+      redactionVersion: input.redactionVersion
+    });
+    return { report };
+  }
+
+  async updateIssueReport(adminId: string, reportId: string, input: {
+    status?: IssueReportStatus;
+    level?: IssueReportLevel;
+    assignee?: string | null;
+    note?: string | null;
+    linkedIncidentId?: string | null;
+  }) {
+    const report = await this.store.updateIssueReport({
+      adminId,
+      reportId,
+      status: input.status,
+      level: input.level,
+      assignee: input.assignee,
+      note: input.note,
+      linkedIncidentId: input.linkedIncidentId
+    });
+    if (!report) throw new ControlError("ISSUE_REPORT_NOT_FOUND", "问题记录不存在", 404);
+    return { report };
+  }
+
   async requestNamedTunnel(userId: string, deviceId: string) {
     const entitlements = await this.store.getEntitlements(userId);
     if (entitlements["tunnel.named"] !== true) {
@@ -369,6 +471,17 @@ export function normalizeIdentifier(type: IdentityType, value: string): string {
     throw new ControlError("INVALID_PHONE", "手机号格式不正确", 400);
   }
   return withCountryCode;
+}
+
+function levelForIssueSource(source: Exclude<IssueReportSource, "manual">): IssueReportLevel {
+  const levels: Record<Exclude<IssueReportSource, "manual">, IssueReportLevel> = {
+    auto_crash: "P1_CRASH",
+    auto_unavailable: "P2_UNAVAILABLE",
+    auto_defect: "P3_DEFECT",
+    auto_optimization: "P4_OPTIMIZATION",
+    auto_requirement: "P5_REQUIREMENT"
+  };
+  return levels[source];
 }
 
 function randomDeviceCode(): string {

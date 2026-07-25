@@ -27,6 +27,23 @@ export class DiagnosticLog {
     writeFileSync(destination, sanitizeDiagnosticText(source), { encoding: "utf8", mode: 0o600 });
   }
 
+  recentEntries(limit = 80): Array<Record<string, unknown>> {
+    const previous = readOptional(`${this.file}.1`);
+    const source = `${previous}${readOptional(this.file)}`;
+    return source
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .slice(-Math.max(1, limit))
+      .map((line) => {
+        try {
+          const parsed = JSON.parse(sanitizeDiagnosticText(line));
+          return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : { message: sanitizeDiagnosticText(line) };
+        } catch {
+          return { message: sanitizeDiagnosticText(line).slice(0, 1000) };
+        }
+      });
+  }
+
   private rotateIfNeeded(): void {
     try {
       if (statSync(this.file).size < 5 * 1024 * 1024) return;
