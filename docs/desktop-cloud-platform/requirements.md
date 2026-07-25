@@ -214,6 +214,23 @@ macOS 可以提供一个 Universal 安装包，也可以分别提供 arm64 和 x
 
 开发测试包可以暂时使用未签名版本，但必须明确标注测试用途。
 
+### 9.5 客户端升级与 Electron 更新
+
+桌面端必须支持 Electron 自动更新和手动更新，减少客户重复下载完整安装包的交付成本。详细变更要求见 `docs/desktop-cloud-platform/electron-update-change-request.md`。
+
+基础要求：
+
+- 现有客户仍需最后一次手动安装“包含更新器”的版本；后续版本通过应用内更新交付。
+- 自动更新在应用启动后后台检查，发现新版本后后台下载，并在下载完成后提示重启安装或下次退出安装。
+- 手动更新由用户主动点击“检查更新/立即更新”触发；如果存在新版本，必须立即下载并进入安装流程，不能只跳转下载页。
+- 更新安装前必须停止桌面端管理的本地服务、Codex app-server 和 cloudflared 子进程，避免升级后遗留孤儿进程。
+- 更新不得删除账号缓存、设备绑定、本地访问密码、诊断日志、Codex CLI、`~/.codex/sessions` 或用户项目文件。
+- Windows x64 使用 NSIS 自动更新产物，必须发布 `latest.yml` 和 `.blockmap`。
+- macOS x64、arm64 必须发布可供自动更新使用的 ZIP 产物、`latest-mac.yml` 和 `.blockmap`，DMG 仅作为首次安装入口。
+- 正式更新包必须完成 macOS Developer ID 签名、公证和 Windows Authenticode 签名。
+- 更新源必须使用 HTTPS，且不可由客户端用户任意配置。
+- 版本号必须递增，禁止同一版本号重打不同内容给客户。
+
 ## 10. 桌面客户端功能需求
 
 ### 10.1 首页
