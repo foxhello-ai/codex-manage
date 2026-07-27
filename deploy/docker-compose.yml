@@ -61,7 +61,7 @@ services:
       - "${ADMIN_WEB_BIND_ADDRESS:-0.0.0.0}:${ADMIN_WEB_PUBLISHED_PORT:-80}:80"
 
   download-web:
-    image: nginx:1.29-alpine
+    image: ${DOWNLOAD_WEB_IMAGE:-nginx:1.29-alpine}
     restart: unless-stopped
     volumes:
       - ../downloads:/usr/share/nginx/html:ro
