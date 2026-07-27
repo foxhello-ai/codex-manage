@@ -35,7 +35,7 @@ describe("CodexConfigWatcher", () => {
     expect(changes).toHaveLength(1);
   });
 
-  it("ignores top-level diagnostic and session JSON files", async () => {
+  it("ignores top-level runtime state JSON files", async () => {
     const dir = await makeTempDir();
     await writeFile(join(dir, "config.toml"), "model = 'a'\n");
     const watcher = new CodexConfigWatcher({
@@ -47,6 +47,9 @@ describe("CodexConfigWatcher", () => {
 
     watcher.start();
     await writeFile(join(dir, "session-cache.json"), "{}\n");
+    await writeFile(join(dir, ".codex-global-state.json"), "{}\n");
+    await writeFile(join(dir, "models_cache.json"), "{}\n");
+    await writeFile(join(dir, "version.json"), "{}\n");
     expect(watcher.checkNow()).toBe(false);
     watcher.stop();
   });

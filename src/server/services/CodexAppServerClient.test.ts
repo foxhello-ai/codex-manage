@@ -12,16 +12,16 @@ type FakeProcess = EventEmitter & {
   kill: (signal?: NodeJS.Signals) => boolean;
 };
 
-function createFakeProcess(): FakeProcess {
+function createFakeProcess(options: { pid?: number; exitOnKill?: boolean } = {}): FakeProcess {
   const process = new EventEmitter() as FakeProcess;
-  process.pid = 1234;
+  process.pid = options.pid ?? 1234;
   process.stdin = new PassThrough();
   process.stdout = new PassThrough();
   process.stderr = new PassThrough();
   process.killed = false;
   process.kill = () => {
     process.killed = true;
-    process.emit("exit", 0, null);
+    if (options.exitOnKill ?? true) process.emit("exit", 0, null);
     return true;
   };
   return process;
@@ -136,5 +136,39 @@ describe("CodexAppServerClient", () => {
     await expect(client.request("thread/resume", { threadId: "thread-1" })).rejects.toThrow(
       "codex app-server request timed out: thread/resume"
     );
+  });
+
+  it("waits for the stopped app-server process before restarting", async () => {
+    const first = createFakeProcess({ pid: 1001, exitOnKill: false });
+    const second = createFakeProcess({ pid: 1002 });
+    const processes = [first, second];
+    for (const fake of processes) {
+      readJsonLines(fake.stdin, (message) => {
+        if (message.method === "initialize") {
+          fake.stdout.write(`${JSON.stringify({ id: message.id, result: {} })}\n`);
+        }
+      });
+    }
+    const client = new CodexAppServerClient({
+      codexCliPath: "codex",
+      spawnProcess: (() => processes.shift()) as any
+    });
+
+    await client.start();
+    expect(client.getSnapshot()).toMatchObject({ pid: 1001, status: "ready" });
+
+    let stopped = false;
+    const stopPromise = client.stop().then(() => {
+      stopped = true;
+    });
+    await Promise.resolve();
+    expect(first.killed).toBe(true);
+    expect(stopped).toBe(false);
+
+    first.emit("exit", 0, null);
+    await stopPromise;
+    await client.start();
+
+    expect(client.getSnapshot()).toMatchObject({ pid: 1002, status: "ready", initialized: true });
   });
 });

@@ -127,5 +127,5 @@ function listCodexConfigFiles(directory: string): string[] {
 
 function isCodexConfigFile(file: string): boolean {
   if (file === "config.toml" || file === "auth.json") return true;
-  return /\.(?:toml|json)$/i.test(file) && !/diagnostics|log|queue|session/i.test(file);
+  return false;
 }

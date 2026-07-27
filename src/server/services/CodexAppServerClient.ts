@@ -88,28 +88,32 @@ export class CodexAppServerClient extends EventEmitter {
     this.lastError = null;
     this.initialized = false;
 
+    let child: ChildProcessWithoutNullStreams;
     try {
-      this.process = this.spawnProcess(this.codexCliPath, ["app-server"], {
+      child = this.spawnProcess(this.codexCliPath, ["app-server"], {
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
         shell: this.platform === "win32" && this.codexCliPath.toLowerCase().endsWith(".cmd"),
         env: this.injectCodexDirectoryIntoPath()
       });
+      this.process = child;
     } catch (error) {
       this.fail(error);
       throw this.toError(error);
     }
 
-    this.process.stderr.on("data", (chunk) => {
+    child.stderr.on("data", (chunk) => {
       const text = String(chunk).trim();
       if (text) this.emit("stderr", text);
     });
 
-    this.process.on("error", (error) => {
+    child.on("error", (error) => {
+      if (this.process !== child) return;
       this.fail(error);
     });
 
-    this.process.on("exit", (code, signal) => {
+    child.on("exit", (code, signal) => {
+      if (this.process !== child) return;
       this.status = this.status === "failed" ? "failed" : "exited";
       this.initialized = false;
       this.lastError = code === 0 || code === null ? null : `app-server exited with code ${code}`;
@@ -118,9 +122,11 @@ export class CodexAppServerClient extends EventEmitter {
     });
 
     this.stdoutLines = createInterface({
-      input: this.process.stdout
+      input: child.stdout
     });
-    this.stdoutLines.on("line", (line) => this.handleLine(line));
+    this.stdoutLines.on("line", (line) => {
+      if (this.process === child) this.handleLine(line);
+    });
 
     await this.initialize();
     this.status = "ready";
@@ -131,14 +137,18 @@ export class CodexAppServerClient extends EventEmitter {
     this.stdoutLines?.close();
     this.stdoutLines = null;
 
-    if (this.process && !this.process.killed) {
-      this.process.kill("SIGTERM");
+    const child = this.process;
+    if (!child) {
+      this.initialized = false;
+      this.status = "exited";
+      return;
     }
-
-    this.rejectAll(new Error("app-server stopped"));
     this.process = null;
+    this.rejectAll(new Error("app-server stopped"));
     this.initialized = false;
     this.status = "exited";
+
+    if (!child.killed) await this.terminate(child);
   }
 
   async initialize(): Promise<unknown> {
@@ -266,6 +276,29 @@ export class CodexAppServerClient extends EventEmitter {
       pending.reject(error);
     }
     this.pending.clear();
+  }
+
+  private terminate(child: ChildProcessWithoutNullStreams): Promise<void> {
+    return new Promise((resolve) => {
+      const exitCode = (child as { exitCode?: number | null }).exitCode;
+      const signalCode = (child as { signalCode?: NodeJS.Signals | null }).signalCode;
+      if (exitCode !== undefined && exitCode !== null) {
+        resolve();
+        return;
+      }
+      if (signalCode !== undefined && signalCode !== null) {
+        resolve();
+        return;
+      }
+
+      const timer = setTimeout(resolve, 3000);
+      timer.unref?.();
+      child.once("exit", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      child.kill("SIGTERM");
+    });
   }
 
   private toError(error: unknown): Error {
