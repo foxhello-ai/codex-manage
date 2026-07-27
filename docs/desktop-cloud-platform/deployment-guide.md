@@ -62,9 +62,23 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d
 ```bash
 curl http://127.0.0.1:4320/health
 curl http://127.0.0.1/
+curl http://127.0.0.1:8080/updates/stable/latest.yml
 ```
 
 局域网默认可通过 `http://服务器IP/` 打开管理后台，通过 `http://服务器IP:4320/health` 检查 API。可使用 `ADMIN_WEB_BIND_ADDRESS`、`ADMIN_WEB_PUBLISHED_PORT`、`CONTROL_API_BIND_ADDRESS` 和 `CONTROL_API_PUBLISHED_PORT` 覆盖监听地址及宿主机端口。
+
+桌面自动更新文件由 `download-web` 服务提供，默认监听宿主机 `8080`，静态根目录为仓库同级 `downloads/`。生产环境需将 `codex.xmwefun.cn` 的入口代理到：
+
+```text
+http://服务器IP:8080
+```
+
+其中 Electron 更新元数据路径必须存在：
+
+```text
+downloads/updates/stable/latest.yml
+downloads/updates/stable/latest-mac.yml
+```
 
 公网生产环境仍建议由 Nginx、Caddy、Cloudflare Tunnel 或云负载均衡器终止 HTTPS；此时可将两个 `*_BIND_ADDRESS` 设为 `127.0.0.1`，只允许入口代理访问。
 

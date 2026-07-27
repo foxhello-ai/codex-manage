@@ -60,5 +60,14 @@ services:
     ports:
       - "${ADMIN_WEB_BIND_ADDRESS:-0.0.0.0}:${ADMIN_WEB_PUBLISHED_PORT:-80}:80"
 
+  download-web:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    volumes:
+      - ../downloads:/usr/share/nginx/html:ro
+      - ./download-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${DOWNLOAD_WEB_BIND_ADDRESS:-0.0.0.0}:${DOWNLOAD_WEB_PUBLISHED_PORT:-8080}:80"
+
 volumes:
   codex-manage-postgres:
