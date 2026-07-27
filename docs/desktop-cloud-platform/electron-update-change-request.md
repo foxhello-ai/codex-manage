@@ -104,7 +104,7 @@
 ### 5.5 更新源与发布产物
 
 - 更新源必须使用 HTTPS。
-- 推荐路径为 `https://codex.xmwefun.cn/updates/stable/` 或等效自有 CDN。
+- 推荐路径为 `https://codex-api.xmwefun.cn/updates/stable/` 或等效自有 CDN。
 - Windows 发布产物至少包含 NSIS 安装包、`latest.yml` 和 `.blockmap`。
 - macOS 发布产物至少包含 DMG、ZIP、`latest-mac.yml` 和 `.blockmap`。
 - CI 构建完成后必须上传安装包、更新元数据和校验文件到同一发布源。

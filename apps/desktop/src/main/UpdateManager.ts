@@ -30,7 +30,7 @@ export class UpdateManager extends EventEmitter {
     autoUpdater.allowDowngrade = false;
     autoUpdater.allowPrerelease = false;
 
-    const updateUrl = options.updateUrl ?? process.env.CODEX_UPDATE_URL ?? "https://codex.xmwefun.cn/updates/stable";
+    const updateUrl = options.updateUrl ?? process.env.CODEX_UPDATE_URL ?? "https://codex-api.xmwefun.cn/updates/stable";
     if (app.isPackaged) {
       autoUpdater.setFeedURL({ provider: "generic", url: updateUrl });
     }

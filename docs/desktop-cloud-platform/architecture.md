@@ -42,12 +42,12 @@ V1 采用“本机数据面 + 云端控制面”架构：
 
 | 用途 | V1 域名 |
 | --- | --- |
-| 官网与下载页 | `codex.xmwefun.cn` |
+| 桌面更新入口 | `codex-api.xmwefun.cn/updates/stable` |
 | 云端控制 API | `codex-api.xmwefun.cn` |
 | 管理后台 | `codex-admin.xmwefun.cn` |
 | 设备固定域名 | `d-<设备短码>.xmwefun.cn` |
 
-如果后续希望统一到 `*.codex.xmwefun.cn`，需先确认并配置覆盖该层级的高级证书。
+`codex.xmwefun.cn` 已被其他客户使用，不得作为 Codex Manage 桌面更新源。如果后续希望统一到 `*.codex.xmwefun.cn`，需先确认域名归属并配置覆盖该层级的高级证书。
 
 ### 3.3 审核修正二：Quick Tunnel 定位
 

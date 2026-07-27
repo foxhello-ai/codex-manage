@@ -52,4 +52,4 @@ nsis:
   allowToChangeInstallationDirectory: true
 publish:
   provider: generic
-  url: https://codex.xmwefun.cn/updates/stable
+  url: https://codex-api.xmwefun.cn/updates/stable

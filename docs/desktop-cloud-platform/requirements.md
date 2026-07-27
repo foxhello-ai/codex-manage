@@ -118,7 +118,7 @@
 | --- | --- |
 | 云端控制 API | `codex-api.xmwefun.cn` |
 | 管理员后台 | `codex-admin.xmwefun.cn` |
-| 产品官网与下载页 | `codex.xmwefun.cn` |
+| 桌面更新入口 | `codex-api.xmwefun.cn/updates/stable` |
 | 正式用户设备域名 | `d-<设备短码>.xmwefun.cn` |
 
 设备短码必须由服务端生成，不直接暴露数据库自增 ID、邮箱、手机号或完整设备 ID。
@@ -129,7 +129,7 @@
 d-a83k2m.xmwefun.cn
 ```
 
-架构审核后，V1 统一采用 `xmwefun.cn` 下的单级子域名，避免多级子域名带来的额外证书配置和成本。如果后续改用 `*.codex.xmwefun.cn`，必须先配置能够覆盖该层级的证书。
+架构审核后，V1 统一采用 `xmwefun.cn` 下的单级子域名，避免多级子域名带来的额外证书配置和成本。`codex.xmwefun.cn` 已被其他客户使用，不得作为 Codex Manage 桌面更新源。如果后续改用 `*.codex.xmwefun.cn`，必须先配置能够覆盖该层级的证书并完成域名归属审核。
 
 V1 默认由平台自动生成子域名，不开放用户自由输入域名前缀，避免域名抢占、敏感词和审核问题。自定义子域名作为后续权益能力预留。
 

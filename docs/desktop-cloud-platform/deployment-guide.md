@@ -8,7 +8,7 @@
 | --- | --- |
 | Control API | `codex-api.xmwefun.cn` |
 | 管理后台 | `codex-admin.xmwefun.cn` |
-| 官网与下载页 | `codex.xmwefun.cn` |
+| 桌面更新入口 | `codex-api.xmwefun.cn/updates/stable` |
 | 设备固定域名 | `d-<设备短码>.xmwefun.cn` |
 
 Cloudflare API Token 最少授予：
@@ -67,11 +67,13 @@ curl http://127.0.0.1:8080/updates/stable/latest.yml
 
 局域网默认可通过 `http://服务器IP/` 打开管理后台，通过 `http://服务器IP:4320/health` 检查 API。可使用 `ADMIN_WEB_BIND_ADDRESS`、`ADMIN_WEB_PUBLISHED_PORT`、`CONTROL_API_BIND_ADDRESS` 和 `CONTROL_API_PUBLISHED_PORT` 覆盖监听地址及宿主机端口。
 
-桌面自动更新文件由 `download-web` 服务提供，默认监听宿主机 `8080`，静态根目录为仓库同级 `downloads/`。生产环境需将 `codex.xmwefun.cn` 的入口代理到：
+桌面自动更新文件由 `download-web` 服务提供，默认监听宿主机 `8080`，静态根目录为仓库同级 `downloads/`。生产环境需将 `codex-api.xmwefun.cn` 的 `/updates/*` 路由代理到：
 
 ```text
 http://服务器IP:8080
 ```
+
+注意：`codex.xmwefun.cn` 已被其他客户使用，不得作为 Codex Manage 桌面更新源。
 
 其中 Electron 更新元数据路径必须存在：
 
