@@ -176,10 +176,13 @@ function DesktopApp() {
     if (!window.confirm("确认立即重启并安装更新？本地服务和远程通道会先停止。")) return;
     setBusy(true);
     setError(null);
+    setUpdateNotice("正在关闭本地服务并触发系统安装器，macOS 可能需要几十秒。");
     try {
       await window.codexDesktop.installUpdate();
+      setUpdateNotice("安装命令已发出，请等待应用自动退出并重启。");
     } catch (caught) {
       setError(errorMessage(caught));
+    } finally {
       setBusy(false);
     }
   }
@@ -378,8 +381,8 @@ function DesktopApp() {
           {status.update.state === "downloaded" ? (
             <button className="primary" onClick={() => void installUpdate()} disabled={busy}>重启安装更新</button>
           ) : (
-            <button onClick={() => void checkForUpdates()} disabled={busy || status.update.state === "checking" || status.update.state === "downloading"}>
-              {status.update.state === "downloading" ? "下载中" : "检查并更新"}
+            <button onClick={() => void checkForUpdates()} disabled={busy || ["checking", "downloading", "installing"].includes(status.update.state)}>
+              {updateActionLabel(status.update)}
             </button>
           )}
           <button onClick={() => void exportDiagnostics()} disabled={busy}>导出脱敏诊断日志</button>
@@ -508,9 +511,16 @@ function updateLabel(update: UpdateStatus): string {
 
 function updateDetail(update: UpdateStatus): string {
   if (update.state === "downloading") return `进度 ${update.progressPercent ?? 0}%`;
+  if (update.state === "installing") return "正在关闭本地服务并触发系统安装器，macOS 可能需要几十秒";
   if (update.targetVersion) return `目标版本 ${update.targetVersion}`;
   if (update.lastCheckedAt) return `上次检查 ${new Date(update.lastCheckedAt).toLocaleString()}`;
   return `当前版本 ${update.currentVersion}`;
+}
+
+function updateActionLabel(update: UpdateStatus): string {
+  if (update.state === "downloading") return "下载中";
+  if (update.state === "installing") return "安装中";
+  return "检查并更新";
 }
 
 function updateMessage(update: UpdateStatus): string {

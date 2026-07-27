@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { app } from "electron";
 import { autoUpdater } from "electron-updater";
+import type { Logger } from "electron-updater";
 import type { UpdateStatus } from "../shared/types";
 import type { DiagnosticLog } from "./DiagnosticLog";
 
@@ -26,9 +27,11 @@ export class UpdateManager extends EventEmitter {
   constructor(private readonly options: UpdateManagerOptions) {
     super();
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.autoRunAppAfterInstall = true;
     autoUpdater.allowDowngrade = false;
     autoUpdater.allowPrerelease = false;
+    autoUpdater.logger = this.createLogger();
 
     const updateUrl = options.updateUrl ?? process.env.CODEX_UPDATE_URL ?? "https://codex-api.xmwefun.cn/updates/stable";
     if (app.isPackaged) {
@@ -57,7 +60,7 @@ export class UpdateManager extends EventEmitter {
     });
     autoUpdater.on("error", (error) => {
       this.manualInstallRequested = false;
-      this.update({ state: "error", error: error.message });
+      this.update({ state: "error", error: this.normalizeError(error) });
     });
   }
 
@@ -96,9 +99,24 @@ export class UpdateManager extends EventEmitter {
     if (this.status.state !== "downloaded") {
       throw new Error("没有已下载的新版本");
     }
+    this.manualInstallRequested = false;
     this.update({ state: "installing", error: null });
-    await this.options.beforeInstall();
-    autoUpdater.quitAndInstall(false, true);
+    this.options.diagnosticLog.write("update", "install_requested", {
+      currentVersion: this.status.currentVersion,
+      targetVersion: this.status.targetVersion,
+      platform: process.platform
+    });
+    try {
+      await this.options.beforeInstall();
+      this.options.diagnosticLog.write("update", "quit_and_install_invoked", {
+        currentVersion: this.status.currentVersion,
+        targetVersion: this.status.targetVersion,
+        platform: process.platform
+      });
+      setImmediate(() => autoUpdater.quitAndInstall(false, true));
+    } catch (error) {
+      this.update({ state: "error", error: this.normalizeError(error) });
+    }
     return this.getStatus();
   }
 
@@ -108,8 +126,32 @@ export class UpdateManager extends EventEmitter {
       await autoUpdater.downloadUpdate();
     } catch (error) {
       this.manualInstallRequested = false;
-      this.update({ state: "error", error: error instanceof Error ? error.message : String(error) });
+      this.update({ state: "error", error: this.normalizeError(error) });
     }
+  }
+
+  private createLogger(): Logger {
+    return {
+      info: (message?: unknown) => this.writeUpdaterLog("info", message),
+      warn: (message?: unknown) => this.writeUpdaterLog("warn", message),
+      error: (message?: unknown) => this.writeUpdaterLog("error", message),
+      debug: (message: string) => this.writeUpdaterLog("debug", message)
+    };
+  }
+
+  private writeUpdaterLog(level: "debug" | "info" | "warn" | "error", message: unknown): void {
+    this.options.diagnosticLog.write("update", "electron_updater_log", {
+      level,
+      message: message instanceof Error ? message.message : String(message ?? "")
+    });
+  }
+
+  private normalizeError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    if (process.platform === "darwin" && message.includes("Could not get code signature")) {
+      return "当前 macOS 安装包未完成代码签名，系统更新器无法校验正在运行的应用签名；请使用已签名并公证的正式安装包验证自动升级。";
+    }
+    return message;
   }
 
   private update(patch: Partial<UpdateStatus>): void {

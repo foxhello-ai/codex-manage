@@ -117,8 +117,8 @@ class DesktopController {
     this.updateManager = new UpdateManager({
       diagnosticLog: this.diagnosticLog,
       beforeInstall: async () => {
+        await this.prepareForUpdateInstall();
         isQuitting = true;
-        await this.shutdown();
       }
     });
     this.updateManager.on("status", () => {
@@ -248,6 +248,34 @@ class DesktopController {
     await this.tunnel?.stop();
     await this.localService?.stop();
     this.diagnosticLog?.write("desktop", "application_stopped");
+  }
+
+  private async prepareForUpdateInstall(): Promise<void> {
+    this.diagnosticLog?.write("desktop", "update_install_prepare_started");
+    this.updateManager?.stop();
+    this.codexConfigWatcher?.stop();
+    if (this.runtimeReloadRetryTimer) clearTimeout(this.runtimeReloadRetryTimer);
+    this.runtimeReloadRetryTimer = null;
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    if (this.localRestartTimer) clearTimeout(this.localRestartTimer);
+    if (this.localStableTimer) clearTimeout(this.localStableTimer);
+
+    const stopTasks: Promise<void>[] = [];
+    if (this.tunnel) stopTasks.push(this.tunnel.stop());
+    if (this.localService) stopTasks.push(this.localService.stop());
+    const stopResults = await withTimeout(
+      Promise.allSettled(stopTasks),
+      12_000,
+      () => this.diagnosticLog?.write("desktop", "update_install_prepare_timeout", { timeoutMs: 12_000 })
+    );
+    const stopErrors = (stopResults ?? []).flatMap((result) => {
+      if (result.status !== "rejected") return [];
+      return [result.reason instanceof Error ? result.reason.message : String(result.reason)];
+    });
+    this.diagnosticLog?.write("desktop", "update_install_prepare_finished", {
+      timedOut: stopResults === null,
+      stopErrors
+    });
   }
 
   showWindow(): void {
@@ -1262,6 +1290,23 @@ async function canListen(port: number): Promise<boolean> {
     server.once("error", () => resolveResult(false));
     server.listen(port, "127.0.0.1", () => server.close(() => resolveResult(true)));
   });
+}
+
+async function withTimeout<T>(task: Promise<T>, timeoutMs: number, onTimeout: () => void): Promise<T | null> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      task,
+      new Promise<null>((resolveTimeout) => {
+        timeout = setTimeout(() => {
+          onTimeout();
+          resolveTimeout(null);
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 if (process.env.CODEX_DESKTOP_USER_DATA_DIR) {
