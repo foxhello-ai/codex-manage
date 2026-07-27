@@ -16,8 +16,10 @@ extraResources:
     to: local-client
   - from: ../../resources/cloudflared
     to: cloudflared
+  - from: ../../public/icon-512.png
+    to: app-icon.png
 mac:
-  icon: build/icon.png
+  icon: ../../public/icon-512.png
   category: public.app-category.developer-tools
   target:
     - target: dmg
@@ -42,7 +44,7 @@ mac:
           NSIncludesSubdomains: false
           NSTemporaryExceptionAllowsInsecureHTTPLoads: true
 win:
-  icon: build/icon.png
+  icon: ../../public/icon-512.png
   target:
     - target: nsis
       arch:

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import { hostname, release } from "node:os";
 import { join, resolve } from "node:path";
@@ -27,6 +28,7 @@ import { UpdateManager } from "./UpdateManager";
 import type { DesktopStatus, IssueReportCategory, IssueReportSubmissionResult } from "../shared/types";
 
 type DesktopAuthStatus = {
+  ready: boolean;
   setupRequired: boolean;
   defaultPassword: boolean;
   activeSessionCount: number;
@@ -44,6 +46,7 @@ class DesktopController {
     error: "正在检测 Codex CLI"
   };
   private auth: DesktopAuthStatus = {
+    ready: false,
     setupRequired: true,
     defaultPassword: false,
     activeSessionCount: 0
@@ -326,11 +329,7 @@ class DesktopController {
   }
 
   private createTray(): void {
-    const icon = nativeImage.createFromDataURL(
-      `data:image/svg+xml;base64,${Buffer.from(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" rx="7" fill="#1769aa"/><path d="M9 9h14v4H13v6h10v4H9z" fill="white"/></svg>'
-      ).toString("base64")}`
-    );
+    const icon = this.createDesktopIcon();
     this.tray = new Tray(icon.resize({ width: 18, height: 18 }));
     this.tray.setToolTip("Codex Manage");
     this.updateTrayMenu();
@@ -338,6 +337,26 @@ class DesktopController {
     if (process.platform === "win32") {
       this.tray.on("double-click", () => this.showWindow());
     }
+  }
+
+  private createDesktopIcon() {
+    const iconCandidates = [
+      join(process.resourcesPath, "app-icon.png"),
+      resolve(app.getAppPath(), "../../public/icon-512.png"),
+      resolve(process.cwd(), "public/icon-512.png"),
+      resolve(process.cwd(), "../../public/icon-512.png"),
+      resolve(__dirname, "../../../../../public/icon-512.png")
+    ];
+    for (const iconPath of iconCandidates) {
+      if (!existsSync(iconPath)) continue;
+      const icon = nativeImage.createFromPath(iconPath);
+      if (!icon.isEmpty()) return icon;
+    }
+    return nativeImage.createFromDataURL(
+      `data:image/svg+xml;base64,${Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" rx="7" fill="#1769aa"/><path d="M9 9h14v4H13v6h10v4H9z" fill="white"/></svg>'
+      ).toString("base64")}`
+    );
   }
 
   private updateTrayMenu(): void {
@@ -931,7 +950,8 @@ class DesktopController {
   private async refreshAuthStatus(): Promise<void> {
     if (!this.localService?.getSnapshot().url) return;
     try {
-      this.auth = await this.controlRequest<DesktopAuthStatus>("/api/desktop/status");
+      const nextAuth = await this.controlRequest<Omit<DesktopAuthStatus, "ready">>("/api/desktop/status");
+      this.auth = { ...nextAuth, ready: true };
     } catch {
       // Preserve the latest valid snapshot while the local process is restarting.
     }
@@ -1200,6 +1220,7 @@ class DesktopController {
       localService: local,
       codex: this.codex,
       auth: {
+        ready: this.auth.ready,
         setupRequired: this.auth.setupRequired,
         activeSessionCount: this.auth.activeSessionCount
       },

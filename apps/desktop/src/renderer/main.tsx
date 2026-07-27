@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import QRCode from "qrcode";
-import type { DesktopStatus, IssueReportCategory, RuntimeReloadStatus, UpdateStatus } from "../shared/types";
+import type { DesktopStatus, IssueReportCategory, UpdateStatus } from "../shared/types";
 import "./styles.css";
 
 function DesktopApp() {
@@ -19,8 +19,9 @@ function DesktopApp() {
   const [accountPassword, setAccountPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
-  const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
   const [updateNotice, setUpdateNotice] = useState<string | null>(null);
+  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [issuePanelOpen, setIssuePanelOpen] = useState(false);
   const [issueCategory, setIssueCategory] = useState<IssueReportCategory>("defect");
   const [issueTitle, setIssueTitle] = useState("");
   const [issueDescription, setIssueDescription] = useState("");
@@ -144,13 +145,31 @@ function DesktopApp() {
     await run(() => window.codexDesktop.unbindDevice());
   }
 
-  async function exportDiagnostics() {
+  async function updateLaunchAtLogin(enabled: boolean) {
     setBusy(true);
     setError(null);
-    setDiagnosticNotice(null);
+    setSettingsNotice(null);
     try {
-      const file = await window.codexDesktop.exportDiagnosticLogs();
-      if (file) setDiagnosticNotice(`诊断日志已导出：${file}`);
+      const next = await window.codexDesktop.setLaunchAtLogin(enabled);
+      setStatus(next);
+      setSettingsNotice(enabled
+        ? "已开启开机自动启动；下次登录系统后会在后台启动，可从菜单栏或系统托盘打开。"
+        : "已关闭开机自动启动。");
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateIssueAutoReport(enabled: boolean) {
+    setBusy(true);
+    setError(null);
+    setSettingsNotice(null);
+    try {
+      const next = await window.codexDesktop.setIssueAutoReportEnabled(enabled);
+      setStatus(next);
+      setSettingsNotice(enabled ? "已开启自动上报崩溃和不可用问题。" : "已关闭自动上报。");
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -214,6 +233,11 @@ function DesktopApp() {
     return <main className="loading">正在启动 Codex Manage…</main>;
   }
 
+  const setupRequired = status.auth.ready && status.auth.setupRequired;
+  const localAccessBlocked = !status.auth.ready || status.auth.setupRequired;
+  const launchAtLoginLabel = status.settings.launchAtLogin ? "已开启" : "未开启";
+  const issueAutoReportLabel = status.issueReporting.autoEnabled ? "已开启" : "未开启";
+
   return (
     <main className="appShell">
       <header className="hero">
@@ -227,7 +251,7 @@ function DesktopApp() {
 
       {error ? <div className="errorBanner" role="alert">{error}</div> : null}
 
-      {status.auth.setupRequired ? (
+      {setupRequired ? (
         <section className="panel setupPanel">
           <div>
             <p className="sectionTag">首次启动</p>
@@ -332,7 +356,7 @@ function DesktopApp() {
           {status.tunnel.state === "online" || status.tunnel.state === "starting" || status.tunnel.state === "reconnecting" ? (
             <button className="danger" onClick={() => void run(() => window.codexDesktop.stopTunnel())} disabled={busy}>停止远程通道</button>
           ) : (
-            <button className="primary" onClick={() => void run(() => window.codexDesktop.startTunnel())} disabled={busy || status.auth.setupRequired || !status.account.authenticated || status.localService.state !== "running"}>启动远程通道</button>
+            <button className="primary" onClick={() => void run(() => window.codexDesktop.startTunnel())} disabled={busy || localAccessBlocked || !status.account.authenticated || status.localService.state !== "running"}>启动远程通道</button>
           )}
           <button onClick={() => void createPairingQr()} disabled={busy || status.tunnel.state !== "online"}>生成扫码二维码</button>
         </div>
@@ -340,39 +364,31 @@ function DesktopApp() {
 
       <section className="panel settingsPanel">
         <div>
-          <p className="sectionTag">桌面设置与诊断</p>
-          <h2>启动和故障排查</h2>
-          <p>诊断日志只记录组件状态和脱敏错误摘要，不包含 Codex 会话与命令内容。</p>
-          {diagnosticNotice ? <p className="notice">{diagnosticNotice}</p> : null}
+          <p className="sectionTag">桌面设置</p>
+          <h2>启动和问题处理</h2>
+          <p>这里保留客户能直接操作的设置。需要排查时，点击上报问题会自动附带脱敏运行信息。</p>
+          {settingsNotice ? <p className="notice">{settingsNotice}</p> : null}
           {updateNotice ? <p className="notice">{updateNotice}</p> : null}
-          {issueNotice ? <p className="notice">{issueNotice}</p> : null}
-          {status.update.error ? <p className="warningText">更新：{status.update.error}</p> : null}
-          {status.issueReporting.lastError ? <p className="warningText">问题上报：{status.issueReporting.lastError}</p> : null}
-          {status.runtimeReload.state !== "idle" ? (
-            <p className={status.runtimeReload.state === "succeeded" ? "notice" : "warningText"}>
-              {runtimeReloadMessage(status.runtimeReload)}
-            </p>
-          ) : null}
         </div>
         <div className="settingsActions">
-          <label className="toggleRow">
-            <input
-              type="checkbox"
-              checked={status.settings.launchAtLogin}
-              disabled={busy}
-              onChange={(event) => void run(() => window.codexDesktop.setLaunchAtLogin(event.target.checked))}
-            />
-            开机自动启动并静默进入托盘
-          </label>
-          <label className="toggleRow">
-            <input
-              type="checkbox"
-              checked={status.issueReporting.autoEnabled}
-              disabled={busy}
-              onChange={(event) => void run(() => window.codexDesktop.setIssueAutoReportEnabled(event.target.checked))}
-            />
-            自动上报崩溃和不可用问题
-          </label>
+          <div className="settingCard">
+            <div>
+              <strong>开机自动启动</strong>
+              <span>下次登录系统后在后台启动，可从菜单栏或系统托盘打开。</span>
+            </div>
+            <button type="button" onClick={() => void updateLaunchAtLogin(!status.settings.launchAtLogin)} disabled={busy}>
+              {launchAtLoginLabel}
+            </button>
+          </div>
+          <div className="settingCard">
+            <div>
+              <strong>自动问题上报</strong>
+              <span>仅上报崩溃、不可用和脱敏运行摘要，不包含 Codex 会话正文。</span>
+            </div>
+            <button type="button" onClick={() => void updateIssueAutoReport(!status.issueReporting.autoEnabled)} disabled={busy}>
+              {issueAutoReportLabel}
+            </button>
+          </div>
           {status.issueReporting.queuedCount > 0 ? <span className="queueHint">待补发 {status.issueReporting.queuedCount} 条</span> : null}
           <div className="updateBox">
             <strong>{updateLabel(status.update)}</strong>
@@ -385,40 +401,57 @@ function DesktopApp() {
               {updateActionLabel(status.update)}
             </button>
           )}
-          <button onClick={() => void exportDiagnostics()} disabled={busy}>导出脱敏诊断日志</button>
+          <button className="primary" type="button" onClick={() => setIssuePanelOpen(true)} disabled={busy}>上报问题</button>
         </div>
       </section>
 
-      <section className="panel issuePanel">
-        <div>
-          <p className="sectionTag">问题反馈</p>
-          <h2>主动上报问题</h2>
-          <p>主动上报按最高优先级处理，会附带脱敏运行快照和最近诊断摘要，不上传 Codex 会话正文、命令输出或项目文件内容。</p>
-        </div>
-        <form onSubmit={submitIssueReport}>
-          <label>
-            问题类型
-            <select value={issueCategory} onChange={(event) => setIssueCategory(event.target.value as IssueReportCategory)}>
-              <option value="defect">功能缺陷</option>
-              <option value="unavailable">服务不可用</option>
-              <option value="optimization">体验优化</option>
-              <option value="requirement">功能需求</option>
-              <option value="crash">崩溃</option>
-            </select>
-          </label>
-          <label>
-            标题
-            <input value={issueTitle} onChange={(event) => setIssueTitle(event.target.value)} maxLength={160} placeholder="例如：Windows 首次启动本地服务失败" />
-          </label>
-          <label>
-            问题描述
-            <textarea value={issueDescription} onChange={(event) => setIssueDescription(event.target.value)} maxLength={4000} rows={5} placeholder="请描述复现步骤、期望结果和实际现象" />
-          </label>
-          <button className="primary" disabled={busy || !status.account.authenticated || !issueTitle.trim() || !issueDescription.trim()}>
-            {status.account.authenticated ? "上报问题" : "登录后可上报"}
-          </button>
-        </form>
-      </section>
+      <button
+        className="issueBubble"
+        type="button"
+        aria-label="打开问题反馈"
+        onClick={() => setIssuePanelOpen(true)}
+      >
+        <span>?</span>
+        {status.issueReporting.queuedCount > 0 ? <em>{status.issueReporting.queuedCount}</em> : null}
+      </button>
+
+      {issuePanelOpen ? (
+        <section className="issuePopover" role="dialog" aria-modal="false" aria-labelledby="issue-report-title">
+          <div className="issuePopoverHeader">
+            <div>
+              <p className="sectionTag">问题反馈</p>
+              <h2 id="issue-report-title">上报问题</h2>
+            </div>
+            <button className="closeButton" type="button" aria-label="关闭问题反馈" onClick={() => setIssuePanelOpen(false)}>×</button>
+          </div>
+          <p>提交后会自动附带脱敏运行快照和最近诊断摘要，不上传 Codex 会话正文、命令输出或项目文件内容。</p>
+          {issueNotice ? <p className="notice">{issueNotice}</p> : null}
+          {status.issueReporting.lastError ? <p className="warningText">上次上报失败：{status.issueReporting.lastError}</p> : null}
+          <form onSubmit={submitIssueReport}>
+            <label>
+              问题类型
+              <select value={issueCategory} onChange={(event) => setIssueCategory(event.target.value as IssueReportCategory)}>
+                <option value="defect">功能缺陷</option>
+                <option value="unavailable">服务不可用</option>
+                <option value="optimization">体验优化</option>
+                <option value="requirement">功能需求</option>
+                <option value="crash">崩溃</option>
+              </select>
+            </label>
+            <label>
+              标题
+              <input value={issueTitle} onChange={(event) => setIssueTitle(event.target.value)} maxLength={160} placeholder="例如：Windows 首次启动本地服务失败" />
+            </label>
+            <label>
+              问题描述
+              <textarea value={issueDescription} onChange={(event) => setIssueDescription(event.target.value)} maxLength={4000} rows={5} placeholder="请描述复现步骤、期望结果和实际现象" />
+            </label>
+            <button className="primary" disabled={busy || !status.account.authenticated || !issueTitle.trim() || !issueDescription.trim()}>
+              {status.account.authenticated ? "提交问题" : "登录后可上报"}
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       {qrCode && pairingUrl ? (
         <section className="panel qrPanel">
@@ -528,18 +561,6 @@ function updateMessage(update: UpdateStatus): string {
   if (update.state === "downloaded") return "新版本已下载，可立即重启安装";
   if (update.state === "error") return update.error ?? "更新检查失败";
   return updateDetail(update);
-}
-
-function runtimeReloadMessage(status: RuntimeReloadStatus): string {
-  if (status.state === "succeeded") {
-    return `Codex 运行时已自动刷新：${status.lastReloadedAt ? new Date(status.lastReloadedAt).toLocaleString() : "刚刚"}`;
-  }
-  if (status.state === "blocked") {
-    return `Codex 配置已变化，当前会话忙，稍后自动刷新${status.nextRetryAt ? `（下次 ${new Date(status.nextRetryAt).toLocaleTimeString()}）` : ""}`;
-  }
-  if (status.state === "reloading") return "检测到 Codex 配置变化，正在自动刷新运行时";
-  if (status.state === "failed") return `Codex 运行时自动刷新失败：${status.error ?? "未知错误"}`;
-  return "检测到 Codex 配置变化，等待自动刷新运行时";
 }
 
 createRoot(document.getElementById("root")!).render(<DesktopApp />);

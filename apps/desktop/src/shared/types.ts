@@ -62,6 +62,7 @@ export type DesktopStatus = {
     error: string | null;
   };
   auth: {
+    ready: boolean;
     setupRequired: boolean;
     activeSessionCount: number;
   };
