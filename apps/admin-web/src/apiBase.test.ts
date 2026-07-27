@@ -22,4 +22,11 @@ describe("resolveApiBase", () => {
       hostname: "localhost"
     }, "54320")).toBe("http://localhost:54320");
   });
+
+  it("falls back to the production API domain when build-time config is missing", () => {
+    expect(resolveApiBase(undefined, {
+      protocol: "https:",
+      hostname: "codex-admin.xmwefun.cn"
+    })).toBe("https://codex-api.xmwefun.cn");
+  });
 });
