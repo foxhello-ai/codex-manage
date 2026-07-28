@@ -1,6 +1,6 @@
 {
   "name": "@codex-manage/desktop",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Codex Manage desktop client with secure Cloudflare Tunnel access",
   "author": "xmwefun.cn",
   "private": true,
