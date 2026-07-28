@@ -225,8 +225,8 @@ function Dashboard({
   const appServerStatus = currentConfig?.appServer
     ? `${currentConfig.appServer.status}${currentConfig.appServer.initialized ? " / initialized" : ""}`
     : "未连接";
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId)
-    ?? (sessionDetail?.id === selectedSessionId ? sessionDetail : null);
+  const selectedSession = sessions.find((session) => isSameSession(session, selectedSessionId))
+    ?? (isSameSession(sessionDetail, selectedSessionId) ? sessionDetail : null);
   const currentModelState = runtime && runtime.status !== "history"
     ? runtime.modelSelection
     : sessionDetail?.modelState ?? runtime?.modelSelection ?? emptyModelState();
@@ -393,7 +393,7 @@ function Dashboard({
 
   function syncRuntimeSnapshot(nextRuntime: RuntimeSnapshot) {
     setRuntime(nextRuntime);
-    setSessionDetail((current) => current && current.id === nextRuntime.threadId
+    setSessionDetail((current) => current && isSameSession(current, nextRuntime.threadId)
       ? { ...current, status: nextRuntime.status, modelState: nextRuntime.modelSelection }
       : current);
     if (nextRuntime.status !== "history") {
@@ -465,7 +465,7 @@ function Dashboard({
       const response = await updateSessionModel(sessionId, input);
       if (selectedSessionIdRef.current !== sessionId) return;
       syncRuntimeSnapshot(response.runtime);
-      setSessionDetail((current) => current && current.id === sessionId
+      setSessionDetail((current) => current && isSameSession(current, sessionId)
         ? { ...current, modelState: response.selection }
         : current);
       setModelPickerOpen(false);
@@ -733,8 +733,8 @@ function Dashboard({
   }
 
   function handleMetadataSaved(updated: SessionSummary) {
-    setSessions((current) => current.map((session) => (session.id === updated.id ? updated : session)));
-    setSessionDetail((current) => (current && current.id === updated.id ? { ...current, ...updated } : current));
+    setSessions((current) => current.map((session) => (isSameSession(session, updated.id) ? updated : session)));
+    setSessionDetail((current) => (current && isSameSession(current, updated.id) ? { ...current, ...updated } : current));
   }
 
   useEffect(() => {
@@ -2371,7 +2371,7 @@ function SessionList({
                 <SessionItem
                   key={session.id}
                   session={session}
-                  selected={session.id === selectedSessionId}
+                  selected={isSameSession(session, selectedSessionId)}
                   onSelect={onSelect}
                   onMetadataSaved={onMetadataSaved}
                 />
@@ -2753,6 +2753,13 @@ function emptyModelState(): SessionModelState {
     confirmationPending: false,
     lastError: null
   };
+}
+
+function isSameSession(
+  session: Pick<SessionSummary, "id" | "sessionId"> | null | undefined,
+  sessionId: string | null | undefined
+): boolean {
+  return Boolean(session && sessionId && (session.id === sessionId || session.sessionId === sessionId));
 }
 
 function modelChangeStatusLabel(status: RuntimeSnapshot["modelChangeStatus"]): string {
