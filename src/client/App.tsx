@@ -177,6 +177,7 @@ function Dashboard({
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loadingDiagnostics, setLoadingDiagnostics] = useState(initialRoute.kind === "settings");
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
+  const [runtimeReloadNotice, setRuntimeReloadNotice] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [search, setSearch] = useState("");
@@ -215,6 +216,7 @@ function Dashboard({
   const selectedSessionIdRef = useRef<string | null>(initialRoute.kind === "detail" ? initialRoute.sessionId : null);
   const liveMessagesRef = useRef<LiveMessage[]>([]);
   const retryMessageRef = useRef<string | null>(null);
+  const runtimeReloadGenerationRef = useRef<number | null>(null);
 
   const listenAddress = useMemo(() => {
     if (!currentConfig) return "读取中";
@@ -223,8 +225,8 @@ function Dashboard({
   const appServerStatus = currentConfig?.appServer
     ? `${currentConfig.appServer.status}${currentConfig.appServer.initialized ? " / initialized" : ""}`
     : "未连接";
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId)
-    ?? (sessionDetail?.id === selectedSessionId ? sessionDetail : null);
+  const selectedSession = sessions.find((session) => isSameSession(session, selectedSessionId))
+    ?? (isSameSession(sessionDetail, selectedSessionId) ? sessionDetail : null);
   const currentModelState = runtime && runtime.status !== "history"
     ? runtime.modelSelection
     : sessionDetail?.modelState ?? runtime?.modelSelection ?? emptyModelState();
@@ -261,6 +263,45 @@ function Dashboard({
   useEffect(() => {
     if (config) setCurrentConfig(config);
   }, [config]);
+
+  useEffect(() => {
+    const generation = currentConfig?.runtimeReload?.generation ?? 0;
+    if (runtimeReloadGenerationRef.current === null) {
+      runtimeReloadGenerationRef.current = generation;
+      return;
+    }
+    if (generation <= runtimeReloadGenerationRef.current) return;
+    runtimeReloadGenerationRef.current = generation;
+    setModelCatalog(null);
+    setModelCatalogError(null);
+    setRuntime((current) => current ? { ...current, status: "history", activeTurnId: null, lastError: null } : current);
+    const reloadedAt = currentConfig?.runtimeReload?.reloadedAt;
+    const trigger = currentConfig?.runtimeReload?.trigger;
+    setRuntimeReloadNotice(
+      `Codex 运行时已${trigger === "config_watcher" ? "自动" : ""}刷新${reloadedAt ? `：${formatDateTime(reloadedAt)}` : ""}`
+    );
+    void loadModelCatalog(true);
+    if (selectedSessionIdRef.current) {
+      void loadRuntime(selectedSessionIdRef.current, { silent: true });
+    }
+  }, [currentConfig?.runtimeReload?.generation]);
+
+  useEffect(() => {
+    let active = true;
+    async function pollRuntimeConfig() {
+      try {
+        const nextConfig = await getPublicConfig();
+        if (active) setCurrentConfig(nextConfig);
+      } catch {
+        // 自动刷新检测是后台能力，诊断页保留显式错误展示。
+      }
+    }
+    const timer = setInterval(() => void pollRuntimeConfig(), 10_000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     void loadSessions("");
@@ -352,7 +393,7 @@ function Dashboard({
 
   function syncRuntimeSnapshot(nextRuntime: RuntimeSnapshot) {
     setRuntime(nextRuntime);
-    setSessionDetail((current) => current && current.id === nextRuntime.threadId
+    setSessionDetail((current) => current && isSameSession(current, nextRuntime.threadId)
       ? { ...current, status: nextRuntime.status, modelState: nextRuntime.modelSelection }
       : current);
     if (nextRuntime.status !== "history") {
@@ -424,7 +465,7 @@ function Dashboard({
       const response = await updateSessionModel(sessionId, input);
       if (selectedSessionIdRef.current !== sessionId) return;
       syncRuntimeSnapshot(response.runtime);
-      setSessionDetail((current) => current && current.id === sessionId
+      setSessionDetail((current) => current && isSameSession(current, sessionId)
         ? { ...current, modelState: response.selection }
         : current);
       setModelPickerOpen(false);
@@ -692,8 +733,8 @@ function Dashboard({
   }
 
   function handleMetadataSaved(updated: SessionSummary) {
-    setSessions((current) => current.map((session) => (session.id === updated.id ? updated : session)));
-    setSessionDetail((current) => (current && current.id === updated.id ? { ...current, ...updated } : current));
+    setSessions((current) => current.map((session) => (isSameSession(session, updated.id) ? updated : session)));
+    setSessionDetail((current) => (current && isSameSession(current, updated.id) ? { ...current, ...updated } : current));
   }
 
   useEffect(() => {
@@ -991,6 +1032,7 @@ function Dashboard({
           health={health}
           loading={loadingDiagnostics}
           error={diagnosticsError}
+          reloadNotice={runtimeReloadNotice}
           onBack={handleBackToList}
           onRefresh={loadDiagnostics}
         />
@@ -1087,6 +1129,7 @@ function SettingsPage({
   health,
   loading,
   error,
+  reloadNotice,
   onBack,
   onRefresh
 }: {
@@ -1094,6 +1137,7 @@ function SettingsPage({
   health: HealthStatus | null;
   loading: boolean;
   error: string | null;
+  reloadNotice: string | null;
   onBack: () => void;
   onRefresh: () => Promise<void>;
 }) {
@@ -1130,6 +1174,7 @@ function SettingsPage({
       </section>
 
       {error ? <div className="errorBanner">{error}</div> : null}
+      {reloadNotice ? <div className="successBanner">{reloadNotice}</div> : null}
       {config?.codexVersionError ? <div className="errorBanner">Codex CLI：{config.codexVersionError}</div> : null}
       {appServer?.lastError ? <div className="errorBanner">App Server：{appServer.lastError}</div> : null}
 
@@ -2326,7 +2371,7 @@ function SessionList({
                 <SessionItem
                   key={session.id}
                   session={session}
-                  selected={session.id === selectedSessionId}
+                  selected={isSameSession(session, selectedSessionId)}
                   onSelect={onSelect}
                   onMetadataSaved={onMetadataSaved}
                 />
@@ -2708,6 +2753,13 @@ function emptyModelState(): SessionModelState {
     confirmationPending: false,
     lastError: null
   };
+}
+
+function isSameSession(
+  session: Pick<SessionSummary, "id" | "sessionId"> | null | undefined,
+  sessionId: string | null | undefined
+): boolean {
+  return Boolean(session && sessionId && (session.id === sessionId || session.sessionId === sessionId));
 }
 
 function modelChangeStatusLabel(status: RuntimeSnapshot["modelChangeStatus"]): string {

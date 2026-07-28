@@ -57,6 +57,12 @@ type SettingsWaiter = {
   timer: NodeJS.Timeout;
 };
 
+export type RuntimeReloadBlocker = {
+  threadId: string;
+  status: RuntimeStatus;
+  reason: "active_runtime" | "pending_operation" | "model_change";
+};
+
 export type RuntimeManagerOptions = {
   modelConfirmationTimeoutMs?: number;
 };
@@ -68,6 +74,7 @@ export class RuntimeManager {
   private readonly operationChains = new Map<string, Promise<void>>();
   private readonly settingsWaiters = new Map<string, SettingsWaiter>();
   private readonly modelConfirmationTimeoutMs: number;
+  private appServerReloading = false;
 
   constructor(
     private readonly appServer: CodexAppServerClient,
@@ -80,7 +87,9 @@ export class RuntimeManager {
 
     this.appServer.on("notification", (message: JsonRpcNotification) => this.handleNotification(message));
     this.appServer.on("serverRequest", (message: JsonRpcRequest) => this.handleServerRequest(message));
-    this.appServer.on("exit", () => this.markAllFailed("Codex app-server 已退出"));
+    this.appServer.on("exit", () => {
+      if (!this.appServerReloading) this.markAllFailed("Codex app-server 已退出");
+    });
     this.appServer.on("error", (error: Error) => this.markAllFailed(sanitizeModelError(error)));
   }
 
@@ -322,6 +331,64 @@ export class RuntimeManager {
 
   getRuntime(threadId: string): RuntimeSnapshot {
     return this.snapshot(threadId);
+  }
+
+  getReloadBlockers(): RuntimeReloadBlocker[] {
+    const blockers: RuntimeReloadBlocker[] = [];
+    const seen = new Set<string>();
+
+    for (const [threadId, runtime] of this.runtimes) {
+      if (runtime.status === "starting" || runtime.status === "running" || runtime.status === "waiting_approval") {
+        blockers.push({ threadId, status: runtime.status, reason: "active_runtime" });
+        seen.add(threadId);
+        continue;
+      }
+      if (runtime.modelChangeStatus === "pending" || runtime.modelChangeStatus === "confirming") {
+        blockers.push({ threadId, status: runtime.status, reason: "model_change" });
+        seen.add(threadId);
+      }
+    }
+
+    for (const threadId of this.operationChains.keys()) {
+      if (!seen.has(threadId)) {
+        blockers.push({ threadId, status: this.runtimes.get(threadId)?.status ?? "history", reason: "pending_operation" });
+      }
+    }
+
+    return blockers;
+  }
+
+  prepareForAppServerReload(): RuntimeReloadBlocker[] {
+    const blockers = this.getReloadBlockers();
+    if (blockers.length > 0) return blockers;
+    this.appServerReloading = true;
+    for (const threadId of this.settingsWaiters.keys()) {
+      this.cancelSettingsWaiter(threadId);
+    }
+    return [];
+  }
+
+  finishAppServerReload(success: boolean, message: string | null = null): void {
+    this.appServerReloading = false;
+    for (const threadId of this.runtimes.keys()) {
+      if (success) {
+        this.setRuntime(threadId, {
+          status: "history",
+          activeTurnId: null,
+          lastError: null,
+          modelChangeStatus: "idle",
+          modelChangeError: null
+        });
+      } else {
+        this.setRuntime(threadId, {
+          status: "failed",
+          activeTurnId: null,
+          lastError: message ?? "Codex app-server 重载失败",
+          modelChangeStatus: "failed",
+          modelChangeError: message ?? "Codex app-server 重载失败"
+        });
+      }
+    }
   }
 
   submitApproval(threadId: string, approvalId: string, params: SubmitApprovalParams): ApprovalResponse {
