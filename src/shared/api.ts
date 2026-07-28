@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, HealthStatus, InputResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, HealthStatus, InputResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -74,6 +74,13 @@ export function getSessions(search?: string): Promise<SessionsResponse> {
 
 export function getModels(forceRefresh = false): Promise<ModelCatalogResponse> {
   return apiRequest<ModelCatalogResponse>(`/api/models${forceRefresh ? "?refresh=true" : ""}`);
+}
+
+export function reloadRuntime(): Promise<RuntimeReloadResponse> {
+  return apiRequest<RuntimeReloadResponse>("/api/runtime/reload", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
 }
 
 export function getSessionDetail(sessionId: string): Promise<SessionDetailResponse> {
