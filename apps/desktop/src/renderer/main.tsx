@@ -12,6 +12,7 @@ function DesktopApp() {
   const [confirmation, setConfirmation] = useState("");
   const [pairingUrl, setPairingUrl] = useState<string | null>(null);
   const [pairingExpiresAt, setPairingExpiresAt] = useState<string | null>(null);
+  const [pairingRemainingMs, setPairingRemainingMs] = useState(0);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [accountMode, setAccountMode] = useState<"login" | "register">("login");
   const [identityType, setIdentityType] = useState<"email" | "phone">("email");
@@ -21,6 +22,7 @@ function DesktopApp() {
   const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
   const [updateNotice, setUpdateNotice] = useState<string | null>(null);
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [issuePanelOpen, setIssuePanelOpen] = useState(false);
   const [issueCategory, setIssueCategory] = useState<IssueReportCategory>("defect");
   const [issueTitle, setIssueTitle] = useState("");
@@ -36,8 +38,7 @@ function DesktopApp() {
       if (!active) return;
       setStatus(next);
       if (next.tunnel.state !== "online") {
-        setPairingUrl(null);
-        setQrCode(null);
+        clearPairingQr();
       }
     });
     return () => {
@@ -45,6 +46,20 @@ function DesktopApp() {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!pairingExpiresAt) {
+      setPairingRemainingMs(0);
+      return;
+    }
+
+    const refreshRemaining = () => {
+      setPairingRemainingMs(Math.max(0, new Date(pairingExpiresAt).getTime() - Date.now()));
+    };
+    refreshRemaining();
+    const timer = window.setInterval(refreshRemaining, 1_000);
+    return () => window.clearInterval(timer);
+  }, [pairingExpiresAt]);
 
   const tunnelLabel = useMemo(() => {
     const labels: Record<string, string> = {
@@ -97,11 +112,29 @@ function DesktopApp() {
         margin: 2,
         color: { dark: "#0e2433", light: "#ffffff" }
       }));
+      setPairingRemainingMs(Math.max(0, new Date(pairing.expiresAt).getTime() - Date.now()));
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
       setBusy(false);
     }
+  }
+
+  function clearPairingQr() {
+    setPairingUrl(null);
+    setPairingExpiresAt(null);
+    setPairingRemainingMs(0);
+    setQrCode(null);
+  }
+
+  function openSettingsPanel() {
+    setIssuePanelOpen(false);
+    setSettingsPanelOpen(true);
+  }
+
+  function openIssuePanel() {
+    setSettingsPanelOpen(false);
+    setIssuePanelOpen(true);
   }
 
   async function requestVerificationCode() {
@@ -237,6 +270,8 @@ function DesktopApp() {
   const localAccessBlocked = !status.auth.ready || status.auth.setupRequired;
   const launchAtLoginLabel = status.settings.launchAtLogin ? "已开启" : "未开启";
   const issueAutoReportLabel = status.issueReporting.autoEnabled ? "已开启" : "未开启";
+  const pairingExpired = Boolean(pairingUrl && pairingExpiresAt && pairingRemainingMs <= 0);
+  const pairingRemainingText = pairingRemainingMs > 0 ? formatDuration(pairingRemainingMs) : "已过期";
 
   return (
     <main className="appShell">
@@ -362,62 +397,76 @@ function DesktopApp() {
         </div>
       </section>
 
-      <section className="panel settingsPanel">
-        <div>
-          <p className="sectionTag">桌面设置</p>
-          <h2>启动和问题处理</h2>
-          <p>这里保留客户能直接操作的设置。需要排查时，点击上报问题会自动附带脱敏运行信息。</p>
+      <div className="floatingTools" aria-label="快捷工具">
+        <button
+          className="floatingButton"
+          type="button"
+          aria-label="打开桌面设置"
+          onClick={settingsPanelOpen ? () => setSettingsPanelOpen(false) : openSettingsPanel}
+        >
+          <span>⚙</span>
+        </button>
+        <button
+          className="floatingButton"
+          type="button"
+          aria-label="打开问题反馈"
+          onClick={issuePanelOpen ? () => setIssuePanelOpen(false) : openIssuePanel}
+        >
+          <span>?</span>
+          {status.issueReporting.queuedCount > 0 ? <em>{status.issueReporting.queuedCount}</em> : null}
+        </button>
+      </div>
+
+      {settingsPanelOpen ? (
+        <section className="toolPopover settingsPopover" role="dialog" aria-modal="false" aria-labelledby="desktop-settings-title">
+          <div className="popoverHeader">
+            <div>
+              <p className="sectionTag">桌面设置</p>
+              <h2 id="desktop-settings-title">启动和问题处理</h2>
+            </div>
+            <button className="closeButton" type="button" aria-label="关闭桌面设置" onClick={() => setSettingsPanelOpen(false)}>×</button>
+          </div>
+          <p>这里保留客户能直接操作的设置。需要排查时，点击问题反馈会自动附带脱敏运行信息。</p>
           {settingsNotice ? <p className="notice">{settingsNotice}</p> : null}
           {updateNotice ? <p className="notice">{updateNotice}</p> : null}
-        </div>
-        <div className="settingsActions">
-          <div className="settingCard">
-            <div>
-              <strong>开机自动启动</strong>
-              <span>下次登录系统后在后台启动，可从菜单栏或系统托盘打开。</span>
+          <div className="settingsActions">
+            <div className="settingCard">
+              <div>
+                <strong>开机自动启动</strong>
+                <span>下次登录系统后在后台启动，可从菜单栏或系统托盘打开。</span>
+              </div>
+              <button type="button" onClick={() => void updateLaunchAtLogin(!status.settings.launchAtLogin)} disabled={busy}>
+                {launchAtLoginLabel}
+              </button>
             </div>
-            <button type="button" onClick={() => void updateLaunchAtLogin(!status.settings.launchAtLogin)} disabled={busy}>
-              {launchAtLoginLabel}
-            </button>
-          </div>
-          <div className="settingCard">
-            <div>
-              <strong>自动问题上报</strong>
-              <span>仅上报崩溃、不可用和脱敏运行摘要，不包含 Codex 会话正文。</span>
+            <div className="settingCard">
+              <div>
+                <strong>自动问题上报</strong>
+                <span>仅上报崩溃、不可用和脱敏运行摘要，不包含 Codex 会话正文。</span>
+              </div>
+              <button type="button" onClick={() => void updateIssueAutoReport(!status.issueReporting.autoEnabled)} disabled={busy}>
+                {issueAutoReportLabel}
+              </button>
             </div>
-            <button type="button" onClick={() => void updateIssueAutoReport(!status.issueReporting.autoEnabled)} disabled={busy}>
-              {issueAutoReportLabel}
-            </button>
+            {status.issueReporting.queuedCount > 0 ? <span className="queueHint">待补发 {status.issueReporting.queuedCount} 条</span> : null}
+            <div className="updateBox">
+              <strong>{updateLabel(status.update)}</strong>
+              <span>{updateDetail(status.update)}</span>
+            </div>
+            {status.update.state === "downloaded" ? (
+              <button className="primary" onClick={() => void installUpdate()} disabled={busy}>重启安装更新</button>
+            ) : (
+              <button onClick={() => void checkForUpdates()} disabled={busy || ["checking", "downloading", "installing"].includes(status.update.state)}>
+                {updateActionLabel(status.update)}
+              </button>
+            )}
           </div>
-          {status.issueReporting.queuedCount > 0 ? <span className="queueHint">待补发 {status.issueReporting.queuedCount} 条</span> : null}
-          <div className="updateBox">
-            <strong>{updateLabel(status.update)}</strong>
-            <span>{updateDetail(status.update)}</span>
-          </div>
-          {status.update.state === "downloaded" ? (
-            <button className="primary" onClick={() => void installUpdate()} disabled={busy}>重启安装更新</button>
-          ) : (
-            <button onClick={() => void checkForUpdates()} disabled={busy || ["checking", "downloading", "installing"].includes(status.update.state)}>
-              {updateActionLabel(status.update)}
-            </button>
-          )}
-          <button className="primary" type="button" onClick={() => setIssuePanelOpen(true)} disabled={busy}>上报问题</button>
-        </div>
-      </section>
-
-      <button
-        className="issueBubble"
-        type="button"
-        aria-label="打开问题反馈"
-        onClick={() => setIssuePanelOpen(true)}
-      >
-        <span>?</span>
-        {status.issueReporting.queuedCount > 0 ? <em>{status.issueReporting.queuedCount}</em> : null}
-      </button>
+        </section>
+      ) : null}
 
       {issuePanelOpen ? (
-        <section className="issuePopover" role="dialog" aria-modal="false" aria-labelledby="issue-report-title">
-          <div className="issuePopoverHeader">
+        <section className="toolPopover issuePopover" role="dialog" aria-modal="false" aria-labelledby="issue-report-title">
+          <div className="popoverHeader">
             <div>
               <p className="sectionTag">问题反馈</p>
               <h2 id="issue-report-title">上报问题</h2>
@@ -453,28 +502,44 @@ function DesktopApp() {
         </section>
       ) : null}
 
-      {qrCode && pairingUrl ? (
-        <section className="panel qrPanel">
-          <img src={qrCode} alt="手机扫码访问二维码" />
-          <div>
-            <p className="sectionTag">一次性授权</p>
-            <h2>使用手机扫码访问</h2>
-            <p>二维码仅可使用一次，默认 5 分钟后失效。</p>
-            <code>{status.tunnel.publicUrl}</code>
-            {pairingExpiresAt ? <p className="muted">有效期至：{new Date(pairingExpiresAt).toLocaleString()}</p> : null}
-            <button onClick={() => navigator.clipboard.writeText(pairingUrl)}>复制授权链接</button>
-            <details role="note" className="pwaGuide">
-              <summary>💡 iPhone 扫码后如何添加到桌面？</summary>
-              <ol>
-                <li>用 <strong>Safari</strong> 打开二维码链接（微信/相机扫码后请点右上角选择在 Safari 打开）</li>
-                <li>点 Safari 底部中间的 <strong>分享按钮</strong>（<span aria-label="分享">⎋</span>）</li>
-                <li>向下滑动找到 <strong>「添加到主屏幕」</strong></li>
-                <li>点右上角「添加」即可在桌面生成 Codex 图标，后续一键打开</li>
-              </ol>
-              <p className="muted">Android 手机用 Chrome 扫码会自动弹出安装提示。</p>
-            </details>
-          </div>
-        </section>
+      {pairingUrl ? (
+        <div className="modalBackdrop" role="presentation">
+          <section className="qrDialog" role="dialog" aria-modal="true" aria-labelledby="pairing-qr-title">
+            <div className="popoverHeader">
+              <div>
+                <p className="sectionTag">一次性授权</p>
+                <h2 id="pairing-qr-title">使用手机扫码访问</h2>
+              </div>
+              <button className="closeButton" type="button" aria-label="关闭扫码二维码" onClick={clearPairingQr}>×</button>
+            </div>
+            <div className="qrContent">
+              <div className="qrImageBox">
+                {qrCode ? <img src={qrCode} alt="手机扫码访问二维码" /> : null}
+                {pairingExpired ? <div className="qrExpiredMask">二维码已过期</div> : null}
+              </div>
+              <div>
+                <p>二维码仅可使用一次，过期后需要重新生成。</p>
+                <p className={pairingExpired ? "warningText" : "countdownText"}>剩余有效期：{pairingRemainingText}</p>
+                <code>{status.tunnel.publicUrl}</code>
+                {pairingExpiresAt ? <p className="muted">有效期至：{new Date(pairingExpiresAt).toLocaleString()}</p> : null}
+                <div className="modalActions">
+                  <button onClick={() => void navigator.clipboard.writeText(pairingUrl)} disabled={pairingExpired}>复制授权链接</button>
+                  <button className="primary" onClick={() => void createPairingQr()} disabled={busy || status.tunnel.state !== "online"}>重新生成二维码</button>
+                </div>
+                <details role="note" className="pwaGuide">
+                  <summary>💡 iPhone 扫码后如何添加到桌面？</summary>
+                  <ol>
+                    <li>用 <strong>Safari</strong> 打开二维码链接（微信/相机扫码后请点右上角选择在 Safari 打开）</li>
+                    <li>点 Safari 底部中间的 <strong>分享按钮</strong>（<span aria-label="分享">⎋</span>）</li>
+                    <li>向下滑动找到 <strong>「添加到主屏幕」</strong></li>
+                    <li>点右上角「添加」即可在桌面生成 Codex 图标，后续一键打开</li>
+                  </ol>
+                  <p className="muted">Android 手机用 Chrome 扫码会自动弹出安装提示。</p>
+                </details>
+              </div>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       <section className="panel planPanel">
@@ -526,6 +591,13 @@ function StatusCard({
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function formatDuration(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function updateLabel(update: UpdateStatus): string {
