@@ -98,6 +98,35 @@ describe("RuntimeManager", () => {
     });
   });
 
+  it("blocks app-server reload while a turn or model change is active", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    await manager.sendInput("thread-1", { text: "继续" });
+
+    expect(manager.prepareForAppServerReload()).toEqual([
+      { threadId: "thread-1", status: "running", reason: "active_runtime" }
+    ]);
+  });
+
+  it("allows app-server reload from waiting input and moves sessions to history", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    await manager.resumeThread("thread-1");
+
+    expect(manager.prepareForAppServerReload()).toEqual([]);
+    appServer.emit("exit", { code: 0, signal: null });
+    manager.finishAppServerReload(true);
+
+    expect(manager.getRuntime("thread-1")).toMatchObject({
+      status: "history",
+      activeTurnId: null,
+      lastError: null,
+      modelChangeStatus: "idle"
+    });
+  });
+
   it("maps an app-server idle thread to waiting for user input", async () => {
     const appServer = new FakeAppServer();
     const manager = new RuntimeManager(appServer as any);

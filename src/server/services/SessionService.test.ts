@@ -49,11 +49,12 @@ describe("SessionService", () => {
     expect(calls).toEqual([
       {
         method: "thread/list",
-        params: {
-          limit: 20,
-          sortDirection: "desc",
-          sortKey: "updated_at",
-          archived: false,
+          params: {
+            cursor: null,
+            limit: 100,
+            sortDirection: "desc",
+            sortKey: "updated_at",
+            archived: false,
           searchTerm: null
         }
       }
@@ -74,6 +75,53 @@ describe("SessionService", () => {
         source: "cli"
       }
     ]);
+  });
+
+  it("paginates app-server sessions and searches beyond the first page", async () => {
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready" as const, pid: 1, lastError: null, initialized: true }),
+      request: async <T = unknown>(method: string, params?: unknown) => {
+        calls.push({ method, params });
+        if ((params as { cursor?: string | null }).cursor === "page-2") {
+          return {
+            data: [
+              {
+                id: "thread-2",
+                sessionId: "session-2",
+                preview: "second page target",
+                cwd: "/workspace/target",
+                createdAt: 1,
+                updatedAt: 3
+              }
+            ],
+            nextCursor: null
+          } as T;
+        }
+        return {
+          data: [
+            {
+              id: "thread-1",
+              sessionId: "session-1",
+              preview: "first page",
+              cwd: "/workspace/first",
+              createdAt: 1,
+              updatedAt: 2
+            }
+          ],
+          nextCursor: "page-2"
+        } as T;
+      }
+    });
+
+    await expect(service.listSessions({ search: "target" })).resolves.toMatchObject([
+      {
+        id: "thread-2",
+        sessionId: "session-2",
+        title: "second page target"
+      }
+    ]);
+    expect(calls.map((call) => (call.params as { cursor?: string | null }).cursor)).toEqual([null, "page-2"]);
   });
 
   it("uses remark title as display title and searches it locally", async () => {
@@ -196,6 +244,25 @@ describe("SessionService", () => {
         }
       ]
     });
+  });
+
+  it("accepts sessionId-only app-server records", async () => {
+    const service = new SessionService(
+      readyClient({
+        data: [{ sessionId: "session-only-1", preview: "session only", cwd: "/a", createdAt: 1, updatedAt: 2 }]
+      }),
+      metadataStore({
+        "session-only-1": { remarkTitle: "兼容标题" }
+      })
+    );
+
+    await expect(service.listSessions()).resolves.toMatchObject([
+      {
+        id: "session-only-1",
+        sessionId: "session-only-1",
+        title: "兼容标题"
+      }
+    ]);
   });
 
   it("maps active and failed statuses", async () => {

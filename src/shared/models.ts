@@ -10,6 +10,14 @@ export type AppServerSnapshot = {
   initialized: boolean;
 };
 
+export type RuntimeReloadSnapshot = {
+  generation: number;
+  reloadedAt: string | null;
+  trigger: "manual" | "config_watcher" | null;
+  reason: string | null;
+  lastError: string | null;
+};
+
 export type PublicConfig = {
   host: string;
   port: number;
@@ -19,6 +27,7 @@ export type PublicConfig = {
   codexCliVersion: string | null;
   codexVersionError: string | null;
   appServer: AppServerSnapshot | null;
+  runtimeReload: RuntimeReloadSnapshot | null;
 };
 
 export type HealthStatus = {
@@ -30,6 +39,17 @@ export type HealthStatus = {
     error: string | null;
   };
   appServer: AppServerSnapshot | null;
+};
+
+export type RuntimeReloadResponse = {
+  runtime: {
+    generation: number;
+    reloadedAt: string;
+    trigger: "manual" | "config_watcher";
+    reason: string | null;
+    codexCliVersion: string | null;
+    appServer: AppServerSnapshot;
+  };
 };
 
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
@@ -136,7 +156,8 @@ export type ModelErrorCode =
   | "MODEL_SWITCH_MISMATCH"
   | "MODEL_PREFERENCE_PERSIST_FAILED"
   | "MODEL_PROVIDER_UNAVAILABLE"
-  | "MODEL_REQUEST_TIMEOUT";
+  | "MODEL_REQUEST_TIMEOUT"
+  | "RUNTIME_RELOAD_BLOCKED";
 
 
 export type SessionDetailResponse = {
