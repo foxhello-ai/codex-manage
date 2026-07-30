@@ -25,7 +25,7 @@ import { IssueReportQueue, type PendingIssueReport } from "./IssueReportQueue";
 import { LocalServiceSupervisor } from "./LocalServiceSupervisor";
 import { resolveCloudflaredBinary, TunnelSupervisor } from "./TunnelSupervisor";
 import { UpdateManager } from "./UpdateManager";
-import type { DesktopStatus, IssueReportCategory, IssueReportSubmissionResult } from "../shared/types";
+import type { BillingOrderDetail, DesktopStatus, IssueReportCategory, IssueReportSubmissionResult, PaymentChannel } from "../shared/types";
 
 type DesktopAuthStatus = {
   ready: boolean;
@@ -452,6 +452,23 @@ class DesktopController {
       this.emitStatus();
       return this.getStatus();
     });
+    ipcMain.handle("desktop:list-billing-plans", async () => this.listBillingPlans());
+    ipcMain.handle("desktop:create-billing-order", async (_event, planId: unknown, channel: unknown) => {
+      if (typeof planId !== "string" || !isPaymentChannel(channel)) throw new Error("支付订单参数不正确");
+      return await this.createBillingOrder(planId, channel);
+    });
+    ipcMain.handle("desktop:pay-billing-order", async (_event, orderId: unknown, channel: unknown) => {
+      if (typeof orderId !== "string" || !isPaymentChannel(channel)) throw new Error("支付参数不正确");
+      return await this.payBillingOrder(orderId, channel);
+    });
+    ipcMain.handle("desktop:get-billing-order", async (_event, orderId: unknown) => {
+      if (typeof orderId !== "string") throw new Error("订单参数不正确");
+      return await this.getBillingOrder(orderId);
+    });
+    ipcMain.handle("desktop:close-billing-order", async (_event, orderId: unknown) => {
+      if (typeof orderId !== "string") throw new Error("订单参数不正确");
+      return await this.closeBillingOrder(orderId);
+    });
   }
 
   private async checkForUpdates() {
@@ -684,6 +701,43 @@ class DesktopController {
     this.namedTunnelStatus = result.tunnel.status;
     this.emitStatus();
     return this.getStatus();
+  }
+
+  private async listBillingPlans() {
+    return await this.cloudClient.getPlans();
+  }
+
+  private async createBillingOrder(planId: string, channel: PaymentChannel) {
+    if (!this.cloudSession) throw new Error("请先登录平台账号");
+    await this.ensureUserAccess();
+    return await this.cloudClient.createOrder(this.cloudSession.accessToken, {
+      planId,
+      channel,
+      clientType: "desktop"
+    });
+  }
+
+  private async payBillingOrder(orderId: string, channel: PaymentChannel): Promise<BillingOrderDetail> {
+    if (!this.cloudSession) throw new Error("请先登录平台账号");
+    await this.ensureUserAccess();
+    return await this.cloudClient.payOrder(this.cloudSession.accessToken, orderId, { channel }) as BillingOrderDetail;
+  }
+
+  private async getBillingOrder(orderId: string): Promise<BillingOrderDetail> {
+    if (!this.cloudSession) throw new Error("请先登录平台账号");
+    await this.ensureUserAccess();
+    const detail = await this.cloudClient.getOrder(this.cloudSession.accessToken, orderId) as BillingOrderDetail;
+    if (detail.order.status === "paid") {
+      await this.refreshEntitlements();
+      this.emitStatus();
+    }
+    return detail;
+  }
+
+  private async closeBillingOrder(orderId: string): Promise<{ closed: boolean }> {
+    if (!this.cloudSession) throw new Error("请先登录平台账号");
+    await this.ensureUserAccess();
+    return await this.cloudClient.closeOrder(this.cloudSession.accessToken, orderId);
   }
 
   private async logoutCloudAccount(): Promise<DesktopStatus> {
@@ -1268,6 +1322,10 @@ function isIssueReportCategory(value: unknown): value is IssueReportCategory {
     || value === "defect"
     || value === "optimization"
     || value === "requirement";
+}
+
+function isPaymentChannel(value: unknown): value is PaymentChannel {
+  return value === "wechat" || value === "alipay";
 }
 
 function shouldQueueIssueReport(error: unknown): boolean {

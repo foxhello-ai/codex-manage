@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import QRCode from "qrcode";
-import type { DesktopStatus, IssueReportCategory, UpdateStatus } from "../shared/types";
+import type { BillingOrderDetail, BillingPlan, DesktopStatus, IssueReportCategory, PaymentChannel, UpdateStatus } from "../shared/types";
 import "./styles.css";
 
 function DesktopApp() {
@@ -28,6 +28,15 @@ function DesktopApp() {
   const [issueTitle, setIssueTitle] = useState("");
   const [issueDescription, setIssueDescription] = useState("");
   const [issueNotice, setIssueNotice] = useState<string | null>(null);
+  const [paymentPanelOpen, setPaymentPanelOpen] = useState(false);
+  const [billingPlans, setBillingPlans] = useState<BillingPlan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [paymentChannel, setPaymentChannel] = useState<PaymentChannel>("wechat");
+  const [paymentDetail, setPaymentDetail] = useState<BillingOrderDetail | null>(null);
+  const [paymentQrCode, setPaymentQrCode] = useState<string | null>(null);
+  const [paymentRemainingMs, setPaymentRemainingMs] = useState(0);
+  const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
+  const [paymentBusy, setPaymentBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -60,6 +69,61 @@ function DesktopApp() {
     const timer = window.setInterval(refreshRemaining, 1_000);
     return () => window.clearInterval(timer);
   }, [pairingExpiresAt]);
+
+  useEffect(() => {
+    const qrUrl = paymentDetail?.payment?.qr_code_url;
+    if (!qrUrl) {
+      setPaymentQrCode(null);
+      return;
+    }
+    let active = true;
+    void QRCode.toDataURL(qrUrl, {
+      width: 300,
+      margin: 2,
+      color: { dark: "#0e2433", light: "#ffffff" }
+    }).then((image) => {
+      if (active) setPaymentQrCode(image);
+    }).catch((caught) => setError(errorMessage(caught)));
+    return () => {
+      active = false;
+    };
+  }, [paymentDetail?.payment?.qr_code_url]);
+
+  useEffect(() => {
+    const expiresAt = paymentDetail?.payment?.expires_at ?? paymentDetail?.order.expires_at;
+    if (!expiresAt || !paymentPanelOpen || paymentDetail?.order.status === "paid") {
+      setPaymentRemainingMs(0);
+      return;
+    }
+    const refreshRemaining = () => setPaymentRemainingMs(Math.max(0, new Date(expiresAt).getTime() - Date.now()));
+    refreshRemaining();
+    const timer = window.setInterval(refreshRemaining, 1_000);
+    return () => window.clearInterval(timer);
+  }, [paymentPanelOpen, paymentDetail?.order.expires_at, paymentDetail?.order.status, paymentDetail?.payment?.expires_at]);
+
+  useEffect(() => {
+    if (!paymentPanelOpen || !paymentDetail?.order.id || paymentDetail.order.status === "paid") return;
+    const expiresAt = paymentDetail.payment?.expires_at ?? paymentDetail.order.expires_at;
+    if (new Date(expiresAt).getTime() <= Date.now()) return;
+    let active = true;
+    const timer = window.setInterval(() => {
+      void window.codexDesktop.getBillingOrder(paymentDetail.order.id)
+        .then((detail) => {
+          if (!active) return;
+          setPaymentDetail(detail);
+          if (detail.order.status === "paid") {
+            setPaymentNotice("支付成功，权益已刷新。");
+          }
+        })
+        .catch((caught) => {
+          if (active) setPaymentNotice(errorMessage(caught));
+        });
+    }, 2_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [paymentPanelOpen, paymentDetail?.order.expires_at, paymentDetail?.order.id, paymentDetail?.order.status, paymentDetail?.payment?.expires_at]);
 
   const tunnelLabel = useMemo(() => {
     const labels: Record<string, string> = {
@@ -135,6 +199,62 @@ function DesktopApp() {
   function openIssuePanel() {
     setSettingsPanelOpen(false);
     setIssuePanelOpen(true);
+  }
+
+  async function openPaymentPanel() {
+    setPaymentPanelOpen(true);
+    setPaymentNotice(null);
+    if (billingPlans.length > 0) return;
+    setPaymentBusy(true);
+    try {
+      const result = await window.codexDesktop.listBillingPlans();
+      const purchasable = result.plans.filter((plan) => plan.status === "active" && plan.purchase_enabled);
+      setBillingPlans(result.plans);
+      setSelectedPlanId((current) => current || purchasable[0]?.id || result.plans[0]?.id || "");
+    } catch (caught) {
+      setPaymentNotice(errorMessage(caught));
+    } finally {
+      setPaymentBusy(false);
+    }
+  }
+
+  async function createPayment() {
+    const plan = billingPlans.find((item) => item.id === selectedPlanId);
+    if (!plan) {
+      setPaymentNotice("请选择套餐");
+      return;
+    }
+    setPaymentBusy(true);
+    setPaymentNotice(null);
+    setPaymentDetail(null);
+    try {
+      const created = await window.codexDesktop.createBillingOrder(plan.id, paymentChannel);
+      const detail = await window.codexDesktop.payBillingOrder(created.order.id, paymentChannel);
+      setPaymentDetail(detail);
+      setPaymentNotice("请使用对应 App 扫码完成支付。");
+    } catch (caught) {
+      setPaymentNotice(errorMessage(caught));
+    } finally {
+      setPaymentBusy(false);
+    }
+  }
+
+  async function closePaymentOrder() {
+    if (!paymentDetail) {
+      setPaymentPanelOpen(false);
+      return;
+    }
+    setPaymentBusy(true);
+    try {
+      await window.codexDesktop.closeBillingOrder(paymentDetail.order.id);
+      setPaymentDetail(null);
+      setPaymentQrCode(null);
+      setPaymentNotice("订单已关闭。");
+    } catch (caught) {
+      setPaymentNotice(errorMessage(caught));
+    } finally {
+      setPaymentBusy(false);
+    }
   }
 
   async function requestVerificationCode() {
@@ -272,6 +392,9 @@ function DesktopApp() {
   const issueAutoReportLabel = status.issueReporting.autoEnabled ? "已开启" : "未开启";
   const pairingExpired = Boolean(pairingUrl && pairingExpiresAt && pairingRemainingMs <= 0);
   const pairingRemainingText = pairingRemainingMs > 0 ? formatDuration(pairingRemainingMs) : "已过期";
+  const purchasablePlans = billingPlans.filter((plan) => plan.status === "active" && plan.purchase_enabled);
+  const selectedPlan = billingPlans.find((plan) => plan.id === selectedPlanId) ?? purchasablePlans[0] ?? null;
+  const paymentExpired = Boolean(paymentDetail && paymentRemainingMs <= 0 && paymentDetail.order.status !== "paid");
 
   return (
     <main className="appShell">
@@ -557,8 +680,77 @@ function DesktopApp() {
               : "到期时间：长期有效或尚未登录"}
           </p>
         </div>
-        <button disabled title="V1 暂不接入真实支付">立即升级（即将开放）</button>
+        <button onClick={() => void openPaymentPanel()} disabled={busy || !status.account.authenticated} title={status.account.authenticated ? "打开套餐购买" : "请先登录平台账号"}>
+          {status.account.entitlements["tunnel.named"] === true ? "续费套餐" : "立即升级"}
+        </button>
       </section>
+
+      {paymentPanelOpen ? (
+        <div className="modalBackdrop" role="presentation">
+          <section className="paymentDialog" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+            <div className="popoverHeader">
+              <div>
+                <p className="sectionTag">套餐与订阅</p>
+                <h2 id="payment-title">购买或续费套餐</h2>
+              </div>
+              <button className="closeButton" type="button" aria-label="关闭支付弹窗" onClick={() => setPaymentPanelOpen(false)}>×</button>
+            </div>
+            {paymentNotice ? <p className={paymentDetail?.order.status === "paid" ? "notice" : "warningText"}>{paymentNotice}</p> : null}
+            {paymentBusy && !paymentDetail ? <p className="muted">正在准备支付信息…</p> : null}
+            {!paymentBusy && billingPlans.length > 0 && purchasablePlans.length === 0 ? (
+              <p className="warningText">后台尚未上架可购买套餐，请先在运营后台配置价格并开启购买。</p>
+            ) : null}
+            {purchasablePlans.length > 0 ? (
+              <div className="paymentGrid">
+                <div className="planChoiceList">
+                  {purchasablePlans.map((plan) => (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      className={selectedPlan?.id === plan.id ? "planChoice selected" : "planChoice"}
+                      onClick={() => setSelectedPlanId(plan.id)}
+                    >
+                      <strong>{plan.name}</strong>
+                      <span>{plan.description ?? "正式版套餐"}</span>
+                      <em>{formatMoney(plan.price_cents, plan.currency)} / {periodLabel(plan.billing_period, plan.duration_days)}</em>
+                    </button>
+                  ))}
+                </div>
+                <div className="paymentBox">
+                  <div className="segmented">
+                    <button type="button" className={paymentChannel === "wechat" ? "selected" : ""} onClick={() => setPaymentChannel("wechat")}>微信支付</button>
+                    <button type="button" className={paymentChannel === "alipay" ? "selected" : ""} onClick={() => setPaymentChannel("alipay")}>支付宝</button>
+                  </div>
+                  {selectedPlan ? (
+                    <div className="paymentSummary">
+                      <span>应付金额</span>
+                      <strong>{formatMoney(selectedPlan.price_cents, selectedPlan.currency)}</strong>
+                    </div>
+                  ) : null}
+                  {paymentDetail?.payment?.qr_code_url ? (
+                    <div className="paymentQrBox">
+                      {paymentQrCode ? <img src={paymentQrCode} alt="支付二维码" /> : null}
+                      {paymentExpired ? <div className="qrExpiredMask">支付二维码已过期</div> : null}
+                      <p className={paymentExpired ? "warningText" : "countdownText"}>剩余有效期：{paymentRemainingMs > 0 ? formatDuration(paymentRemainingMs) : "已过期"}</p>
+                      <p className="muted">订单状态：{paymentStatusText(paymentDetail.order.status)}</p>
+                    </div>
+                  ) : null}
+                  {paymentDetail?.order.status === "paid" ? (
+                    <button className="primary" type="button" onClick={() => setPaymentPanelOpen(false)}>完成</button>
+                  ) : (
+                    <div className="modalActions">
+                      <button className="primary" type="button" onClick={() => void createPayment()} disabled={paymentBusy || !selectedPlan}>
+                        {paymentDetail ? "重新生成支付二维码" : "生成支付二维码"}
+                      </button>
+                      {paymentDetail ? <button type="button" onClick={() => void closePaymentOrder()} disabled={paymentBusy}>关闭订单</button> : null}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
 
       <footer>
         Quick Tunnel 由 Cloudflare 提供，仅用于测试体验；正式用户使用 Named Tunnel 固定域名。
@@ -598,6 +790,32 @@ function formatDuration(milliseconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatMoney(cents: number, currency: string): string {
+  const amount = (cents / 100).toFixed(2);
+  return currency === "CNY" ? `¥${amount}` : `${amount} ${currency}`;
+}
+
+function periodLabel(period: string, durationDays: number | null): string {
+  if (period === "month") return "月";
+  if (period === "year") return "年";
+  if (period === "lifetime") return "长期";
+  if (durationDays) return `${durationDays} 天`;
+  return period;
+}
+
+function paymentStatusText(status: string): string {
+  const labels: Record<string, string> = {
+    pending: "待支付",
+    paying: "等待支付",
+    paid: "已支付",
+    closed: "已关闭",
+    failed: "支付失败",
+    refunded: "已退款",
+    refunding: "退款处理中"
+  };
+  return labels[status] ?? status;
 }
 
 function updateLabel(update: UpdateStatus): string {

@@ -27,6 +27,63 @@ export type IssueReportSubmissionResult = {
   duplicateCount: number | null;
 };
 
+export type PaymentChannel = "wechat" | "alipay";
+
+export type BillingPlan = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  price_cents: number;
+  currency: string;
+  billing_period: string;
+  duration_days: number | null;
+  purchase_enabled: boolean;
+  features: Record<string, unknown>;
+  status: string;
+  sort_order: number;
+};
+
+export type BillingOrder = {
+  id: string;
+  order_no: string;
+  plan_id: string;
+  plan_code: string;
+  plan_name: string;
+  amount_cents: number;
+  currency: string;
+  channel: PaymentChannel;
+  status: string;
+  expires_at: string;
+  paid_at: string | null;
+  closed_at: string | null;
+  created_at: string;
+};
+
+export type BillingPayment = {
+  id: string;
+  provider: PaymentChannel;
+  channel: string;
+  status: string;
+  qr_code_url: string | null;
+  expires_at: string;
+  paid_at: string | null;
+  provider_transaction_id: string | null;
+};
+
+export type BillingOrderDetail = {
+  order: BillingOrder;
+  payment: BillingPayment | null;
+  fulfillment: {
+    fulfilled: true;
+    business_object_type: string;
+    business_object_id: string;
+    starts_at: string;
+    expires_at: string | null;
+    summary: Record<string, unknown>;
+  } | null;
+};
+
 export type IssueReportingStatus = {
   autoEnabled: boolean;
   queuedCount: number;
@@ -112,5 +169,10 @@ export type CodexDesktopApi = {
   installUpdate(): Promise<UpdateStatus>;
   submitIssueReport(input: IssueReportSubmission): Promise<IssueReportSubmissionResult>;
   setIssueAutoReportEnabled(enabled: boolean): Promise<DesktopStatus>;
+  listBillingPlans(): Promise<{ plans: BillingPlan[] }>;
+  createBillingOrder(planId: string, channel: PaymentChannel): Promise<{ order: BillingOrder }>;
+  payBillingOrder(orderId: string, channel: PaymentChannel): Promise<BillingOrderDetail>;
+  getBillingOrder(orderId: string): Promise<BillingOrderDetail>;
+  closeBillingOrder(orderId: string): Promise<{ closed: boolean }>;
   onStatus(listener: (status: DesktopStatus) => void): () => void;
 };

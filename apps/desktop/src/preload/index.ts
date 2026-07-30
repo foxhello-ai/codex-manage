@@ -20,6 +20,11 @@ const api: CodexDesktopApi = {
   installUpdate: () => ipcRenderer.invoke("desktop:install-update"),
   submitIssueReport: (input) => ipcRenderer.invoke("desktop:submit-issue-report", input),
   setIssueAutoReportEnabled: (enabled) => ipcRenderer.invoke("desktop:set-issue-auto-report-enabled", enabled),
+  listBillingPlans: () => ipcRenderer.invoke("desktop:list-billing-plans"),
+  createBillingOrder: (planId, channel) => ipcRenderer.invoke("desktop:create-billing-order", planId, channel),
+  payBillingOrder: (orderId, channel) => ipcRenderer.invoke("desktop:pay-billing-order", orderId, channel),
+  getBillingOrder: (orderId) => ipcRenderer.invoke("desktop:get-billing-order", orderId),
+  closeBillingOrder: (orderId) => ipcRenderer.invoke("desktop:close-billing-order", orderId),
   onStatus: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, status: DesktopStatus) => listener(status);
     ipcRenderer.on("desktop:status", handler);

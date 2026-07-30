@@ -107,6 +107,36 @@ export class CloudClient {
     return this.request<{ plans: Array<Record<string, unknown>> }>("/v1/plans");
   }
 
+  createOrder(accessToken: string, input: { planId: string; channel: "wechat" | "alipay"; clientType: string }) {
+    return this.request<{ order: Record<string, unknown> }>("/v1/orders", {
+      method: "POST",
+      token: accessToken,
+      body: input
+    });
+  }
+
+  payOrder(accessToken: string, orderId: string, input: { channel: "wechat" | "alipay" }) {
+    return this.request<Record<string, unknown>>(`/v1/orders/${encodeURIComponent(orderId)}/pay`, {
+      method: "POST",
+      token: accessToken,
+      body: input
+    });
+  }
+
+  getOrder(accessToken: string, orderId: string) {
+    return this.request<Record<string, unknown>>(`/v1/orders/${encodeURIComponent(orderId)}`, {
+      token: accessToken
+    });
+  }
+
+  closeOrder(accessToken: string, orderId: string) {
+    return this.request<{ closed: boolean }>(`/v1/orders/${encodeURIComponent(orderId)}/close`, {
+      method: "POST",
+      token: accessToken,
+      body: {}
+    });
+  }
+
   provisionNamedTunnel(accessToken: string, deviceId: string) {
     return this.request<{ tunnel: { hostname: string; status: string } }>(
       `/v1/devices/${encodeURIComponent(deviceId)}/named-tunnel/provision`,
