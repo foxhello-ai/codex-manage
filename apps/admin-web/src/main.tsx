@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { resolveApiBase } from "./apiBase";
 import "./styles.css";
 
-type Tab = "overview" | "users" | "devices" | "tunnels" | "domains" | "subscriptions" | "orders" | "payments" | "issue-reports" | "audit";
+type Tab = "overview" | "users" | "devices" | "tunnels" | "domains" | "billing-plans" | "subscriptions" | "orders" | "payments" | "payment-callbacks" | "issue-reports" | "audit";
 type JsonRecord = Record<string, unknown>;
 
 const apiBase = resolveApiBase(
@@ -25,9 +25,7 @@ function AdminApp() {
     setLoading(true);
     setError(null);
     try {
-      const path = nextTab === "overview"
-        ? "/v1/admin/overview"
-        : nextTab === "audit" ? "/v1/admin/audit-logs" : `/v1/admin/${nextTab}`;
+      const path = adminPath(nextTab);
       setData(await request(path, {}, token));
       setTab(nextTab);
       setSearch("");
@@ -62,7 +60,7 @@ function AdminApp() {
       <aside>
         <div className="brand"><span>CM</span><strong>运营后台</strong></div>
         <nav>
-          {(["overview", "users", "devices", "tunnels", "domains", "subscriptions", "orders", "payments", "issue-reports", "audit"] as Tab[]).map((item) => (
+          {(["overview", "users", "devices", "tunnels", "domains", "billing-plans", "subscriptions", "orders", "payments", "payment-callbacks", "issue-reports", "audit"] as Tab[]).map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => void load(item)}>
               {tabLabel(item)}
             </button>
@@ -153,19 +151,78 @@ function DataTable({ rows, token, onChanged, tab }: { rows: JsonRecord[]; token:
   return (
     <div className="tableWrap">
       <table>
-        <thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}{tab === "users" || tab === "devices" || tab === "tunnels" || tab === "issue-reports" ? <th>操作</th> : null}</tr></thead>
+        <thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}{["users", "devices", "tunnels", "issue-reports", "billing-plans", "orders"].includes(tab) ? <th>操作</th> : null}</tr></thead>
         <tbody>{rows.map((row, index) => (
           <tr key={String(row.id ?? index)}>
             {columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}
             {tab === "users" ? <td className="rowActions"><GrantButton userId={String(row.id)} token={token} onChanged={onChanged} /><StatusButton kind="users" id={String(row.id)} current={String(row.status)} token={token} onChanged={onChanged} /></td> : null}
             {tab === "devices" ? <td><StatusButton kind="devices" id={String(row.id)} current={String(row.status)} token={token} onChanged={onChanged} /></td> : null}
             {tab === "tunnels" ? <td><RebuildTunnelButton id={String(row.id)} mode={String(row.mode)} token={token} onChanged={onChanged} /></td> : null}
+            {tab === "billing-plans" ? <td><PlanEditButton row={row} token={token} onChanged={onChanged} /></td> : null}
+            {tab === "orders" ? <td><RefundReserveButton row={row} token={token} onChanged={onChanged} /></td> : null}
             {tab === "issue-reports" ? <td><IssueReportActions id={String(row.id)} status={String(row.status)} token={token} onChanged={onChanged} /></td> : null}
           </tr>
         ))}</tbody>
       </table>
     </div>
   );
+}
+
+function PlanEditButton({ row, token, onChanged }: { row: JsonRecord; token: string; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  async function edit() {
+    const price = window.prompt("请输入价格，单位：分", String(row.price_cents ?? 0));
+    if (price === null) return;
+    const duration = window.prompt("请输入有效天数，月付 30 / 年付 365", row.duration_days === null || row.duration_days === undefined ? "" : String(row.duration_days));
+    if (duration === null) return;
+    const enabled = window.confirm("是否开启购买？确定=开启，取消=关闭");
+    const features = window.prompt("请输入权益 JSON", JSON.stringify(row.features ?? {}, null, 2));
+    if (features === null) return;
+    setBusy(true);
+    try {
+      await request(`/v1/admin/billing/plans/${encodeURIComponent(String(row.id))}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          priceCents: Number.parseInt(price, 10),
+          durationDays: duration.trim() ? Number.parseInt(duration, 10) : null,
+          purchaseEnabled: enabled,
+          features: JSON.parse(features) as Record<string, unknown>
+        })
+      }, token);
+      onChanged();
+    } catch (caught) {
+      window.alert(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <button className="small" disabled={busy} onClick={() => void edit()}>配置套餐</button>;
+}
+
+function RefundReserveButton({ row, token, onChanged }: { row: JsonRecord; token: string; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  async function reserve() {
+    if (String(row.status) !== "paid") {
+      window.alert("只有已支付订单可以记录退款预留。");
+      return;
+    }
+    const reason = window.prompt("请输入退款处理原因", "客户申请退款");
+    if (!reason) return;
+    if (!window.confirm("首版只记录退款预留，不会自动调用支付平台退款。确认记录？")) return;
+    setBusy(true);
+    try {
+      await request(`/v1/admin/billing/orders/${encodeURIComponent(String(row.id))}/refund`, {
+        method: "POST",
+        body: JSON.stringify({ reason })
+      }, token);
+      onChanged();
+    } catch (caught) {
+      window.alert(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <button className="small" disabled={busy || String(row.status) !== "paid"} onClick={() => void reserve()}>退款预留</button>;
 }
 
 function IssueReportActions({ id, status, token, onChanged }: { id: string; status: string; token: string; onChanged: () => void }) {
@@ -292,7 +349,15 @@ async function request(path: string, init: RequestInit = {}, token?: string): Pr
 
 function extractRows(tab: Tab, data: unknown): JsonRecord[] {
   if (!data || typeof data !== "object") return [];
-  const key = tab === "audit" ? "auditLogs" : tab === "issue-reports" ? "issueReports" : tab;
+  const key = tab === "audit"
+    ? "auditLogs"
+    : tab === "issue-reports"
+      ? "issueReports"
+      : tab === "billing-plans"
+        ? "plans"
+        : tab === "payment-callbacks"
+          ? "callbacks"
+          : tab;
   const value = (data as Record<string, unknown>)[key];
   return Array.isArray(value) ? value as JsonRecord[] : [];
 }
@@ -310,12 +375,22 @@ function tabLabel(tab: Tab): string {
     devices: "设备管理",
     tunnels: "Tunnel 与域名",
     domains: "域名记录",
+    "billing-plans": "套餐配置",
     subscriptions: "订阅与权益",
     orders: "订单",
     payments: "支付记录",
+    "payment-callbacks": "支付回调",
     "issue-reports": "问题反馈",
     audit: "审计日志"
   })[tab];
+}
+
+function adminPath(tab: Tab): string {
+  if (tab === "overview") return "/v1/admin/overview";
+  if (tab === "audit") return "/v1/admin/audit-logs";
+  if (tab === "billing-plans") return "/v1/admin/billing/plans";
+  if (tab === "payment-callbacks") return "/v1/admin/billing/callbacks";
+  return `/v1/admin/${tab}`;
 }
 
 createRoot(document.getElementById("root")!).render(<AdminApp />);
