@@ -173,6 +173,22 @@ describe("PgControlStore", () => {
       expect(rebuildProvision?.jobType).toBe("provision_named_tunnel");
       expect(await store.completeProvisioningJob(rebuildProvision!.id, tunnel.id, "cf-tunnel-2")).toBe(true);
 
+      const migrated = await store.requestNamedTunnel(user.id, "device-1", "d-a83k2m.newroot.cn");
+      expect(migrated.status).toBe("revoked");
+      expect(migrated.lastErrorCode).toBe("DOMAIN_MIGRATION");
+      const migrationRevocation = await store.claimProvisioningJob();
+      expect(migrationRevocation?.jobType).toBe("revoke_named_tunnel");
+      expect(migrationRevocation?.tunnel.hostname).toBe("d-a83k2m.xmwefun.cn");
+      await store.completeRevocationJob(migrationRevocation!.id, tunnel.id);
+      const migrationProvision = await store.claimProvisioningJob();
+      expect(migrationProvision?.jobType).toBe("provision_named_tunnel");
+      expect(migrationProvision?.tunnel.hostname).toBe("d-a83k2m.newroot.cn");
+      expect(await store.completeProvisioningJob(migrationProvision!.id, tunnel.id, "cf-tunnel-3")).toBe(true);
+      expect(await store.getNamedTunnelForDevice("device-1")).toMatchObject({
+        hostname: "d-a83k2m.newroot.cn",
+        status: "active"
+      });
+
       await store.setDeviceStatus({
         adminId: "admin-1",
         deviceId: "device-1",

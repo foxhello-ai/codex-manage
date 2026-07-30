@@ -414,9 +414,51 @@ export class PgControlStore implements ControlStore {
       const owned = await client.query("SELECT id FROM devices WHERE id = $1 AND user_id = $2 AND status = 'active'", [deviceId, userId]);
       if (owned.rowCount !== 1) throw new Error("DEVICE_NOT_FOUND");
       const existing = await client.query(`
-        SELECT * FROM tunnels WHERE device_id = $1 AND status NOT IN ('revoked','deleted') LIMIT 1
+        SELECT * FROM tunnels WHERE device_id = $1 AND status <> 'deleted'
+        ORDER BY created_at DESC LIMIT 1
+        FOR UPDATE
       `, [deviceId]);
-      if (existing.rows[0]) return mapTunnel(existing.rows[0]);
+      if (existing.rows[0]) {
+        const current = existing.rows[0];
+        if (
+          String(current.status) !== "revoked"
+          && String(current.hostname) === hostname
+          && (!current.target_hostname || String(current.target_hostname) === hostname)
+        ) {
+          return mapTunnel(current);
+        }
+        await client.query(`
+          UPDATE tunnels SET status = 'revoked', target_hostname = $2, updated_at = now(), last_error_code = 'DOMAIN_MIGRATION'
+          WHERE id = $1
+        `, [current.id, hostname]);
+        await client.query(`
+          UPDATE domains SET status = 'released', released_at = now(), updated_at = now()
+          WHERE tunnel_id = $1 AND status IN ('active','reserved')
+        `, [current.id]);
+        await client.query(`
+          UPDATE provisioning_jobs SET status = 'failed', last_error_code = 'DOMAIN_MIGRATION',
+            last_error_message = 'Superseded by root domain migration', updated_at = now()
+          WHERE tunnel_id = $1 AND job_type = 'provision_named_tunnel'
+            AND status IN ('queued','retry','running')
+        `, [current.id]);
+        await client.query(`
+          INSERT INTO provisioning_jobs (id, device_id, tunnel_id, job_type, status)
+          SELECT $1,$2,$3,'revoke_named_tunnel','queued'
+          WHERE NOT EXISTS (
+            SELECT 1 FROM provisioning_jobs WHERE tunnel_id = $3 AND job_type = 'revoke_named_tunnel'
+              AND status IN ('queued','retry','running')
+          )
+        `, [randomUUID(), deviceId, current.id]);
+        await client.query(`
+          INSERT INTO provisioning_jobs (id, device_id, tunnel_id, job_type, status)
+          SELECT $1,$2,$3,'provision_named_tunnel','blocked'
+          WHERE NOT EXISTS (
+            SELECT 1 FROM provisioning_jobs WHERE tunnel_id = $3 AND job_type = 'provision_named_tunnel'
+              AND status = 'blocked'
+          )
+        `, [randomUUID(), deviceId, current.id]);
+        return mapTunnel({ ...current, status: "revoked", target_hostname: hostname, last_error_code: "DOMAIN_MIGRATION" });
+      }
 
       const tunnelId = randomUUID();
       const created = await client.query(`
@@ -500,7 +542,10 @@ export class PgControlStore implements ControlStore {
         RETURNING id
       `, [tunnelId, cloudflareTunnelId, jobId]);
       if (updated.rowCount !== 1) return false;
-      await client.query("UPDATE domains SET status = 'active', updated_at = now() WHERE tunnel_id = $1", [tunnelId]);
+      await client.query(`
+        UPDATE domains SET status = 'active', updated_at = now()
+        WHERE tunnel_id = $1 AND hostname = (SELECT hostname FROM tunnels WHERE id = $1)
+      `, [tunnelId]);
       await client.query("UPDATE provisioning_jobs SET status = 'succeeded', updated_at = now() WHERE id = $1", [jobId]);
       return true;
     });
@@ -558,7 +603,7 @@ export class PgControlStore implements ControlStore {
       }
       const rebuild = job.rows[0]?.job_type === "revoke_named_tunnel"
         ? await client.query(`
-          SELECT j.id
+          SELECT j.id, t.device_id, t.target_hostname
           FROM provisioning_jobs j
           JOIN tunnels t ON t.id = j.tunnel_id
           JOIN devices d ON d.id = t.device_id
@@ -576,14 +621,32 @@ export class PgControlStore implements ControlStore {
         : { rows: [] };
 
       if (rebuild.rows[0]) {
-        await client.query(`
-          UPDATE tunnels SET cloudflare_tunnel_id = NULL, status = 'provisioning',
-            last_error_code = NULL, updated_at = now() WHERE id = $1
-        `, [tunnelId]);
-        await client.query(`
-          UPDATE domains SET status = 'reserved', released_at = NULL, updated_at = now()
-          WHERE tunnel_id = $1
-        `, [tunnelId]);
+        const targetHostname = rebuild.rows[0].target_hostname ? String(rebuild.rows[0].target_hostname) : null;
+        if (targetHostname) {
+          await client.query(`
+            UPDATE tunnels SET hostname = $2, target_hostname = NULL, cloudflare_tunnel_id = NULL,
+              status = 'provisioning', last_error_code = NULL, updated_at = now() WHERE id = $1
+          `, [tunnelId, targetHostname]);
+          await client.query(`
+            WITH updated AS (
+              UPDATE domains SET status = 'reserved', released_at = NULL, updated_at = now()
+              WHERE tunnel_id = $1 AND hostname = $2
+              RETURNING id
+            )
+            INSERT INTO domains (id, device_id, tunnel_id, hostname, domain_type, status)
+            SELECT $3,$4,$1,$2,'managed_subdomain','reserved'
+            WHERE NOT EXISTS (SELECT 1 FROM updated)
+          `, [tunnelId, targetHostname, randomUUID(), rebuild.rows[0].device_id]);
+        } else {
+          await client.query(`
+            UPDATE tunnels SET cloudflare_tunnel_id = NULL, status = 'provisioning',
+              last_error_code = NULL, updated_at = now() WHERE id = $1
+          `, [tunnelId]);
+          await client.query(`
+            UPDATE domains SET status = 'reserved', released_at = NULL, updated_at = now()
+            WHERE tunnel_id = $1
+          `, [tunnelId]);
+        }
         await client.query(`
           UPDATE provisioning_jobs SET status = 'queued', next_attempt_at = now(),
             locked_at = NULL, updated_at = now() WHERE id = $1

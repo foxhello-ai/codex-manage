@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS tunnels (
   mode TEXT NOT NULL,
   cloudflare_tunnel_id TEXT,
   hostname TEXT NOT NULL,
+  target_hostname TEXT,
   status TEXT NOT NULL,
   token_version INTEGER NOT NULL DEFAULT 1,
   last_connected_at TIMESTAMPTZ,
@@ -94,6 +95,7 @@ CREATE TABLE IF NOT EXISTS tunnels (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE tunnels ADD COLUMN IF NOT EXISTS target_hostname TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS tunnels_active_device_idx
   ON tunnels(device_id) WHERE status NOT IN ('revoked', 'deleted');
 
