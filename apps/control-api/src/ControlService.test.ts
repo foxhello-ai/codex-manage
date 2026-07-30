@@ -12,6 +12,7 @@ function config(): ControlConfig {
     databaseUrl: "postgres://test",
     adminOrigin: "https://codex-admin.xmwefun.cn",
     publicDomain: "xmwefun.cn",
+    publicApiBaseUrl: "https://codex-api.xmwefun.cn",
     allowDebugCodes: true,
     emailWebhookUrl: null,
     smsWebhookUrl: null,
@@ -19,6 +20,12 @@ function config(): ControlConfig {
     refreshTokenTtlSeconds: 3600,
     deviceTokenTtlSeconds: 900,
     verificationCodeTtlSeconds: 600,
+    desktop: {
+      apiBaseUrl: "https://codex-api.xmwefun.cn",
+      updateFeedUrl: "https://codex-api.xmwefun.cn/updates/stable",
+      managedDomainSuffixes: ["xmwefun.cn"],
+      configTtlSeconds: 3600
+    },
     cloudflare: { apiToken: null, accountId: null, zoneId: null }
   };
 }

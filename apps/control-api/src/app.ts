@@ -132,6 +132,16 @@ export async function createControlApp(
     health: "/health"
   }));
   app.get("/health", async () => ({ ok: true, checkedAt: new Date().toISOString() }));
+  app.get("/v1/desktop/config", async () => ({
+    desktop: {
+      schema_version: 1,
+      api_base_url: config.desktop.apiBaseUrl,
+      update_feed_url: config.desktop.updateFeedUrl,
+      managed_domain_suffixes: config.desktop.managedDomainSuffixes,
+      config_ttl_seconds: config.desktop.configTtlSeconds,
+      generated_at: new Date().toISOString()
+    }
+  }));
 
   app.post("/v1/auth/email/codes", async (request) => {
     const body = parseBody(CodeRequest, request.body);
