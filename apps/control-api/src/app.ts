@@ -1,6 +1,9 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
+import { BillingError } from "@codex-manage/payment-core";
+import { registerBillingRoutes } from "@codex-manage/payment-fastify";
+import type { PaymentService } from "@codex-manage/payment-service";
 import type { CloudflareAdapter } from "./cloudflare/CloudflareAdapter";
 import type { ControlConfig } from "./config";
 import { ControlService } from "./ControlService";
@@ -87,7 +90,8 @@ export async function createControlApp(
   config: ControlConfig,
   store: ControlStore,
   notifier: VerificationNotifier,
-  cloudflare: CloudflareAdapter | null
+  cloudflare: CloudflareAdapter | null,
+  paymentService: PaymentService | null = null
 ): Promise<{ app: FastifyInstance; service: ControlService }> {
   const app = Fastify({ logger: true, genReqId: () => crypto.randomUUID() });
   const service = new ControlService(config, store, notifier, cloudflare);
@@ -104,6 +108,17 @@ export async function createControlApp(
   });
 
   app.setErrorHandler((error, request, reply) => {
+    if (error instanceof BillingError) {
+      return reply.status(error.statusCode).send({
+        error: {
+          code: error.code,
+          message: error.message,
+          requestId: request.id,
+          retryable: error.statusCode >= 500 || error.statusCode === 429,
+          ...(error.details === undefined ? {} : { details: error.details })
+        }
+      });
+    }
     if (error instanceof ControlError) {
       return reply.status(error.statusCode).send({
         error: {
@@ -274,7 +289,40 @@ export async function createControlApp(
     return await service.getDeviceTunnelConfig(params.deviceId);
   });
 
-  app.get("/v1/plans", async () => ({ plans: await store.listPlans() }));
+  if (paymentService) {
+    await registerBillingRoutes(app, {
+      prefix: "/v1/billing",
+      compatibleRoutes: true,
+      paymentService,
+      authenticateUser: async (request) => await service.authenticateUser(readBearerToken(request)),
+      authenticateAdmin: async (request, requireWrite) => await service.authenticateAdmin(readBearerToken(request), requireWrite)
+    });
+    app.post("/v1/orders/:orderId/refund", async () => {
+      throw new ControlError("REFUND_ADMIN_ONLY", "退款请由管理员在后台发起", 403);
+    });
+    app.post("/v1/payments/callback", async () => {
+      throw new ControlError("PAYMENT_PROVIDER_REQUIRED", "支付回调地址必须包含支付渠道", 400);
+    });
+  } else {
+    app.get("/v1/plans", async () => ({ plans: await store.listPlans() }));
+    app.get("/v1/orders", async (request) => {
+      const userId = await service.authenticateUser(readBearerToken(request));
+      return { orders: await store.listOrders(userId) };
+    });
+    app.post("/v1/orders", async () => {
+      throw new ControlError("PAYMENT_NOT_AVAILABLE", "支付功能即将开放", 503);
+    });
+    app.post("/v1/orders/:orderId/pay", async () => {
+      throw new ControlError("PAYMENT_NOT_AVAILABLE", "支付功能即将开放", 503);
+    });
+    app.post("/v1/orders/:orderId/refund", async () => {
+      throw new ControlError("PAYMENT_NOT_AVAILABLE", "退款功能尚未开放", 503);
+    });
+    app.post("/v1/payments/callback", async () => {
+      throw new ControlError("PAYMENT_NOT_AVAILABLE", "支付回调尚未开放", 503);
+    });
+  }
+
   app.get("/v1/entitlements", async (request) => {
     const userId = await service.authenticateUser(readBearerToken(request));
     return { entitlements: await store.getEntitlements(userId) };
@@ -286,22 +334,6 @@ export async function createControlApp(
   app.post("/v1/issue-reports/manual", async (request) => {
     const userId = await service.authenticateUser(readBearerToken(request));
     return await service.createManualIssueReport(userId, parseBody(ManualIssueReportRequest, request.body));
-  });
-  app.get("/v1/orders", async (request) => {
-    const userId = await service.authenticateUser(readBearerToken(request));
-    return { orders: await store.listOrders(userId) };
-  });
-  app.post("/v1/orders", async () => {
-    throw new ControlError("PAYMENT_NOT_AVAILABLE", "支付功能即将开放", 503);
-  });
-  app.post("/v1/orders/:orderId/pay", async () => {
-    throw new ControlError("PAYMENT_NOT_AVAILABLE", "支付功能即将开放", 503);
-  });
-  app.post("/v1/orders/:orderId/refund", async () => {
-    throw new ControlError("PAYMENT_NOT_AVAILABLE", "退款功能尚未开放", 503);
-  });
-  app.post("/v1/payments/callback", async () => {
-    throw new ControlError("PAYMENT_NOT_AVAILABLE", "支付回调尚未开放", 503);
   });
 
   app.post("/v1/admin/login", async (request) => {
@@ -335,11 +367,11 @@ export async function createControlApp(
   });
   app.get("/v1/admin/orders", async (request) => {
     await service.authenticateAdmin(readBearerToken(request));
-    return { orders: await store.listAdminOrders() };
+    return { orders: paymentService ? await paymentService.listAdminOrders() : await store.listAdminOrders() };
   });
   app.get("/v1/admin/payments", async (request) => {
     await service.authenticateAdmin(readBearerToken(request));
-    return { payments: await store.listAdminPayments() };
+    return { payments: paymentService ? await paymentService.listAdminPayments() : await store.listAdminPayments() };
   });
   app.get("/v1/admin/audit-logs", async (request) => {
     await service.authenticateAdmin(readBearerToken(request));

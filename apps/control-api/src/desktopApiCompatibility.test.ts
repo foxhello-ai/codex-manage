@@ -19,6 +19,29 @@ function config(): ControlConfig {
     refreshTokenTtlSeconds: 3600,
     deviceTokenTtlSeconds: 900,
     verificationCodeTtlSeconds: 600,
+    billing: {
+      orderExpiresInSeconds: 900,
+      offlinePayments: { enabled: false, secret: null },
+      wechat: {
+        enabled: false,
+        appId: null,
+        merchantId: null,
+        apiV3Key: null,
+        privateKeyPem: null,
+        certificateSerialNo: null,
+        platformCertificatePem: null,
+        notifyUrl: null,
+        apiBaseUrl: null
+      },
+      alipay: {
+        enabled: false,
+        appId: null,
+        privateKeyPem: null,
+        publicKeyPem: null,
+        notifyUrl: null,
+        gatewayUrl: null
+      }
+    },
     cloudflare: { apiToken: null, accountId: null, zoneId: null }
   };
 }

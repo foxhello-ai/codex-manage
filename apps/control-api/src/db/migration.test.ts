@@ -25,6 +25,9 @@ describe("control database migration", () => {
     for (const required of [
       "users", "user_identities", "devices", "tunnels", "domains",
       "subscriptions", "entitlements", "orders", "payments",
+      "billing_plans", "billing_orders", "billing_payments",
+      "billing_payment_callback_logs", "billing_refund_requests",
+      "billing_fulfillment_events",
       "provisioning_jobs", "admin_users", "audit_logs"
     ]) {
       expect(names.has(required)).toBe(true);
