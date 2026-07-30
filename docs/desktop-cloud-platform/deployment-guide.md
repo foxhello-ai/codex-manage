@@ -6,10 +6,10 @@
 
 | 服务 | 域名 |
 | --- | --- |
-| Control API | `codex-api.xmwefun.cn` |
-| 管理后台 | `codex-admin.xmwefun.cn` |
-| 桌面更新入口 | `codex-api.xmwefun.cn/updates/stable` |
-| 设备固定域名 | `d-<设备短码>.xmwefun.cn` |
+| Control API / 桌面配置发现入口 | `codex-api.foxhello.com` |
+| 管理后台 | `codex-admin.foxhello.com` |
+| 桌面更新入口 | `codex-api.foxhello.com/updates/stable` |
+| 设备固定域名 | `d-<设备短码>.foxhello.com` |
 
 Cloudflare API Token 最少授予：
 
@@ -33,6 +33,19 @@ Token、Account ID 和 Zone ID 只注入 Control API/Worker，不得进入桌面
 ```text
 CONTROL_ALLOW_DEBUG_CODES=false
 ```
+
+域名相关变量必须成组配置：
+
+```text
+CONTROL_DEVICE_DOMAIN=foxhello.com
+CONTROL_PUBLIC_API_BASE_URL=https://codex-api.foxhello.com
+CONTROL_DESKTOP_UPDATE_FEED_URL=https://codex-api.foxhello.com/updates/stable
+CONTROL_MANAGED_DOMAIN_SUFFIXES=foxhello.com,xmwefun.cn
+CONTROL_ADMIN_ORIGIN=https://codex-admin.foxhello.com,https://codex-admin.xmwefun.cn,http://192.168.31.107
+CODEX_ADMIN_CONTROL_API_URL=https://codex-api.foxhello.com
+```
+
+桌面端会通过 `GET /v1/desktop/config` 拉取 `api_base_url`、`update_feed_url` 和固定设备域名后缀，并缓存到本机。内置兜底配置发现入口为 `https://codex-api.foxhello.com/v1/desktop/config`。已安装了支持该接口版本的客户端，后续正常切换业务根域名时不需要重新打包。
 
 验证码 Webhook 接收 JSON：
 
@@ -67,7 +80,7 @@ curl http://127.0.0.1:8080/updates/stable/latest.yml
 
 局域网默认可通过 `http://服务器IP/` 打开管理后台，通过 `http://服务器IP:4320/health` 检查 API。可使用 `ADMIN_WEB_BIND_ADDRESS`、`ADMIN_WEB_PUBLISHED_PORT`、`CONTROL_API_BIND_ADDRESS` 和 `CONTROL_API_PUBLISHED_PORT` 覆盖监听地址及宿主机端口。
 
-桌面自动更新文件由 `download-web` 服务提供，默认监听宿主机 `8080`，静态根目录为仓库同级 `downloads/`。生产环境需将 `codex-api.xmwefun.cn` 的 `/updates/*` 路由代理到：
+桌面自动更新文件由 `download-web` 服务提供，默认监听宿主机 `8080`，静态根目录为仓库同级 `downloads/`。生产环境需将 `codex-api.foxhello.com` 的 `/updates/*` 路由代理到：
 
 ```text
 http://服务器IP:8080
@@ -84,7 +97,27 @@ downloads/updates/stable/latest-mac.yml
 
 公网生产环境仍建议由 Nginx、Caddy、Cloudflare Tunnel 或云负载均衡器终止 HTTPS；此时可将两个 `*_BIND_ADDRESS` 设为 `127.0.0.1`，只允许入口代理访问。
 
-## 4. 首次管理员登录
+## 4. 根域名切换流程
+
+支持桌面运行配置接口的版本发布后，后续根域名切换按以下流程执行：
+
+1. 在新根域名下准备 `codex-api.<新根域名>`、`codex-admin.<新根域名>` 和 `d-<设备短码>.<新根域名>`。
+2. 在 Cloudflare 中准备新 Zone，并将 `CLOUDFLARE_ZONE_ID` 切到新 Zone。
+3. 更新 `deploy/.env`：
+   - `CONTROL_DEVICE_DOMAIN=<新根域名>`
+   - `CONTROL_PUBLIC_API_BASE_URL=https://codex-api.<新根域名>`
+   - `CONTROL_DESKTOP_UPDATE_FEED_URL=https://codex-api.<新根域名>/updates/stable`
+   - `CONTROL_MANAGED_DOMAIN_SUFFIXES=xmwefun.cn,<新根域名>`，灰度期必须同时保留新旧后缀。
+   - `CONTROL_ADMIN_ORIGIN=https://codex-admin.<新根域名>`
+   - `CODEX_ADMIN_CONTROL_API_URL=https://codex-api.<新根域名>`
+4. 部署服务并确认稳定入口 `codex-api.foxhello.com/v1/desktop/config` 可返回新配置；灰度期如仍存在旧客户端，也要确认旧 `codex-api.xmwefun.cn/v1/desktop/config` 和旧更新入口可用。
+5. 灰度验证新客户端启动后诊断日志出现 `cloud-config applied`，并确认固定域名白名单包含新后缀。
+6. 迁移已有 Named Tunnel。支持该版本后，桌面端再次启动或重新申请固定域名时，服务端会发现旧 `domains.hostname` 与当前 `CONTROL_DEVICE_DOMAIN` 不一致，并排队撤销旧域名后重新签发新域名；大批量客户仍建议使用后台或批量脚本分批触发。
+7. 观察一到两个版本周期后，再决定是否下线旧 API、旧更新入口和旧固定设备域名。
+
+关键约束：如果旧 bootstrap/update 域名提前下线，尚未升级到支持远程配置的客户端仍无法自动发现新域名，只能重新下载安装包。
+
+## 5. 首次管理员登录
 
 首次启动时通过以下变量创建管理员：
 
@@ -95,18 +128,18 @@ CONTROL_BOOTSTRAP_ADMIN_PASSWORD
 
 数据库已存在同邮箱管理员时不会覆盖密码。首次登录成功后，应从长期部署配置中移除明文初始密码，并改用 Secret Manager 注入。
 
-## 5. Named Tunnel 验收
+## 6. Named Tunnel 验收
 
 1. 注册测试用户和设备。
 2. 在管理后台人工开通正式权益。
 3. 桌面端申请固定域名。
 4. 观察 Worker 完成 Tunnel、ingress 和 CNAME。
-5. 确认设备获得 `d-<设备短码>.xmwefun.cn`。
+5. 确认设备获得 `d-<设备短码>.foxhello.com`。
 6. 修改本地端口，确认 Worker 重新更新 ingress。
 7. 停用设备，确认设备 Token、DNS 和 Tunnel 被撤销。
 8. 重复撤销操作，确认 Cloudflare 404 被幂等处理。
 
-## 6. 桌面发布
+## 7. 桌面发布
 
 发布流水线需要 Secret：
 
@@ -128,7 +161,7 @@ ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-builder
 
 未签名包只能用于内部测试，不应放到公开下载页。
 
-## 7. 上线门禁
+## 8. 上线门禁
 
 - PostgreSQL 迁移、备份和恢复演练通过。
 - Cloudflare 创建、重试、撤销和对账演练通过。
