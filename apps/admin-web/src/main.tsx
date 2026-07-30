@@ -5,11 +5,16 @@ import "./styles.css";
 
 type Tab = "overview" | "users" | "devices" | "tunnels" | "domains" | "subscriptions" | "orders" | "payments" | "issue-reports" | "audit";
 type JsonRecord = Record<string, unknown>;
+type RuntimeAdminConfig = {
+  controlApiUrl?: string;
+  controlApiPort?: string;
+};
 
+const runtimeConfig = (window as Window & { CODEX_ADMIN_CONFIG?: RuntimeAdminConfig }).CODEX_ADMIN_CONFIG;
 const apiBase = resolveApiBase(
-  import.meta.env.VITE_CONTROL_API_URL,
+  runtimeConfig?.controlApiUrl || import.meta.env.VITE_CONTROL_API_URL,
   window.location,
-  import.meta.env.VITE_CONTROL_API_PORT ?? "4320"
+  runtimeConfig?.controlApiPort || import.meta.env.VITE_CONTROL_API_PORT || "4320"
 );
 
 function AdminApp() {

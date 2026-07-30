@@ -1,6 +1,6 @@
 type BrowserLocation = Pick<Location, "hostname" | "protocol">;
 
-const DEFAULT_API_BASE = "https://codex-api.xmwefun.cn";
+const DEFAULT_API_BASE = "https://codex-api.foxhello.com";
 
 export function resolveApiBase(
   configuredBase: string | undefined,

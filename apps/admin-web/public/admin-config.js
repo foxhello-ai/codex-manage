@@ -1,0 +1,1 @@
+window.CODEX_ADMIN_CONFIG = window.CODEX_ADMIN_CONFIG || {};
