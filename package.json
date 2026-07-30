@@ -35,7 +35,8 @@
     "start": "NODE_ENV=production node dist/server/index.js",
     "typecheck": "tsc --noEmit",
     "typecheck:desktop": "tsc --noEmit -p apps/desktop/tsconfig.json",
-    "typecheck:all": "npm run typecheck && npm run typecheck:desktop && npm --workspace @codex-manage/control-api run typecheck && npm --workspace @codex-manage/admin-web run typecheck",
+    "typecheck:packages": "npm --workspaces --if-present --include-workspace-root=false run typecheck",
+    "typecheck:all": "npm run typecheck && npm run typecheck:desktop && npm --workspace @codex-manage/control-api run typecheck && npm --workspace @codex-manage/admin-web run typecheck && npm run typecheck:packages",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
     "test:desktop:e2e": "npm run build:desktop && playwright test -c playwright.desktop.config.ts"
