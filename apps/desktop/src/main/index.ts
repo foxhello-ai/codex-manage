@@ -21,6 +21,12 @@ import { CredentialVault } from "./CredentialVault";
 import { DeviceBindingVault } from "./DeviceBindingVault";
 import { DiagnosticLog } from "./DiagnosticLog";
 import { DesktopSettingsStore } from "./DesktopSettingsStore";
+import {
+  DesktopRuntimeConfigStore,
+  normalizeDomainSuffix,
+  normalizeUrl,
+  type DesktopRuntimeConfig
+} from "./DesktopRuntimeConfigStore";
 import { IssueReportQueue, type PendingIssueReport } from "./IssueReportQueue";
 import { LocalServiceSupervisor } from "./LocalServiceSupervisor";
 import { resolveCloudflaredBinary, TunnelSupervisor } from "./TunnelSupervisor";
@@ -51,12 +57,16 @@ class DesktopController {
     defaultPassword: false,
     activeSessionCount: 0
   };
-  private readonly cloudClient = new CloudClient(
-    process.env.CODEX_CONTROL_API_URL ?? "https://codex-api.xmwefun.cn"
+  private readonly bootstrapControlApiUrl = normalizeUrl(
+    process.env.CODEX_CONTROL_API_URL ?? "https://codex-api.foxhello.com"
   );
+  private readonly cloudClient = new CloudClient(this.bootstrapControlApiUrl);
   private credentialVault: CredentialVault | null = null;
   private deviceBindingVault: DeviceBindingVault | null = null;
   private desktopSettingsStore: DesktopSettingsStore | null = null;
+  private desktopRuntimeConfigStore: DesktopRuntimeConfigStore | null = null;
+  private desktopRuntimeConfig: DesktopRuntimeConfig | null = null;
+  private desktopRuntimeConfigTimer: ReturnType<typeof setInterval> | null = null;
   private issueReportQueue: IssueReportQueue | null = null;
   private cloudSession: CloudSession | null = null;
   private entitlements: Record<string, string | number | boolean> = {};
@@ -100,6 +110,11 @@ class DesktopController {
   async initialize(): Promise<void> {
     this.diagnosticLog = new DiagnosticLog(join(app.getPath("userData"), "logs", "desktop-diagnostics.jsonl"));
     this.desktopSettingsStore = new DesktopSettingsStore(join(app.getPath("userData"), "desktop-settings.json"));
+    this.desktopRuntimeConfigStore = new DesktopRuntimeConfigStore(join(app.getPath("userData"), "desktop-runtime-config.json"));
+    const cachedRuntimeConfig = this.desktopRuntimeConfigStore.load();
+    if (cachedRuntimeConfig) {
+      this.applyDesktopRuntimeConfig(cachedRuntimeConfig, "cache");
+    }
     this.issueReportQueue = new IssueReportQueue(join(app.getPath("userData"), "issue-report-queue.json"));
     const desktopSettings = this.desktopSettingsStore.load();
     this.issueReporting = {
@@ -122,7 +137,8 @@ class DesktopController {
       beforeInstall: async () => {
         await this.prepareForUpdateInstall();
         isQuitting = true;
-      }
+      },
+      updateUrl: this.desktopRuntimeConfig?.updateFeedUrl
     });
     this.updateManager.on("status", () => {
       const updateStatus = this.updateManager?.getStatus();
@@ -137,6 +153,9 @@ class DesktopController {
       }
       this.updateTrayMenu();
       this.emitStatus();
+    });
+    await this.refreshDesktopRuntimeConfig("startup").catch((error) => {
+      this.diagnosticLog?.write("cloud-config", "startup_refresh_failed", { error: errorMessage(error) });
     });
     this.credentialVault = new CredentialVault(join(app.getPath("userData"), "cloud-credentials.json"));
     this.deviceBindingVault = new DeviceBindingVault(join(app.getPath("userData"), "device-bindings.json"));
@@ -167,7 +186,8 @@ class DesktopController {
       userDataDir: app.getPath("userData"),
       port,
       controlToken: this.controlToken,
-      codexCliPath: this.codex.path ?? "codex"
+      codexCliPath: this.codex.path ?? "codex",
+      allowedHosts: this.buildManagedAllowedHosts()
     });
     this.localService.on("status", (snapshot) => {
       this.diagnosticLog?.write("local-service", "status_changed", {
@@ -236,6 +256,7 @@ class DesktopController {
     }
     this.emitStatus();
     this.heartbeatTimer = setInterval(() => void this.sendHeartbeat(), 60_000);
+    this.startDesktopRuntimeConfigRefreshTimer();
     this.updateManager.startAutomaticChecks();
   }
 
@@ -243,6 +264,8 @@ class DesktopController {
     this.diagnosticLog?.write("desktop", "application_stopping");
     this.updateManager?.stop();
     this.codexConfigWatcher?.stop();
+    if (this.desktopRuntimeConfigTimer) clearInterval(this.desktopRuntimeConfigTimer);
+    this.desktopRuntimeConfigTimer = null;
     if (this.runtimeReloadRetryTimer) clearTimeout(this.runtimeReloadRetryTimer);
     this.runtimeReloadRetryTimer = null;
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
@@ -257,6 +280,8 @@ class DesktopController {
     this.diagnosticLog?.write("desktop", "update_install_prepare_started");
     this.updateManager?.stop();
     this.codexConfigWatcher?.stop();
+    if (this.desktopRuntimeConfigTimer) clearInterval(this.desktopRuntimeConfigTimer);
+    this.desktopRuntimeConfigTimer = null;
     if (this.runtimeReloadRetryTimer) clearTimeout(this.runtimeReloadRetryTimer);
     this.runtimeReloadRetryTimer = null;
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
@@ -908,6 +933,97 @@ class DesktopController {
     this.emitStatus();
   }
 
+  private async refreshDesktopRuntimeConfig(trigger: "startup" | "timer"): Promise<void> {
+    const candidates = uniqueStrings([
+      process.env.CODEX_CONTROL_API_URL,
+      this.desktopRuntimeConfig?.apiBaseUrl,
+      this.cloudClient.getBaseUrl(),
+      this.bootstrapControlApiUrl
+    ].filter((value): value is string => Boolean(value)).map(normalizeUrl));
+    let lastError: unknown = null;
+    for (const candidate of candidates) {
+      try {
+        const response = await this.cloudClient.getDesktopConfig(candidate);
+        const nextConfig: DesktopRuntimeConfig = {
+          schemaVersion: response.desktop.schema_version,
+          apiBaseUrl: normalizeHttpUrl(response.desktop.api_base_url),
+          updateFeedUrl: normalizeHttpUrl(response.desktop.update_feed_url),
+          managedDomainSuffixes: response.desktop.managed_domain_suffixes
+            .map(normalizeDomainSuffix)
+            .filter(Boolean),
+          configTtlSeconds: Math.max(60, Math.floor(response.desktop.config_ttl_seconds)),
+          generatedAt: response.desktop.generated_at,
+          fetchedAt: new Date().toISOString(),
+          sourceBaseUrl: candidate
+        };
+        if (nextConfig.schemaVersion !== 1 || nextConfig.managedDomainSuffixes.length === 0) {
+          throw new Error("桌面运行配置格式不正确");
+        }
+        this.applyDesktopRuntimeConfig(nextConfig, trigger);
+        this.desktopRuntimeConfigStore?.save(nextConfig);
+        return;
+      } catch (error) {
+        lastError = error;
+        this.diagnosticLog?.write("cloud-config", "candidate_failed", {
+          trigger,
+          candidate,
+          error: errorMessage(error)
+        });
+      }
+    }
+    if (!this.desktopRuntimeConfig) {
+      throw lastError instanceof Error ? lastError : new Error("桌面运行配置拉取失败");
+    }
+  }
+
+  private applyDesktopRuntimeConfig(config: DesktopRuntimeConfig, source: "cache" | "startup" | "timer"): void {
+    const previousAllowedHosts = this.buildManagedAllowedHosts();
+    this.desktopRuntimeConfig = config;
+    this.cloudClient.setBaseUrl(config.apiBaseUrl);
+    this.updateManager?.setUpdateUrl(config.updateFeedUrl);
+    this.localService?.setAllowedHosts(this.buildManagedAllowedHosts());
+    this.diagnosticLog?.write("cloud-config", "applied", {
+      source,
+      apiBaseUrl: config.apiBaseUrl,
+      updateFeedUrl: config.updateFeedUrl,
+      managedDomainSuffixes: config.managedDomainSuffixes,
+      allowedHostsChanged: previousAllowedHosts.join(",") !== this.buildManagedAllowedHosts().join(",")
+    });
+    if (source === "timer" && this.desktopRuntimeConfigTimer) {
+      this.startDesktopRuntimeConfigRefreshTimer();
+    }
+  }
+
+  private startDesktopRuntimeConfigRefreshTimer(): void {
+    if (this.desktopRuntimeConfigTimer) clearInterval(this.desktopRuntimeConfigTimer);
+    const ttlSeconds = this.desktopRuntimeConfig?.configTtlSeconds ?? 60 * 60;
+    const intervalMs = Math.max(5 * 60_000, Math.min(24 * 60 * 60_000, ttlSeconds * 1000));
+    this.desktopRuntimeConfigTimer = setInterval(() => {
+      void this.refreshDesktopRuntimeConfig("timer").catch((error) => {
+        this.diagnosticLog?.write("cloud-config", "timer_refresh_failed", { error: errorMessage(error) });
+      });
+    }, intervalMs);
+  }
+
+  private buildManagedAllowedHosts(): string[] {
+    const configuredSuffixes = this.desktopRuntimeConfig?.managedDomainSuffixes.length
+      ? this.desktopRuntimeConfig.managedDomainSuffixes
+      : ["foxhello.com", "xmwefun.cn"];
+    const suffixHosts = configuredSuffixes.flatMap((suffix) => [`*.${suffix}`]);
+    const inherited = process.env.CODEX_WEB_ALLOWED_HOSTS
+      ?.split(",")
+      .map((item) => item.trim())
+      .filter(Boolean) ?? [];
+    return uniqueStrings([
+      "localhost",
+      "127.0.0.1",
+      "::1",
+      "*.trycloudflare.com",
+      ...suffixHosts,
+      ...inherited
+    ]);
+  }
+
   private async createPairingUrl(): Promise<{ url: string; expiresAt: string }> {
     const publicUrl = this.tunnel?.getSnapshot().publicUrl;
     if (!publicUrl) throw new Error("远程通道尚未在线");
@@ -1282,6 +1398,19 @@ function runtimeReloadRetryDelayMs(attempt: number, blocked = false): number {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+function normalizeHttpUrl(value: string): string {
+  const normalized = normalizeUrl(value);
+  const parsed = new URL(normalized);
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(`不支持的 URL 协议：${parsed.protocol}`);
+  }
+  return normalized;
 }
 
 function safeHostname(value: string): string | null {

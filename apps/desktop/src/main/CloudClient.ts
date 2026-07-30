@@ -19,8 +19,33 @@ export type CloudSession = {
   deviceAccessExpiresAt: string | null;
 };
 
+export type DesktopCloudConfig = {
+  schema_version: number;
+  api_base_url: string;
+  update_feed_url: string;
+  managed_domain_suffixes: string[];
+  config_ttl_seconds: number;
+  generated_at: string;
+};
+
 export class CloudClient {
-  constructor(private readonly baseUrl: string) {}
+  constructor(private baseUrl: string) {
+    this.baseUrl = normalizeBaseUrl(baseUrl);
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  setBaseUrl(baseUrl: string): void {
+    this.baseUrl = normalizeBaseUrl(baseUrl);
+  }
+
+  getDesktopConfig(baseUrl = this.baseUrl) {
+    return this.request<{ desktop: DesktopCloudConfig }>("/v1/desktop/config", {
+      baseUrl: normalizeBaseUrl(baseUrl)
+    });
+  }
 
   requestVerificationCode(type: "email" | "phone", identifier: string) {
     return this.request<{ sent: boolean; expiresAt: string; debugCode?: string }>(`/v1/auth/${type}/codes`, {
@@ -159,31 +184,41 @@ export class CloudClient {
     });
   }
 
-  private async request<T>(path: string, options: { method?: string; token?: string; body?: unknown } = {}): Promise<T> {
+  private async request<T>(
+    path: string,
+    options: { method?: string; token?: string; body?: unknown; baseUrl?: string } = {}
+  ): Promise<T> {
     const maxRetries = 2;
+    const baseUrl = options.baseUrl ?? this.baseUrl;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const response = await fetch(new URL(path, this.baseUrl), {
-      method: options.method ?? "GET",
-      signal: AbortSignal.timeout(15_000),
-      headers: {
-        "content-type": "application/json",
-        ...(options.token ? { authorization: `Bearer ${options.token}` } : {})
-      },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body)
-    });
-    const payload = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
-    if (!response.ok) {
-      const error = new Error(payload?.error?.message ?? `云端请求失败：${response.status}`) as Error & { code?: string; statusCode?: number };
-      error.code = payload?.error?.code;
-      error.statusCode = response.status;
-      if ((response.status === 503 || response.status === 500) && attempt < maxRetries) {
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        continue;
+      const response = await fetch(new URL(path, baseUrl), {
+        method: options.method ?? "GET",
+        signal: AbortSignal.timeout(15_000),
+        headers: {
+          "content-type": "application/json",
+          ...(options.token ? { authorization: `Bearer ${options.token}` } : {})
+        },
+        body: options.body === undefined ? undefined : JSON.stringify(options.body)
+      });
+      const payload = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
+      if (!response.ok) {
+        const error = new Error(payload?.error?.message ?? `云端请求失败：${response.status}`) as Error & { code?: string; statusCode?: number };
+        error.code = payload?.error?.code;
+        error.statusCode = response.status;
+        if ((response.status === 503 || response.status === 500) && attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        throw error;
       }
-      throw error;
-    }
-    return payload as T;
+      return payload as T;
     }
     throw new Error("云端请求失败");
   }
+}
+
+function normalizeBaseUrl(value: string): string {
+  const normalized = value.trim().replace(/\/+$/, "");
+  if (!normalized) throw new Error("云端 API 地址不能为空");
+  return normalized;
 }

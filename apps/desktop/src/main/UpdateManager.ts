@@ -23,6 +23,7 @@ export class UpdateManager extends EventEmitter {
   };
   private manualInstallRequested = false;
   private checkTimer: ReturnType<typeof setInterval> | null = null;
+  private updateUrl: string;
 
   constructor(private readonly options: UpdateManagerOptions) {
     super();
@@ -33,9 +34,9 @@ export class UpdateManager extends EventEmitter {
     autoUpdater.allowPrerelease = false;
     autoUpdater.logger = this.createLogger();
 
-    const updateUrl = options.updateUrl ?? process.env.CODEX_UPDATE_URL ?? "https://codex-api.xmwefun.cn/updates/stable";
+    this.updateUrl = normalizeUpdateUrl(options.updateUrl ?? process.env.CODEX_UPDATE_URL ?? "https://codex-api.foxhello.com/updates/stable");
     if (app.isPackaged) {
-      autoUpdater.setFeedURL({ provider: "generic", url: updateUrl });
+      autoUpdater.setFeedURL({ provider: "generic", url: this.updateUrl });
     }
 
     autoUpdater.on("checking-for-update", () => {
@@ -66,6 +67,16 @@ export class UpdateManager extends EventEmitter {
 
   getStatus(): UpdateStatus {
     return { ...this.status };
+  }
+
+  setUpdateUrl(updateUrl: string): void {
+    const normalized = normalizeUpdateUrl(updateUrl);
+    if (normalized === this.updateUrl) return;
+    this.updateUrl = normalized;
+    this.options.diagnosticLog.write("update", "feed_url_changed", { updateUrl: normalized });
+    if (app.isPackaged) {
+      autoUpdater.setFeedURL({ provider: "generic", url: normalized });
+    }
   }
 
   startAutomaticChecks(): void {
@@ -165,4 +176,10 @@ export class UpdateManager extends EventEmitter {
     });
     this.emit("status", this.getStatus());
   }
+}
+
+function normalizeUpdateUrl(value: string): string {
+  const normalized = value.trim().replace(/\/+$/, "");
+  if (!normalized) throw new Error("更新源地址不能为空");
+  return normalized;
 }

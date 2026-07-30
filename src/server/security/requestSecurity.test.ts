@@ -5,11 +5,12 @@ import { LocalRateLimiter } from "./LocalRateLimiter";
 
 describe("request security", () => {
   it("matches exact hosts and controlled wildcard suffixes", () => {
-    const allowed = ["localhost", "*.trycloudflare.com", "*.xmwefun.cn"];
+    const allowed = ["localhost", "*.trycloudflare.com", "*.foxhello.com", "*.xmwefun.cn"];
 
     expect(isAllowedHostname("localhost", allowed)).toBe(true);
     expect(isAllowedHostname("quiet-tree.trycloudflare.com", allowed)).toBe(true);
     expect(isAllowedHostname("d-a83k2m.xmwefun.cn", allowed)).toBe(true);
+    expect(isAllowedHostname("d-a83k2m.foxhello.com", allowed)).toBe(true);
     expect(isAllowedHostname("trycloudflare.com.attacker.test", allowed)).toBe(false);
     expect(isAllowedHostname("xmwefun.cn", allowed)).toBe(false);
   });

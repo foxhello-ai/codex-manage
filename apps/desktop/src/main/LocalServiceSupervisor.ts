@@ -17,6 +17,7 @@ export type LocalServiceOptions = {
   port: number;
   controlToken: string;
   codexCliPath: string;
+  allowedHosts?: string[];
 };
 
 export class LocalServiceSupervisor extends EventEmitter {
@@ -34,6 +35,10 @@ export class LocalServiceSupervisor extends EventEmitter {
 
   getSnapshot(): LocalServiceSnapshot {
     return { ...this.snapshot };
+  }
+
+  setAllowedHosts(allowedHosts: string[]): void {
+    this.options.allowedHosts = allowedHosts;
   }
 
   async start(): Promise<LocalServiceSnapshot> {
@@ -58,7 +63,10 @@ export class LocalServiceSupervisor extends EventEmitter {
           CODEX_WEB_PORT: String(this.options.port),
           CODEX_WEB_CLIENT_DIR: this.options.clientDir,
           CODEX_DESKTOP_CONTROL_TOKEN: this.options.controlToken,
-          CODEX_CLI_PATH: this.options.codexCliPath
+          CODEX_CLI_PATH: this.options.codexCliPath,
+          ...(this.options.allowedHosts?.length
+            ? { CODEX_WEB_ALLOWED_HOSTS: this.options.allowedHosts.join(",") }
+            : {})
         },
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true

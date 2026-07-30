@@ -49,6 +49,7 @@ function readAllowedHosts(value: string | undefined): string[] {
     "codex.foxhello.com",
     "codex.foxhello.cn",
     "*.trycloudflare.com",
+    "*.foxhello.com",
     "*.xmwefun.cn"
   ];
   const configured = value?.split(",").map((item) => item.trim()).filter(Boolean) ?? [];
