@@ -24,7 +24,8 @@ Token、Account ID 和 Zone ID 只注入 Control API/Worker，不得进入桌面
 
 - 强随机 `POSTGRES_PASSWORD`
 - 初始管理员邮箱和强密码
-- Cloudflare API Token、Account ID、Zone ID
+- Cloudflare API Token、Account ID
+- 首个 Cloudflare Zone ID 可放在 `.env` 作为兜底，后续可在后台“系统配置”中切换
 - 邮件验证码 Webhook
 - 可选短信验证码 Webhook
 
@@ -34,7 +35,7 @@ Token、Account ID 和 Zone ID 只注入 Control API/Worker，不得进入桌面
 CONTROL_ALLOW_DEBUG_CODES=false
 ```
 
-域名相关变量必须成组配置：
+域名相关变量作为首次启动兜底配置：
 
 ```text
 CONTROL_DEVICE_DOMAIN=foxhello.com
@@ -46,6 +47,18 @@ CODEX_ADMIN_CONTROL_API_URL=https://codex-api.foxhello.com
 ```
 
 桌面端会通过 `GET /v1/desktop/config` 拉取 `api_base_url`、`update_feed_url` 和固定设备域名后缀，并缓存到本机。内置兜底配置发现入口为 `https://codex-api.foxhello.com/v1/desktop/config`。已安装了支持该接口版本的客户端，后续正常切换业务根域名时不需要重新打包。
+
+首次启动后，管理后台提供“系统配置”页面，可写入数据库级运行配置：
+
+- 控制 API 地址
+- 桌面更新源
+- 设备固定域名根域名
+- 托管域名后缀列表
+- 后台允许访问 Origin
+- 桌面配置刷新 TTL
+- Cloudflare Zone ID
+
+这些值由 Control API 和 Tunnel Worker 在运行时读取，保存后无需修改 `.env`，也无需重启服务。`.env` 中的域名配置仅在数据库尚未写入系统配置时作为兜底。
 
 验证码 Webhook 接收 JSON：
 
@@ -99,21 +112,22 @@ downloads/updates/stable/latest-mac.yml
 
 ## 4. 根域名切换流程
 
-支持桌面运行配置接口的版本发布后，后续根域名切换按以下流程执行：
+支持桌面运行配置接口和后台系统配置页面的版本发布后，后续根域名切换按以下流程执行：
 
 1. 在新根域名下准备 `codex-api.<新根域名>`、`codex-admin.<新根域名>` 和 `d-<设备短码>.<新根域名>`。
-2. 在 Cloudflare 中准备新 Zone，并将 `CLOUDFLARE_ZONE_ID` 切到新 Zone。
-3. 更新 `deploy/.env`：
-   - `CONTROL_DEVICE_DOMAIN=<新根域名>`
-   - `CONTROL_PUBLIC_API_BASE_URL=https://codex-api.<新根域名>`
-   - `CONTROL_DESKTOP_UPDATE_FEED_URL=https://codex-api.<新根域名>/updates/stable`
-   - `CONTROL_MANAGED_DOMAIN_SUFFIXES=xmwefun.cn,<新根域名>`，灰度期必须同时保留新旧后缀。
-   - `CONTROL_ADMIN_ORIGIN=https://codex-admin.<新根域名>`
-   - `CODEX_ADMIN_CONTROL_API_URL=https://codex-api.<新根域名>`
-4. 部署服务并确认稳定入口 `codex-api.foxhello.com/v1/desktop/config` 可返回新配置；灰度期如仍存在旧客户端，也要确认旧 `codex-api.xmwefun.cn/v1/desktop/config` 和旧更新入口可用。
-5. 灰度验证新客户端启动后诊断日志出现 `cloud-config applied`，并确认固定域名白名单包含新后缀。
-6. 迁移已有 Named Tunnel。支持该版本后，桌面端再次启动或重新申请固定域名时，服务端会发现旧 `domains.hostname` 与当前 `CONTROL_DEVICE_DOMAIN` 不一致，并排队撤销旧域名后重新签发新域名；大批量客户仍建议使用后台或批量脚本分批触发。
-7. 观察一到两个版本周期后，再决定是否下线旧 API、旧更新入口和旧固定设备域名。
+2. 在 Cloudflare 中准备新 Zone，确认 API Token 对新 Zone 具备 DNS Edit 权限。
+3. 确认新旧 API 域名都能反向代理到同一套 Control API，灰度期不要提前关闭旧 `codex-api.*`。
+4. 登录管理后台，打开“系统配置”，保存：
+   - 控制 API 地址：`https://codex-api.<新根域名>`
+   - 桌面更新源：`https://codex-api.<新根域名>/updates/stable`
+   - 设备固定域名根域名：`<新根域名>`
+   - 托管域名后缀：`<旧根域名>,<新根域名>`，灰度期必须同时保留新旧后缀。
+   - 后台允许访问 Origin：至少保留当前后台域名，并加入 `https://codex-admin.<新根域名>`。
+   - Cloudflare Zone ID：新根域名所在 Zone ID。
+5. 保存后立即请求 `https://codex-api.foxhello.com/v1/desktop/config` 和 `https://codex-api.<新根域名>/v1/desktop/config`，确认返回新配置。
+6. 灰度验证客户端配置刷新后诊断日志出现 `cloud-config applied`，并确认固定域名白名单包含新后缀。
+7. 迁移已有 Named Tunnel。桌面端再次申请固定域名时，服务端会发现旧 `domains.hostname` 与当前设备根域名不一致，并排队撤销旧域名后按新 Zone 重新签发；大批量客户仍建议使用后台或批量脚本分批触发。
+8. 观察一到两个版本周期后，再决定是否下线旧 API、旧更新入口和旧固定设备域名。
 
 关键约束：如果旧 bootstrap/update 域名提前下线，尚未升级到支持远程配置的客户端仍无法自动发现新域名，只能重新下载安装包。
 
