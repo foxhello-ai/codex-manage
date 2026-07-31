@@ -10,6 +10,15 @@ export type ControlConfig = {
   allowDebugCodes: boolean;
   emailWebhookUrl: string | null;
   smsWebhookUrl: string | null;
+  smtp: {
+    host: string | null;
+    port: number;
+    secure: boolean;
+    user: string | null;
+    password: string | null;
+    fromEmail: string | null;
+    fromName: string;
+  };
   accessTokenTtlSeconds: number;
   refreshTokenTtlSeconds: number;
   deviceTokenTtlSeconds: number;
@@ -40,6 +49,15 @@ export function loadControlConfig(): ControlConfig {
     allowDebugCodes: process.env.CONTROL_ALLOW_DEBUG_CODES === "true",
     emailWebhookUrl: process.env.CONTROL_EMAIL_WEBHOOK_URL ?? null,
     smsWebhookUrl: process.env.CONTROL_SMS_WEBHOOK_URL ?? null,
+    smtp: {
+      host: readOptionalString(process.env.CONTROL_SMTP_HOST),
+      port: readInteger(process.env.CONTROL_SMTP_PORT, 465),
+      secure: readBoolean(process.env.CONTROL_SMTP_SECURE, true),
+      user: readOptionalString(process.env.CONTROL_SMTP_USER ?? process.env.CONTROL_SMTP_FROM_EMAIL),
+      password: readOptionalString(process.env.CONTROL_SMTP_PASSWORD),
+      fromEmail: readOptionalString(process.env.CONTROL_SMTP_FROM_EMAIL ?? process.env.CONTROL_SMTP_USER),
+      fromName: process.env.CONTROL_SMTP_FROM_NAME?.trim() || "Codex Manage"
+    },
     accessTokenTtlSeconds: readInteger(process.env.CONTROL_ACCESS_TOKEN_TTL_SECONDS, 15 * 60),
     refreshTokenTtlSeconds: readInteger(process.env.CONTROL_REFRESH_TOKEN_TTL_SECONDS, 30 * 24 * 60 * 60),
     deviceTokenTtlSeconds: readInteger(process.env.CONTROL_DEVICE_TOKEN_TTL_SECONDS, 60 * 60),
@@ -124,6 +142,16 @@ function readInteger(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function readBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value.trim() === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+function readOptionalString(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed || null;
 }
 
 function normalizeUrl(value: string): string {

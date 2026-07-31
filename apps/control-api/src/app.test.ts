@@ -23,6 +23,15 @@ describe("control API", () => {
       allowDebugCodes: true,
       emailWebhookUrl: null,
       smsWebhookUrl: null,
+      smtp: {
+        host: null,
+        port: 465,
+        secure: true,
+        user: null,
+        password: null,
+        fromEmail: null,
+        fromName: "Codex Manage"
+      },
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 3600,
       deviceTokenTtlSeconds: 900,
@@ -110,6 +119,15 @@ describe("control API", () => {
       allowDebugCodes: true,
       emailWebhookUrl: null,
       smsWebhookUrl: null,
+      smtp: {
+        host: null,
+        port: 465,
+        secure: true,
+        user: null,
+        password: null,
+        fromEmail: null,
+        fromName: "Codex Manage"
+      },
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 3600,
       deviceTokenTtlSeconds: 900,
