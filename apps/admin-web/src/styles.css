@@ -1,7 +1,7 @@
 :root { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172b3a; background: #eef3f6; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 1100px; }
-button, input { font: inherit; }
+button, input, textarea { font: inherit; }
 button { cursor: pointer; border: 1px solid #c7d4dc; border-radius: 8px; background: white; padding: 9px 13px; color: #18394e; }
 .adminShell { min-height: 100vh; display: grid; grid-template-columns: 230px 1fr; }
 aside { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; background: #0e2c40; color: white; padding: 24px 16px; }
@@ -32,6 +32,17 @@ td code { font-size: 11px; }
 .rowActions { display: flex; gap: 6px; }
 .empty { padding: 50px; text-align: center; color: #6b7e8a; }
 .error { padding: 12px 15px; margin-bottom: 16px; border: 1px solid #e2a19b; color: #962e26; background: #fff4f3; border-radius: 9px; }
+.success { padding: 12px 15px; margin-bottom: 16px; border: 1px solid #9bcfbe; color: #0c6d56; background: #effbf7; border-radius: 9px; }
+.configPanel { display: grid; gap: 16px; max-width: 980px; }
+.configPanel section { display: grid; gap: 14px; padding: 22px; border: 1px solid #dae4e9; background: white; border-radius: 13px; box-shadow: 0 8px 25px rgba(28, 65, 87, .05); }
+.configPanel h2 { margin: 0; }
+.configPanel p { margin: -4px 0 2px; color: #637b8a; }
+.configPanel label { display: grid; gap: 7px; font-weight: 700; color: #26485d; }
+.configPanel input, .configPanel textarea { width: 100%; padding: 10px 12px; border: 1px solid #bccbd4; border-radius: 8px; color: #173448; background: #fbfdfe; }
+.configPanel textarea { resize: vertical; line-height: 1.5; }
+.configMeta { color: #6a7f8d; font-size: 13px; }
+.formActions { display: flex; justify-content: flex-end; }
+.formActions button { color: white; border-color: #1769aa; background: #1769aa; }
 .loginPage { min-height: 100vh; display: grid; place-items: center; background: linear-gradient(135deg, #0d344c, #126d61); }
 .loginCard { width: 390px; display: grid; gap: 15px; padding: 30px; border-radius: 16px; background: white; box-shadow: 0 20px 60px rgba(0,0,0,.22); }
 .loginCard p { margin: 0; color: #13836c; font-weight: 800; font-size: 12px; letter-spacing: .12em; }

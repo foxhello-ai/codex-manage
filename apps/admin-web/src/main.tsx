@@ -3,11 +3,22 @@ import { createRoot } from "react-dom/client";
 import { resolveApiBase } from "./apiBase";
 import "./styles.css";
 
-type Tab = "overview" | "users" | "devices" | "tunnels" | "domains" | "subscriptions" | "orders" | "payments" | "issue-reports" | "audit";
+type Tab = "overview" | "users" | "devices" | "tunnels" | "domains" | "subscriptions" | "orders" | "payments" | "issue-reports" | "system-config" | "audit";
 type JsonRecord = Record<string, unknown>;
 type RuntimeAdminConfig = {
   controlApiUrl?: string;
   controlApiPort?: string;
+};
+type SystemConfig = {
+  publicApiBaseUrl: string;
+  desktopUpdateFeedUrl: string;
+  deviceDomain: string;
+  managedDomainSuffixes: string[];
+  adminOrigins: string[];
+  desktopConfigTtlSeconds: number;
+  cloudflareZoneId: string | null;
+  updatedAt: string | null;
+  updatedByAdminId: string | null;
 };
 
 const runtimeConfig = (window as Window & { CODEX_ADMIN_CONFIG?: RuntimeAdminConfig }).CODEX_ADMIN_CONFIG;
@@ -67,7 +78,7 @@ function AdminApp() {
       <aside>
         <div className="brand"><span>CM</span><strong>运营后台</strong></div>
         <nav>
-          {(["overview", "users", "devices", "tunnels", "domains", "subscriptions", "orders", "payments", "issue-reports", "audit"] as Tab[]).map((item) => (
+          {(["overview", "users", "devices", "tunnels", "domains", "subscriptions", "orders", "payments", "issue-reports", "system-config", "audit"] as Tab[]).map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => void load(item)}>
               {tabLabel(item)}
             </button>
@@ -82,13 +93,15 @@ function AdminApp() {
         <header>
           <div><p>CODEX MANAGE</p><h1>{tabLabel(tab)}</h1></div>
           <div className="headerActions">
-            {tab !== "overview" ? <input aria-label="搜索当前列表" placeholder="搜索当前列表" value={search} onChange={(event) => setSearch(event.target.value)} /> : null}
+            {tab !== "overview" && tab !== "system-config" ? <input aria-label="搜索当前列表" placeholder="搜索当前列表" value={search} onChange={(event) => setSearch(event.target.value)} /> : null}
             <button onClick={() => void load(tab)}>刷新</button>
           </div>
         </header>
         {error ? <div className="error">{error}</div> : null}
         {loading ? <div className="empty">正在载入…</div> : tab === "overview" ? (
           <Overview data={(data ?? {}) as JsonRecord} />
+        ) : tab === "system-config" ? (
+          <SystemConfigPanel config={(data as { systemConfig?: SystemConfig } | null)?.systemConfig ?? null} token={token} onSaved={() => void load("system-config")} />
         ) : (
           <DataTable rows={rows} token={token} onChanged={() => void load(tab)} tab={tab} />
         )}
@@ -150,6 +163,83 @@ function Overview({ data }: { data: JsonRecord }) {
     ["主动反馈", data.manual_issue_reports]
   ];
   return <section className="overview">{cards.map(([label, value]) => <article key={String(label)}><span>{String(label)}</span><strong>{String(value ?? 0)}</strong></article>)}</section>;
+}
+
+function SystemConfigPanel({ config, token, onSaved }: { config: SystemConfig | null; token: string; onSaved: () => void }) {
+  const [publicApiBaseUrl, setPublicApiBaseUrl] = useState(config?.publicApiBaseUrl ?? "");
+  const [desktopUpdateFeedUrl, setDesktopUpdateFeedUrl] = useState(config?.desktopUpdateFeedUrl ?? "");
+  const [deviceDomain, setDeviceDomain] = useState(config?.deviceDomain ?? "");
+  const [managedDomainSuffixes, setManagedDomainSuffixes] = useState((config?.managedDomainSuffixes ?? []).join("\n"));
+  const [adminOrigins, setAdminOrigins] = useState((config?.adminOrigins ?? []).join("\n"));
+  const [desktopConfigTtlSeconds, setDesktopConfigTtlSeconds] = useState(String(config?.desktopConfigTtlSeconds ?? 3600));
+  const [cloudflareZoneId, setCloudflareZoneId] = useState(config?.cloudflareZoneId ?? "");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPublicApiBaseUrl(config?.publicApiBaseUrl ?? "");
+    setDesktopUpdateFeedUrl(config?.desktopUpdateFeedUrl ?? "");
+    setDeviceDomain(config?.deviceDomain ?? "");
+    setManagedDomainSuffixes((config?.managedDomainSuffixes ?? []).join("\n"));
+    setAdminOrigins((config?.adminOrigins ?? []).join("\n"));
+    setDesktopConfigTtlSeconds(String(config?.desktopConfigTtlSeconds ?? 3600));
+    setCloudflareZoneId(config?.cloudflareZoneId ?? "");
+  }, [config]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!window.confirm("确认保存系统域名配置？保存后会立即影响桌面配置下发和新固定域名签发，请确认 DNS 与 Cloudflare Zone 已准备好。")) return;
+    setBusy(true);
+    setMessage(null);
+    setError(null);
+    try {
+      await request("/v1/admin/system-config", {
+        method: "PATCH",
+        body: JSON.stringify({
+          publicApiBaseUrl,
+          desktopUpdateFeedUrl,
+          deviceDomain,
+          managedDomainSuffixes: parseLines(managedDomainSuffixes),
+          adminOrigins: parseLines(adminOrigins),
+          desktopConfigTtlSeconds: Number.parseInt(desktopConfigTtlSeconds, 10),
+          cloudflareZoneId: cloudflareZoneId.trim() || null
+        })
+      }, token);
+      setMessage("系统配置已保存，服务端无需重启。桌面端会在配置 TTL 到期后自动刷新。");
+      onSaved();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!config) return <div className="empty">暂无系统配置</div>;
+  return (
+    <form className="configPanel" onSubmit={submit}>
+      <section>
+        <h2>业务域名</h2>
+        <p>这些配置保存在数据库，保存后由服务端实时读取，不需要修改 `.env` 或重启服务。</p>
+        <label>控制 API 地址<input value={publicApiBaseUrl} onChange={(event) => setPublicApiBaseUrl(event.target.value)} placeholder="https://codex-api.example.com" /></label>
+        <label>桌面更新源<input value={desktopUpdateFeedUrl} onChange={(event) => setDesktopUpdateFeedUrl(event.target.value)} placeholder="https://codex-api.example.com/updates/stable" /></label>
+        <label>设备固定域名根域名<input value={deviceDomain} onChange={(event) => setDeviceDomain(event.target.value)} placeholder="example.com" /></label>
+        <label>托管域名后缀<textarea value={managedDomainSuffixes} onChange={(event) => setManagedDomainSuffixes(event.target.value)} rows={4} placeholder={"example.com\nold-domain.com"} /></label>
+      </section>
+      <section>
+        <h2>后台与 Cloudflare</h2>
+        <label>后台允许访问 Origin<textarea value={adminOrigins} onChange={(event) => setAdminOrigins(event.target.value)} rows={4} placeholder={"https://codex-admin.example.com\nhttp://192.168.31.107"} /></label>
+        <label>桌面配置刷新 TTL（秒）<input type="number" min={60} max={86400} value={desktopConfigTtlSeconds} onChange={(event) => setDesktopConfigTtlSeconds(event.target.value)} /></label>
+        <label>Cloudflare Zone ID<input value={cloudflareZoneId} onChange={(event) => setCloudflareZoneId(event.target.value)} placeholder="切换根域名时填写新 Zone ID" /></label>
+        <div className="configMeta">最近更新：{config.updatedAt ?? "尚未写入数据库"}{config.updatedByAdminId ? ` / 操作人：${config.updatedByAdminId}` : ""}</div>
+      </section>
+      {error ? <div className="error">{error}</div> : null}
+      {message ? <div className="success">{message}</div> : null}
+      <div className="formActions">
+        <button disabled={busy}>{busy ? "保存中" : "保存配置"}</button>
+      </div>
+    </form>
+  );
 }
 
 function DataTable({ rows, token, onChanged, tab }: { rows: JsonRecord[]; token: string; onChanged: () => void; tab: Tab }) {
@@ -302,6 +392,10 @@ function extractRows(tab: Tab, data: unknown): JsonRecord[] {
   return Array.isArray(value) ? value as JsonRecord[] : [];
 }
 
+function parseLines(value: string): string[] {
+  return value.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+}
+
 function formatValue(value: unknown): ReactNode {
   if (value === null || value === undefined) return "-";
   if (typeof value === "object") return <code>{JSON.stringify(value)}</code>;
@@ -319,6 +413,7 @@ function tabLabel(tab: Tab): string {
     orders: "订单",
     payments: "支付记录",
     "issue-reports": "问题反馈",
+    "system-config": "系统配置",
     audit: "审计日志"
   })[tab];
 }
