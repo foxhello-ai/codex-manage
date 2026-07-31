@@ -26,7 +26,7 @@ Token、Account ID 和 Zone ID 只注入 Control API/Worker，不得进入桌面
 - 初始管理员邮箱和强密码
 - Cloudflare API Token、Account ID
 - 首个 Cloudflare Zone ID 可放在 `.env` 作为兜底，后续可在后台“系统配置”中切换
-- 邮件验证码 Webhook
+- 邮件验证码 SMTP 或 Webhook
 - 可选短信验证码 Webhook
 
 生产环境必须保持：
@@ -60,7 +60,21 @@ CODEX_ADMIN_CONTROL_API_URL=https://codex-api.foxhello.com
 
 这些值由 Control API 和 Tunnel Worker 在运行时读取，保存后无需修改 `.env`，也无需重启服务。`.env` 中的域名配置仅在数据库尚未写入系统配置时作为兜底。
 
-验证码 Webhook 接收 JSON：
+邮件验证码优先使用 SMTP。163 邮箱示例：
+
+```text
+CONTROL_SMTP_HOST=smtp.163.com
+CONTROL_SMTP_PORT=465
+CONTROL_SMTP_SECURE=true
+CONTROL_SMTP_USER=ericoto@163.com
+CONTROL_SMTP_PASSWORD=<163 SMTP 授权码或密码>
+CONTROL_SMTP_FROM_EMAIL=ericoto@163.com
+CONTROL_SMTP_FROM_NAME=ericoto
+```
+
+生产环境不要把 SMTP 密码提交到 Git，应通过私有 `deploy/.env`、Secret Manager 或 CI/CD Secret 注入。163 邮箱如果开启了客户端授权码，`CONTROL_SMTP_PASSWORD` 应使用授权码而不是网页登录密码。
+
+未配置 SMTP 时，邮件验证码可回退到 Webhook。验证码 Webhook 接收 JSON：
 
 ```json
 {
