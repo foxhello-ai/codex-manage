@@ -1,4 +1,4 @@
-import type { AuthTokenRecord, DeviceRecord, EntitlementMap, IdentityType, IssueReportCategory, IssueReportLevel, IssueReportRecord, IssueReportSource, IssueReportStatus, NamedTunnelRecord, SubjectType, TokenType, UserRecord } from "./domain";
+import type { AuthTokenRecord, DeviceRecord, EntitlementMap, IdentityType, IssueReportCategory, IssueReportLevel, IssueReportRecord, IssueReportSource, IssueReportStatus, NamedTunnelRecord, SubjectType, SystemConfigRecord, TokenType, UserRecord } from "./domain";
 
 export type CreatedDevice = {
   device: DeviceRecord;
@@ -84,7 +84,7 @@ export interface ControlStore {
   listPlans(): Promise<Array<Record<string, unknown>>>;
   getCurrentSubscription(userId: string): Promise<Record<string, unknown> | null>;
   listOrders(userId: string): Promise<Array<Record<string, unknown>>>;
-  requestNamedTunnel(userId: string, deviceId: string, hostname: string): Promise<NamedTunnelRecord>;
+  requestNamedTunnel(userId: string, deviceId: string, hostname: string, cloudflareZoneId: string | null): Promise<NamedTunnelRecord>;
   getNamedTunnelForDevice(deviceId: string): Promise<NamedTunnelRecord | null>;
   claimProvisioningJob(): Promise<ProvisioningJob | null>;
   completeProvisioningJob(jobId: string, tunnelId: string, cloudflareTunnelId: string): Promise<boolean>;
@@ -110,6 +110,11 @@ export interface ControlStore {
   listAdminOrders(): Promise<Array<Record<string, unknown>>>;
   listAdminPayments(): Promise<Array<Record<string, unknown>>>;
   listAdminAuditLogs(): Promise<Array<Record<string, unknown>>>;
+  getSystemConfig(): Promise<SystemConfigRecord | null>;
+  upsertSystemConfig(input: {
+    adminId: string;
+    config: Omit<SystemConfigRecord, "updatedAt" | "updatedByAdminId">;
+  }): Promise<SystemConfigRecord>;
   createIssueReport(input: {
     source: IssueReportSource;
     level: IssueReportLevel;

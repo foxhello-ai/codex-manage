@@ -98,6 +98,7 @@ describe("desktop API backward compatibility", () => {
         id: "tunnel-1",
         deviceId: device.id,
         cloudflareTunnelId: "cf-tunnel-1",
+        cloudflareZoneId: "zone-xmwefun-123456",
         hostname: "d-abc123def0.xmwefun.cn",
         status: "active",
         lastErrorCode: null
@@ -106,6 +107,7 @@ describe("desktop API backward compatibility", () => {
         id: "tunnel-1",
         deviceId: device.id,
         cloudflareTunnelId: "cf-tunnel-1",
+        cloudflareZoneId: "zone-xmwefun-123456",
         hostname: "d-abc123def0.xmwefun.cn",
         status: "active",
         lastErrorCode: null
@@ -128,6 +130,18 @@ describe("desktop API backward compatibility", () => {
       listAdminOrders: vi.fn(async () => []),
       listAdminPayments: vi.fn(async () => []),
       listAdminAuditLogs: vi.fn(async () => []),
+      getSystemConfig: vi.fn(async () => null),
+      upsertSystemConfig: vi.fn(async (_input: Parameters<ControlStore["upsertSystemConfig"]>[0]) => ({
+        publicApiBaseUrl: "https://codex-api.xmwefun.cn",
+        desktopUpdateFeedUrl: "https://codex-api.xmwefun.cn/updates/stable",
+        deviceDomain: "xmwefun.cn",
+        managedDomainSuffixes: ["xmwefun.cn"],
+        adminOrigins: ["https://codex-admin.xmwefun.cn"],
+        desktopConfigTtlSeconds: 3600,
+        cloudflareZoneId: null,
+        updatedAt: "2026-07-27T00:00:00.000Z",
+        updatedByAdminId: "admin-1"
+      })),
       createIssueReport: vi.fn(async () => { throw new Error("not used by 1.0.1"); }),
       listAdminIssueReports: vi.fn(async () => []),
       getAdminIssueReport: vi.fn(async () => null),

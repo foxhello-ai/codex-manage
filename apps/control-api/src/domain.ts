@@ -94,9 +94,22 @@ export type NamedTunnelRecord = {
   id: string;
   deviceId: string;
   cloudflareTunnelId: string | null;
+  cloudflareZoneId: string | null;
   hostname: string;
   status: string;
   lastErrorCode: string | null;
+};
+
+export type SystemConfigRecord = {
+  publicApiBaseUrl: string;
+  desktopUpdateFeedUrl: string;
+  deviceDomain: string;
+  managedDomainSuffixes: string[];
+  adminOrigins: string[];
+  desktopConfigTtlSeconds: number;
+  cloudflareZoneId: string | null;
+  updatedAt: string | null;
+  updatedByAdminId: string | null;
 };
 
 export class ControlError extends Error {

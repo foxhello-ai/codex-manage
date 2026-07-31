@@ -14,8 +14,9 @@ describe("CloudflareAdapter", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const adapter = new CloudflareAdapter("api-token", "account-1", "zone-1");
-    await expect(adapter.deletePublishedTunnel("cf-1", "d-test.xmwefun.cn")).resolves.toBeUndefined();
+    await expect(adapter.deletePublishedTunnel("cf-1", "d-test.xmwefun.cn", "zone-runtime")).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/zones/zone-runtime/dns_records");
   });
 
   it("writes a catch-all ingress rule after the device hostname", async () => {

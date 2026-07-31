@@ -84,6 +84,18 @@ function mockStore(overrides: Partial<ControlStore> = {}): ControlStore {
     listAdminOrders: vi.fn(async () => []),
     listAdminPayments: vi.fn(async () => []),
     listAdminAuditLogs: vi.fn(async () => []),
+    getSystemConfig: vi.fn(async () => null),
+    upsertSystemConfig: vi.fn(async (_input: Parameters<ControlStore["upsertSystemConfig"]>[0]) => ({
+      publicApiBaseUrl: "https://codex-api.xmwefun.cn",
+      desktopUpdateFeedUrl: "https://codex-api.xmwefun.cn/updates/stable",
+      deviceDomain: "xmwefun.cn",
+      managedDomainSuffixes: ["xmwefun.cn"],
+      adminOrigins: ["https://codex-admin.xmwefun.cn"],
+      desktopConfigTtlSeconds: 3600,
+      cloudflareZoneId: null,
+      updatedAt: new Date().toISOString(),
+      updatedByAdminId: "admin-1"
+    })),
     createIssueReport: vi.fn(async () => ({
       id: "issue-1",
       source: "manual" as const,
@@ -178,6 +190,55 @@ describe("ControlService", () => {
     await expect(service.requestNamedTunnel("user-1", "device-1")).rejects.toMatchObject({
       code: "NAMED_TUNNEL_NOT_ENTITLED",
       statusCode: 403
+    });
+  });
+
+  it("uses runtime system config for desktop config and Named Tunnel hostname", async () => {
+    const store = mockStore({
+      getSystemConfig: vi.fn(async () => ({
+        publicApiBaseUrl: "https://codex-api.newroot.cn",
+        desktopUpdateFeedUrl: "https://codex-api.newroot.cn/updates/stable",
+        deviceDomain: "newroot.cn",
+        managedDomainSuffixes: ["newroot.cn", "xmwefun.cn"],
+        adminOrigins: ["https://codex-admin.newroot.cn"],
+        desktopConfigTtlSeconds: 300,
+        cloudflareZoneId: "zone-newroot-123456",
+        updatedAt: "2026-07-31T00:00:00.000Z",
+        updatedByAdminId: "admin-1"
+      })),
+      getEntitlements: vi.fn(async () => ({ "tunnel.named": true })),
+      getDevice: vi.fn(async () => ({
+        id: "device-1",
+        deviceCode: "abc123",
+        userId: "user-1",
+        name: "Windows",
+        os: "win32",
+        arch: "x64",
+        clientVersion: "1.0.6",
+        codexCliVersion: null,
+        originPort: 4310,
+        status: "active" as const,
+        lastSeenAt: null,
+        createdAt: "2026-07-31T00:00:00.000Z"
+      })),
+      requestNamedTunnel: vi.fn(async (_userId, deviceId, hostname) => ({
+        id: "tunnel-1",
+        deviceId,
+        cloudflareTunnelId: null,
+        cloudflareZoneId: "zone-newroot-123456",
+        hostname,
+        status: "provisioning",
+        lastErrorCode: null
+      }))
+    });
+    const service = new ControlService(config(), store, { send: vi.fn(async () => undefined) }, null);
+
+    await expect(service.getSystemConfig()).resolves.toMatchObject({
+      publicApiBaseUrl: "https://codex-api.newroot.cn",
+      deviceDomain: "newroot.cn"
+    });
+    await expect(service.requestNamedTunnel("user-1", "device-1")).resolves.toMatchObject({
+      hostname: "d-abc123.newroot.cn"
     });
   });
 });

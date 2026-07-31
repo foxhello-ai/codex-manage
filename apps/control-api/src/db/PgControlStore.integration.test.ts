@@ -82,6 +82,29 @@ describe("PgControlStore", () => {
       })).toBe(true);
 
       await store.ensureAdmin({ id: "admin-1", email: "admin@example.com", passwordHash: "hash", role: "admin" });
+      expect(await store.getSystemConfig()).toBeNull();
+      const systemConfig = await store.upsertSystemConfig({
+        adminId: "admin-1",
+        config: {
+          publicApiBaseUrl: "https://codex-api.newroot.cn",
+          desktopUpdateFeedUrl: "https://codex-api.newroot.cn/updates/stable",
+          deviceDomain: "newroot.cn",
+          managedDomainSuffixes: ["newroot.cn", "xmwefun.cn"],
+          adminOrigins: ["https://codex-admin.newroot.cn"],
+          desktopConfigTtlSeconds: 300,
+          cloudflareZoneId: "zone-newroot-123456"
+        }
+      });
+      expect(systemConfig).toMatchObject({
+        publicApiBaseUrl: "https://codex-api.newroot.cn",
+        deviceDomain: "newroot.cn",
+        managedDomainSuffixes: ["newroot.cn", "xmwefun.cn"],
+        cloudflareZoneId: "zone-newroot-123456",
+        updatedByAdminId: "admin-1"
+      });
+      expect(await store.getSystemConfig()).toMatchObject({
+        desktopUpdateFeedUrl: "https://codex-api.newroot.cn/updates/stable"
+      });
       const manualIssue = await store.createIssueReport({
         source: "manual",
         level: "P0_MANUAL",
@@ -156,7 +179,7 @@ describe("PgControlStore", () => {
         expiresAt: null,
         reason: "integration test"
       });
-      const tunnel = await store.requestNamedTunnel(user.id, "device-1", "d-a83k2m.xmwefun.cn");
+      const tunnel = await store.requestNamedTunnel(user.id, "device-1", "d-a83k2m.xmwefun.cn", "zone-xmwefun-123456");
       const claimed = await store.claimProvisioningJob();
       expect(claimed?.tunnel.id).toBe(tunnel.id);
       expect(await store.completeProvisioningJob(claimed!.id, tunnel.id, "cf-tunnel-1")).toBe(true);
@@ -173,16 +196,18 @@ describe("PgControlStore", () => {
       expect(rebuildProvision?.jobType).toBe("provision_named_tunnel");
       expect(await store.completeProvisioningJob(rebuildProvision!.id, tunnel.id, "cf-tunnel-2")).toBe(true);
 
-      const migrated = await store.requestNamedTunnel(user.id, "device-1", "d-a83k2m.newroot.cn");
+      const migrated = await store.requestNamedTunnel(user.id, "device-1", "d-a83k2m.newroot.cn", "zone-newroot-123456");
       expect(migrated.status).toBe("revoked");
       expect(migrated.lastErrorCode).toBe("DOMAIN_MIGRATION");
       const migrationRevocation = await store.claimProvisioningJob();
       expect(migrationRevocation?.jobType).toBe("revoke_named_tunnel");
       expect(migrationRevocation?.tunnel.hostname).toBe("d-a83k2m.xmwefun.cn");
+      expect(migrationRevocation?.tunnel.cloudflareZoneId).toBe("zone-xmwefun-123456");
       await store.completeRevocationJob(migrationRevocation!.id, tunnel.id);
       const migrationProvision = await store.claimProvisioningJob();
       expect(migrationProvision?.jobType).toBe("provision_named_tunnel");
       expect(migrationProvision?.tunnel.hostname).toBe("d-a83k2m.newroot.cn");
+      expect(migrationProvision?.tunnel.cloudflareZoneId).toBe("zone-newroot-123456");
       expect(await store.completeProvisioningJob(migrationProvision!.id, tunnel.id, "cf-tunnel-3")).toBe(true);
       expect(await store.getNamedTunnelForDevice("device-1")).toMatchObject({
         hostname: "d-a83k2m.newroot.cn",
@@ -235,7 +260,7 @@ describe("PgControlStore", () => {
         originPort: 4310,
         credentialHash: "expiry-credential"
       }, 5);
-      const tunnel = await store.requestNamedTunnel(user.id, "device-expiry", "d-expiry01.xmwefun.cn");
+      const tunnel = await store.requestNamedTunnel(user.id, "device-expiry", "d-expiry01.xmwefun.cn", "zone-xmwefun-123456");
       const provision = await store.claimProvisioningJob();
       await store.completeProvisioningJob(provision!.id, tunnel.id, "cf-expiry");
 

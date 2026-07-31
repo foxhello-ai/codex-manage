@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
-import type { AuthTokenRecord, DeviceRecord, EntitlementMap, IdentityType, IssueReportRecord, NamedTunnelRecord, SubjectType, TokenType, UserRecord } from "../domain";
+import type { AuthTokenRecord, DeviceRecord, EntitlementMap, IdentityType, IssueReportRecord, NamedTunnelRecord, SubjectType, SystemConfigRecord, TokenType, UserRecord } from "../domain";
 import type { ControlStore, ProvisioningJob } from "../store";
 
 export class PgControlStore implements ControlStore {
@@ -409,7 +409,7 @@ export class PgControlStore implements ControlStore {
     return result.rows;
   }
 
-  async requestNamedTunnel(userId: string, deviceId: string, hostname: string): Promise<NamedTunnelRecord> {
+  async requestNamedTunnel(userId: string, deviceId: string, hostname: string, cloudflareZoneId: string | null): Promise<NamedTunnelRecord> {
     return this.transaction(async (client) => {
       const owned = await client.query("SELECT id FROM devices WHERE id = $1 AND user_id = $2 AND status = 'active'", [deviceId, userId]);
       if (owned.rowCount !== 1) throw new Error("DEVICE_NOT_FOUND");
@@ -424,13 +424,15 @@ export class PgControlStore implements ControlStore {
           String(current.status) !== "revoked"
           && String(current.hostname) === hostname
           && (!current.target_hostname || String(current.target_hostname) === hostname)
+          && (!cloudflareZoneId || !current.cloudflare_zone_id || String(current.cloudflare_zone_id) === cloudflareZoneId)
         ) {
           return mapTunnel(current);
         }
         await client.query(`
-          UPDATE tunnels SET status = 'revoked', target_hostname = $2, updated_at = now(), last_error_code = 'DOMAIN_MIGRATION'
+          UPDATE tunnels SET status = 'revoked', target_hostname = $2, target_cloudflare_zone_id = $3,
+            updated_at = now(), last_error_code = 'DOMAIN_MIGRATION'
           WHERE id = $1
-        `, [current.id, hostname]);
+        `, [current.id, hostname, cloudflareZoneId]);
         await client.query(`
           UPDATE domains SET status = 'released', released_at = now(), updated_at = now()
           WHERE tunnel_id = $1 AND status IN ('active','reserved')
@@ -457,14 +459,20 @@ export class PgControlStore implements ControlStore {
               AND status = 'blocked'
           )
         `, [randomUUID(), deviceId, current.id]);
-        return mapTunnel({ ...current, status: "revoked", target_hostname: hostname, last_error_code: "DOMAIN_MIGRATION" });
+        return mapTunnel({
+          ...current,
+          status: "revoked",
+          target_hostname: hostname,
+          target_cloudflare_zone_id: cloudflareZoneId,
+          last_error_code: "DOMAIN_MIGRATION"
+        });
       }
 
       const tunnelId = randomUUID();
       const created = await client.query(`
-        INSERT INTO tunnels (id, device_id, mode, hostname, status)
-        VALUES ($1,$2,'named',$3,'provisioning') RETURNING *
-      `, [tunnelId, deviceId, hostname]);
+        INSERT INTO tunnels (id, device_id, mode, hostname, cloudflare_zone_id, status)
+        VALUES ($1,$2,'named',$3,$4,'provisioning') RETURNING *
+      `, [tunnelId, deviceId, hostname, cloudflareZoneId]);
       await client.query(`
         INSERT INTO domains (id, device_id, tunnel_id, hostname, domain_type, status)
         VALUES ($1,$2,$3,$4,'managed_subdomain','reserved')
@@ -603,7 +611,7 @@ export class PgControlStore implements ControlStore {
       }
       const rebuild = job.rows[0]?.job_type === "revoke_named_tunnel"
         ? await client.query(`
-          SELECT j.id, t.device_id, t.target_hostname
+              SELECT j.id, t.device_id, t.target_hostname, t.target_cloudflare_zone_id
           FROM provisioning_jobs j
           JOIN tunnels t ON t.id = j.tunnel_id
           JOIN devices d ON d.id = t.device_id
@@ -624,9 +632,10 @@ export class PgControlStore implements ControlStore {
         const targetHostname = rebuild.rows[0].target_hostname ? String(rebuild.rows[0].target_hostname) : null;
         if (targetHostname) {
           await client.query(`
-            UPDATE tunnels SET hostname = $2, target_hostname = NULL, cloudflare_tunnel_id = NULL,
+            UPDATE tunnels SET hostname = $2, target_hostname = NULL, cloudflare_zone_id = $3,
+              target_cloudflare_zone_id = NULL, cloudflare_tunnel_id = NULL,
               status = 'provisioning', last_error_code = NULL, updated_at = now() WHERE id = $1
-          `, [tunnelId, targetHostname]);
+          `, [tunnelId, targetHostname, rebuild.rows[0].target_cloudflare_zone_id ?? null]);
           await client.query(`
             WITH updated AS (
               UPDATE domains SET status = 'reserved', released_at = NULL, updated_at = now()
@@ -834,6 +843,53 @@ export class PgControlStore implements ControlStore {
       ...row,
       admin_email: row.admin_email ? maskIdentifier("email", String(row.admin_email)) : null
     }));
+  }
+
+  async getSystemConfig(): Promise<SystemConfigRecord | null> {
+    const result = await this.pool.query("SELECT * FROM system_configs WHERE id = 'global'");
+    return result.rows[0] ? mapSystemConfig(result.rows[0]) : null;
+  }
+
+  async upsertSystemConfig(input: {
+    adminId: string;
+    config: Omit<SystemConfigRecord, "updatedAt" | "updatedByAdminId">;
+  }): Promise<SystemConfigRecord> {
+    return this.transaction(async (client) => {
+      const before = await client.query("SELECT * FROM system_configs WHERE id = 'global' FOR UPDATE");
+      const result = await client.query(`
+        INSERT INTO system_configs (
+          id, public_api_base_url, desktop_update_feed_url, device_domain,
+          managed_domain_suffixes, admin_origins, desktop_config_ttl_seconds,
+          cloudflare_zone_id, updated_by_admin_id
+        ) VALUES ('global',$1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8)
+        ON CONFLICT (id) DO UPDATE SET
+          public_api_base_url = EXCLUDED.public_api_base_url,
+          desktop_update_feed_url = EXCLUDED.desktop_update_feed_url,
+          device_domain = EXCLUDED.device_domain,
+          managed_domain_suffixes = EXCLUDED.managed_domain_suffixes,
+          admin_origins = EXCLUDED.admin_origins,
+          desktop_config_ttl_seconds = EXCLUDED.desktop_config_ttl_seconds,
+          cloudflare_zone_id = EXCLUDED.cloudflare_zone_id,
+          updated_by_admin_id = EXCLUDED.updated_by_admin_id,
+          updated_at = now()
+        RETURNING *
+      `, [
+        input.config.publicApiBaseUrl,
+        input.config.desktopUpdateFeedUrl,
+        input.config.deviceDomain,
+        JSON.stringify(input.config.managedDomainSuffixes),
+        JSON.stringify(input.config.adminOrigins),
+        input.config.desktopConfigTtlSeconds,
+        input.config.cloudflareZoneId,
+        input.adminId
+      ]);
+      const next = mapSystemConfig(result.rows[0]);
+      await insertAudit(client, input.adminId, "system_config.update", "system_config", "global", {
+        before: before.rows[0] ? mapSystemConfig(before.rows[0]) : null,
+        after: next
+      });
+      return next;
+    });
   }
 
   async createIssueReport(input: Parameters<ControlStore["createIssueReport"]>[0]): Promise<IssueReportRecord> {
@@ -1282,9 +1338,24 @@ function mapTunnel(row: Record<string, unknown>): NamedTunnelRecord {
     id: String(row.id),
     deviceId: String(row.device_id),
     cloudflareTunnelId: row.cloudflare_tunnel_id ? String(row.cloudflare_tunnel_id) : null,
+    cloudflareZoneId: row.cloudflare_zone_id ? String(row.cloudflare_zone_id) : null,
     hostname: String(row.hostname),
     status: String(row.status),
     lastErrorCode: row.last_error_code ? String(row.last_error_code) : null
+  };
+}
+
+function mapSystemConfig(row: Record<string, unknown>): SystemConfigRecord {
+  return {
+    publicApiBaseUrl: String(row.public_api_base_url),
+    desktopUpdateFeedUrl: String(row.desktop_update_feed_url),
+    deviceDomain: String(row.device_domain),
+    managedDomainSuffixes: readStringArray(row.managed_domain_suffixes),
+    adminOrigins: readStringArray(row.admin_origins),
+    desktopConfigTtlSeconds: Number(row.desktop_config_ttl_seconds),
+    cloudflareZoneId: row.cloudflare_zone_id ? String(row.cloudflare_zone_id) : null,
+    updatedAt: row.updated_at ? new Date(String(row.updated_at)).toISOString() : null,
+    updatedByAdminId: row.updated_by_admin_id ? String(row.updated_by_admin_id) : null
   };
 }
 
@@ -1310,6 +1381,19 @@ function mapIssueReport(row: Record<string, unknown>): IssueReportRecord {
     createdAt: new Date(String(row.created_at)).toISOString(),
     updatedAt: new Date(String(row.updated_at)).toISOString()
   };
+}
+
+function readStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 function maskIdentifier(type: IdentityType, value: string): string {

@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { CloudflareAdapter } from "./cloudflare/CloudflareAdapter";
 import type { ControlConfig } from "./config";
+import { fallbackSystemConfig, isOriginAllowed } from "./config";
 import { ControlService } from "./ControlService";
 import { ControlError } from "./domain";
 import type { VerificationNotifier } from "./notifier";
@@ -82,6 +83,15 @@ const IssueReportUpdateRequest = z.object({
   note: z.string().trim().max(1000).nullable().optional(),
   linkedIncidentId: z.string().trim().max(120).nullable().optional()
 }).refine((value) => Object.keys(value).length > 0, "至少需要一个更新字段");
+const SystemConfigRequest = z.object({
+  publicApiBaseUrl: z.string().trim().url().max(300),
+  desktopUpdateFeedUrl: z.string().trim().url().max(300),
+  deviceDomain: z.string().trim().min(3).max(253),
+  managedDomainSuffixes: z.array(z.string().trim().min(3).max(253)).min(1).max(20),
+  adminOrigins: z.array(z.string().trim().url().max(300)).min(1).max(20),
+  desktopConfigTtlSeconds: z.number().int().min(60).max(24 * 60 * 60),
+  cloudflareZoneId: z.string().trim().max(80).nullable().default(null)
+});
 
 export async function createControlApp(
   config: ControlConfig,
@@ -94,7 +104,14 @@ export async function createControlApp(
   const rateLimiter = new ApiRateLimiter();
 
   await app.register(cors, {
-    origin: config.adminOrigin.split(",").map((origin) => origin.trim()).filter(Boolean),
+    origin: async (origin: string | undefined) => {
+      try {
+        return await service.isAdminOriginAllowed(origin);
+      } catch (error) {
+        app.log.warn({ err: error }, "Falling back to environment admin CORS origins");
+        return isOriginAllowed(origin, fallbackSystemConfig(config).adminOrigins);
+      }
+    },
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
   });
 
@@ -132,16 +149,19 @@ export async function createControlApp(
     health: "/health"
   }));
   app.get("/health", async () => ({ ok: true, checkedAt: new Date().toISOString() }));
-  app.get("/v1/desktop/config", async () => ({
-    desktop: {
-      schema_version: 1,
-      api_base_url: config.desktop.apiBaseUrl,
-      update_feed_url: config.desktop.updateFeedUrl,
-      managed_domain_suffixes: config.desktop.managedDomainSuffixes,
-      config_ttl_seconds: config.desktop.configTtlSeconds,
-      generated_at: new Date().toISOString()
-    }
-  }));
+  app.get("/v1/desktop/config", async () => {
+    const systemConfig = await service.getSystemConfig();
+    return {
+      desktop: {
+        schema_version: 1,
+        api_base_url: systemConfig.publicApiBaseUrl,
+        update_feed_url: systemConfig.desktopUpdateFeedUrl,
+        managed_domain_suffixes: systemConfig.managedDomainSuffixes,
+        config_ttl_seconds: systemConfig.desktopConfigTtlSeconds,
+        generated_at: new Date().toISOString()
+      }
+    };
+  });
 
   app.post("/v1/auth/email/codes", async (request) => {
     const body = parseBody(CodeRequest, request.body);
@@ -354,6 +374,14 @@ export async function createControlApp(
   app.get("/v1/admin/audit-logs", async (request) => {
     await service.authenticateAdmin(readBearerToken(request));
     return { auditLogs: await store.listAdminAuditLogs() };
+  });
+  app.get("/v1/admin/system-config", async (request) => {
+    await service.authenticateAdmin(readBearerToken(request));
+    return { systemConfig: await service.getSystemConfig() };
+  });
+  app.patch("/v1/admin/system-config", async (request) => {
+    const adminId = await service.authenticateAdmin(readBearerToken(request), true);
+    return await service.updateSystemConfig(adminId, parseBody(SystemConfigRequest, request.body));
   });
   app.get("/v1/admin/issue-reports", async (request) => {
     await service.authenticateAdmin(readBearerToken(request));

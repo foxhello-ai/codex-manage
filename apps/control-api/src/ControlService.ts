@@ -1,7 +1,8 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { CloudflareAdapter } from "./cloudflare/CloudflareAdapter";
 import type { ControlConfig } from "./config";
-import { ControlError, type EntitlementMap, type IdentityType, type IssueReportCategory, type IssueReportLevel, type IssueReportSource, type IssueReportStatus } from "./domain";
+import { fallbackSystemConfig, isOriginAllowed, mergeSystemConfig, normalizeSystemConfigInput } from "./config";
+import { ControlError, type EntitlementMap, type IdentityType, type IssueReportCategory, type IssueReportLevel, type IssueReportSource, type IssueReportStatus, type SystemConfigRecord } from "./domain";
 import type { VerificationNotifier } from "./notifier";
 import {
   hashPassword,
@@ -20,6 +21,31 @@ export class ControlService {
     private readonly notifier: VerificationNotifier,
     private readonly cloudflare: CloudflareAdapter | null
   ) {}
+
+  async getSystemConfig(): Promise<SystemConfigRecord> {
+    return mergeSystemConfig(fallbackSystemConfig(this.config), await this.store.getSystemConfig());
+  }
+
+  async isAdminOriginAllowed(origin: string | undefined): Promise<boolean> {
+    return isOriginAllowed(origin, (await this.getSystemConfig()).adminOrigins);
+  }
+
+  async updateSystemConfig(adminId: string, input: {
+    publicApiBaseUrl: string;
+    desktopUpdateFeedUrl: string;
+    deviceDomain: string;
+    managedDomainSuffixes: string[];
+    adminOrigins: string[];
+    desktopConfigTtlSeconds: number;
+    cloudflareZoneId: string | null;
+  }): Promise<{ systemConfig: SystemConfigRecord }> {
+    try {
+      const config = normalizeSystemConfigInput(input);
+      return { systemConfig: await this.store.upsertSystemConfig({ adminId, config }) };
+    } catch (error) {
+      throw new ControlError("INVALID_SYSTEM_CONFIG", error instanceof Error ? error.message : "系统配置不正确", 400);
+    }
+  }
 
   async requestVerificationCode(type: IdentityType, rawIdentifier: string, purpose = "register") {
     const identifier = normalizeIdentifier(type, rawIdentifier);
@@ -338,7 +364,13 @@ export class ControlService {
       throw new ControlError("DEVICE_NOT_FOUND", "设备不存在", 404);
     }
     try {
-      return await this.store.requestNamedTunnel(userId, deviceId, `d-${device.deviceCode}.${this.config.publicDomain}`);
+      const systemConfig = await this.getSystemConfig();
+      return await this.store.requestNamedTunnel(
+        userId,
+        deviceId,
+        `d-${device.deviceCode}.${systemConfig.deviceDomain}`,
+        systemConfig.cloudflareZoneId
+      );
     } catch (error) {
       if (error instanceof Error && error.message === "DEVICE_NOT_FOUND") {
         throw new ControlError("DEVICE_NOT_FOUND", "设备不存在", 404);

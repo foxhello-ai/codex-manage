@@ -5,8 +5,8 @@ import { PgControlStore } from "./db/PgControlStore";
 import { TunnelProvisioner } from "./provisioner";
 
 const config = loadControlConfig();
-if (!config.cloudflare.apiToken || !config.cloudflare.accountId || !config.cloudflare.zoneId) {
-  throw new Error("Cloudflare API configuration is required for the provisioning worker");
+if (!config.cloudflare.apiToken || !config.cloudflare.accountId) {
+  throw new Error("Cloudflare API token and account configuration are required for the provisioning worker");
 }
 
 const store = new PgControlStore(createPool(config.databaseUrl));

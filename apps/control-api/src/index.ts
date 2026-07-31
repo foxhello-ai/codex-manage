@@ -9,7 +9,7 @@ import { WebhookVerificationNotifier } from "./notifier";
 
 const config = loadControlConfig();
 const store = new PgControlStore(createPool(config.databaseUrl));
-const cloudflare = config.cloudflare.apiToken && config.cloudflare.accountId && config.cloudflare.zoneId
+const cloudflare = config.cloudflare.apiToken && config.cloudflare.accountId
   ? new CloudflareAdapter(config.cloudflare.apiToken, config.cloudflare.accountId, config.cloudflare.zoneId)
   : null;
 const notifier = new WebhookVerificationNotifier(

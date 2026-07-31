@@ -86,8 +86,10 @@ CREATE TABLE IF NOT EXISTS tunnels (
   device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
   mode TEXT NOT NULL,
   cloudflare_tunnel_id TEXT,
+  cloudflare_zone_id TEXT,
   hostname TEXT NOT NULL,
   target_hostname TEXT,
+  target_cloudflare_zone_id TEXT,
   status TEXT NOT NULL,
   token_version INTEGER NOT NULL DEFAULT 1,
   last_connected_at TIMESTAMPTZ,
@@ -96,6 +98,8 @@ CREATE TABLE IF NOT EXISTS tunnels (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE tunnels ADD COLUMN IF NOT EXISTS target_hostname TEXT;
+ALTER TABLE tunnels ADD COLUMN IF NOT EXISTS cloudflare_zone_id TEXT;
+ALTER TABLE tunnels ADD COLUMN IF NOT EXISTS target_cloudflare_zone_id TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS tunnels_active_device_idx
   ON tunnels(device_id) WHERE status NOT IN ('revoked', 'deleted');
 
@@ -213,6 +217,21 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   summary JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS system_configs (
+  id TEXT PRIMARY KEY,
+  public_api_base_url TEXT NOT NULL,
+  desktop_update_feed_url TEXT NOT NULL,
+  device_domain TEXT NOT NULL,
+  managed_domain_suffixes JSONB NOT NULL DEFAULT '[]'::jsonb,
+  admin_origins JSONB NOT NULL DEFAULT '[]'::jsonb,
+  desktop_config_ttl_seconds INTEGER NOT NULL DEFAULT 3600,
+  cloudflare_zone_id TEXT,
+  updated_by_admin_id TEXT REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE system_configs ADD COLUMN IF NOT EXISTS cloudflare_zone_id TEXT;
 
 CREATE TABLE IF NOT EXISTS issue_reports (
   id TEXT PRIMARY KEY,

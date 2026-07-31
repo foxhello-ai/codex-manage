@@ -10,7 +10,7 @@ export class CloudflareAdapter {
   constructor(
     private readonly apiToken: string,
     private readonly accountId: string,
-    private readonly zoneId: string
+    private readonly zoneId: string | null
   ) {}
 
   async createTunnel(name: string): Promise<{ id: string }> {
@@ -50,11 +50,12 @@ export class CloudflareAdapter {
     );
   }
 
-  async createDnsRoute(hostname: string, tunnelId: string): Promise<void> {
-    const existing = await this.findDnsRecord(hostname);
+  async createDnsRoute(hostname: string, tunnelId: string, zoneId = this.zoneId): Promise<void> {
+    const targetZoneId = this.requireZoneId(zoneId);
+    const existing = await this.findDnsRecord(hostname, targetZoneId);
     if (existing) {
       if (existing.content === `${tunnelId}.cfargotunnel.com`) return;
-      await this.request(`/zones/${this.zoneId}/dns_records/${existing.id}`, {
+      await this.request(`/zones/${targetZoneId}/dns_records/${existing.id}`, {
         method: "PUT",
         body: JSON.stringify({
           type: "CNAME",
@@ -66,7 +67,7 @@ export class CloudflareAdapter {
       return;
     }
 
-    await this.request(`/zones/${this.zoneId}/dns_records`, {
+    await this.request(`/zones/${targetZoneId}/dns_records`, {
       method: "POST",
       body: JSON.stringify({
         type: "CNAME",
@@ -81,22 +82,28 @@ export class CloudflareAdapter {
     return await this.request<string>(`/accounts/${this.accountId}/cfd_tunnel/${tunnelId}/token`);
   }
 
-  async deletePublishedTunnel(tunnelId: string | null, hostname: string): Promise<void> {
-    const dns = await this.findDnsRecord(hostname);
+  async deletePublishedTunnel(tunnelId: string | null, hostname: string, zoneId = this.zoneId): Promise<void> {
+    const targetZoneId = this.requireZoneId(zoneId);
+    const dns = await this.findDnsRecord(hostname, targetZoneId);
     if (dns) {
-      await this.ignoreNotFound(() => this.request(`/zones/${this.zoneId}/dns_records/${dns.id}`, { method: "DELETE" }));
+      await this.ignoreNotFound(() => this.request(`/zones/${targetZoneId}/dns_records/${dns.id}`, { method: "DELETE" }));
     }
     if (tunnelId) {
       await this.ignoreNotFound(() => this.request(`/accounts/${this.accountId}/cfd_tunnel/${tunnelId}`, { method: "DELETE" }));
     }
   }
 
-  private async findDnsRecord(hostname: string): Promise<{ id: string; content: string } | null> {
+  private async findDnsRecord(hostname: string, zoneId: string): Promise<{ id: string; content: string } | null> {
     const params = new URLSearchParams({ type: "CNAME", name: hostname });
     const records = await this.request<Array<{ id: string; content: string }>>(
-      `/zones/${this.zoneId}/dns_records?${params.toString()}`
+      `/zones/${zoneId}/dns_records?${params.toString()}`
     );
     return records[0] ?? null;
+  }
+
+  private requireZoneId(zoneId: string | null): string {
+    if (!zoneId) throw new ControlError("CLOUDFLARE_ZONE_NOT_CONFIGURED", "Cloudflare Zone 尚未配置", 503);
+    return zoneId;
   }
 
   private async request<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
