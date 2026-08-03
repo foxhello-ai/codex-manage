@@ -192,9 +192,12 @@ ls -l /opt/codex-manage
 cat /opt/codex-manage/build-info.txt
 sudo systemctl cat codex-manage
 sudo systemctl status codex-manage
+sudo systemctl restart codex-manage
 sudo journalctl -u codex-manage -f
 sudoedit /etc/codex-manage/codex-manage.env
 ```
+
+修改 `/etc/codex-manage/codex-manage.env` 后，执行 `sudo systemctl restart codex-manage` 让配置生效。
 
 ## 手动安装运行包
 
