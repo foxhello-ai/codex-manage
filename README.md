@@ -70,6 +70,12 @@ cat /opt/codex-manage/current/build-info.txt
 
 关键点：systemd 服务必须用这个同一个 Linux 用户启动。这样已有会话里的绝对路径、宿主机工具链、SSH key、MCP 配置和未来新建目录都能按宿主机真实环境工作。
 
+`install-runtime.sh` 的 `--user` 可以省略：
+
+- 用普通用户执行 `sudo bash install-runtime.sh ...` 时，默认使用发起 sudo 的用户。
+- 已经在 root shell 中执行 `bash install-runtime.sh ...` 时，默认使用 `root`。
+- 如果 Codex 会话属于其他用户，必须显式传 `--user <用户名>`。
+
 示例：
 
 ```bash
@@ -102,6 +108,13 @@ scp scripts/install-runtime.sh \
 ssh deploy@server
 sudo bash /tmp/install-runtime.sh \
   --user deploy \
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
+```
+
+如果当前登录服务器的用户就是已登录 Codex 的用户，可以省略 `--user`：
+
+```bash
+sudo bash /tmp/install-runtime.sh \
   --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
 ```
 
@@ -200,6 +213,8 @@ sudo bash /tmp/install-runtime.sh \
   --user deploy \
   --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
 ```
+
+如果当前用户就是 Codex 用户，可以省略 `--user`。
 
 如果手里是 Release asset 的 `codex-manage-runtime.tgz`，也可以传 `--package /tmp/codex-manage-runtime.tgz`。如果不使用安装脚本，也可以手动安装到版本目录：
 

@@ -5,7 +5,7 @@ REPO="foxhello-ai/codex-manage"
 VERSION="latest"
 LOCAL_PACKAGE=""
 LOCAL_CHECKSUM=""
-SERVICE_USER="${SUDO_USER:-deploy}"
+SERVICE_USER=""
 SERVICE_GROUP=""
 INSTALL_DIR="/opt/codex-manage"
 ENV_FILE="/etc/codex-manage/codex-manage.env"
@@ -26,7 +26,7 @@ Options:
   --version VERSION      Release version, for example 1.0.1 or v1.0.1. Default: latest
   --package FILE         Local .tgz package or GitHub Actions artifact .zip. Skips GitHub download
   --checksum FILE        Optional sha256 file for local .tgz. Default: FILE.sha256 when present
-  --user USER            Linux user that owns the real Codex sessions. Default: $SUDO_USER or deploy
+  --user USER            Linux user that owns the real Codex sessions. Default: sudo invoking user or current user
   --group GROUP          Linux group for installed files. Default: user's primary group
   --install-dir DIR      Install directory. Default: /opt/codex-manage
   --env-file FILE        Environment file. Default: /etc/codex-manage/codex-manage.env
@@ -106,6 +106,14 @@ done
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "This installer must run as root. Use sudo." >&2
   exit 1
+fi
+
+if [[ -z "$SERVICE_USER" ]]; then
+  if [[ -n "${SUDO_USER:-}" && "${SUDO_USER:-}" != "root" ]]; then
+    SERVICE_USER="$SUDO_USER"
+  else
+    SERVICE_USER="$(id -un)"
+  fi
 fi
 
 need_command() {
