@@ -6,3 +6,9 @@ dist/
 .codex-manage/
 test-results/
 playwright-report/
+coverage/
+logs/
+
+# Other branch worktrees can leave these directories behind on main.
+apps/
+resources/
