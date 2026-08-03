@@ -1,0 +1,126 @@
+name: Build Runtime Package
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Runtime package version
+        required: true
+        default: "1.0.1"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Package runtime
+        id: package
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version || '1.0.1' }}
+        run: |
+          set -euo pipefail
+
+          version="${INPUT_VERSION:-1.0.1}"
+          version="${version#v}"
+          short_sha="${GITHUB_SHA::12}"
+          package_name="codex-manage-runtime.tgz"
+          checksum_name="${package_name}.sha256"
+          runtime_root="$RUNNER_TEMP/codex-manage-runtime"
+          runtime_dir="$runtime_root/codex-manage"
+          release_notes="$RUNNER_TEMP/release-notes.md"
+
+          rm -rf "$runtime_root"
+          mkdir -p "$runtime_dir"
+
+          find dist -name '*.map' -delete
+          cp package.json package-lock.json "$runtime_dir/"
+          cp -R dist "$runtime_dir/dist"
+
+          cat > "$runtime_dir/build-info.txt" <<EOF
+          version=${version}
+          build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          source_repository=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}
+          source_ref=${GITHUB_REF_NAME}
+          source_commit=${GITHUB_SHA}
+          source_commit_message=$(git log -1 --pretty=%s)
+          source_run_url=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+
+          npm ci --omit=dev --prefix "$runtime_dir"
+          find "$runtime_dir" -name '*.map' -delete
+          find "$runtime_dir/node_modules" -type d \( -name test -o -name tests -o -name __tests__ -o -name docs -o -name doc -o -name benchmark -o -name benchmarks \) -prune -exec rm -rf '{}' +
+          find "$runtime_dir/node_modules" -type d -empty -delete
+          tar -C "$runtime_root" -czf "$package_name" codex-manage
+          sha256sum "$package_name" > "$checksum_name"
+
+          cat > "$release_notes" <<EOF
+          Codex Manage runtime package ${version}
+
+          Source commit: ${GITHUB_SHA}
+          Source ref: ${GITHUB_REF_NAME}
+          Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+
+          echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "package_path=$PWD/$package_name" >> "$GITHUB_OUTPUT"
+          echo "checksum_name=$checksum_name" >> "$GITHUB_OUTPUT"
+          echo "checksum_path=$PWD/$checksum_name" >> "$GITHUB_OUTPUT"
+          echo "release_notes=$release_notes" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=codex-manage-runtime-${version}-${short_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload runtime package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: |
+            ${{ steps.package.outputs.package_path }}
+            ${{ steps.package.outputs.checksum_path }}
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.package.outputs.release_tag }}
+          RELEASE_TITLE: Codex Manage Runtime ${{ steps.package.outputs.version }}
+          RELEASE_NOTES: ${{ steps.package.outputs.release_notes }}
+          PACKAGE_PATH: ${{ steps.package.outputs.package_path }}
+          CHECKSUM_PATH: ${{ steps.package.outputs.checksum_path }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists. Use a new version or delete the existing release first." >&2
+            exit 1
+          fi
+
+          gh release create "$RELEASE_TAG" "$PACKAGE_PATH" "$CHECKSUM_PATH" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TITLE" \
+            --notes-file "$RELEASE_NOTES" \
+            --latest
