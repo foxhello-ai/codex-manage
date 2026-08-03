@@ -24,8 +24,8 @@ Usage:
 Options:
   --repo OWNER/REPO       GitHub repository. Default: foxhello-ai/codex-manage
   --version VERSION      Release version, for example 1.0.1 or v1.0.1. Default: latest
-  --package FILE         Local codex-manage-runtime.tgz path. Skips GitHub download
-  --checksum FILE        Optional sha256 file for --package. Default: FILE.sha256 when present
+  --package FILE         Local .tgz package or GitHub Actions artifact .zip. Skips GitHub download
+  --checksum FILE        Optional sha256 file for local .tgz. Default: FILE.sha256 when present
   --user USER            Linux user that owns the real Codex sessions. Default: $SUDO_USER or deploy
   --group GROUP          Linux group for installed files. Default: user's primary group
   --install-dir DIR      Install directory. Default: /opt/codex-manage
@@ -117,13 +117,16 @@ need_command() {
 
 need_command tar
 need_command systemctl
-need_command node
 
 if [[ -z "$LOCAL_PACKAGE" ]]; then
   need_command curl
   need_command sha256sum
 elif [[ -n "$LOCAL_CHECKSUM" || -f "${LOCAL_PACKAGE}.sha256" ]]; then
   need_command sha256sum
+fi
+
+if [[ -n "$LOCAL_PACKAGE" && "$LOCAL_PACKAGE" == *.zip ]]; then
+  need_command unzip
 fi
 
 if ! id "$SERVICE_USER" >/dev/null 2>&1; then
@@ -151,7 +154,29 @@ run_as_service_user() {
 }
 
 detect_codex_path() {
-  run_as_service_user sh -lc 'command -v codex' 2>/dev/null || true
+  run_as_service_user bash -lc 'command -v codex' 2>/dev/null || true
+}
+
+detect_node_path() {
+  local node_path
+  node_path="$(command -v node 2>/dev/null || true)"
+  if [[ -n "$node_path" ]]; then
+    printf '%s\n' "$node_path"
+    return
+  fi
+
+  node_path="$(run_as_service_user bash -lc 'command -v node' 2>/dev/null || true)"
+  if [[ -n "$node_path" ]]; then
+    printf '%s\n' "$node_path"
+    return
+  fi
+
+  for node_path in /usr/local/bin/node /usr/bin/node /bin/node; do
+    if [[ -x "$node_path" ]]; then
+      printf '%s\n' "$node_path"
+      return
+    fi
+  done
 }
 
 generate_secret() {
@@ -187,14 +212,35 @@ if [[ -n "$LOCAL_PACKAGE" ]]; then
     exit 1
   fi
 
-  if [[ -z "$LOCAL_CHECKSUM" && -f "${LOCAL_PACKAGE}.sha256" ]]; then
-    LOCAL_CHECKSUM="${LOCAL_PACKAGE}.sha256"
+  echo "Using local Codex Manage runtime package: $LOCAL_PACKAGE"
+
+  if [[ "$LOCAL_PACKAGE" == *.zip ]]; then
+    ARTIFACT_DIR="$TMP_DIR/artifact"
+    mkdir -p "$ARTIFACT_DIR"
+    unzip -q "$LOCAL_PACKAGE" -d "$ARTIFACT_DIR"
+
+    ARTIFACT_PACKAGE="$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name 'codex-manage-runtime.tgz' -print -quit)"
+    if [[ -z "$ARTIFACT_PACKAGE" ]]; then
+      echo "Invalid Actions artifact zip: missing codex-manage-runtime.tgz" >&2
+      exit 1
+    fi
+    cp "$ARTIFACT_PACKAGE" "$PACKAGE_FILE"
+
+    if [[ -z "$LOCAL_CHECKSUM" ]]; then
+      ARTIFACT_CHECKSUM="$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name 'codex-manage-runtime.tgz.sha256' -print -quit)"
+      if [[ -n "$ARTIFACT_CHECKSUM" ]]; then
+        LOCAL_CHECKSUM="$ARTIFACT_CHECKSUM"
+      fi
+    fi
+  else
+    if [[ -z "$LOCAL_CHECKSUM" && -f "${LOCAL_PACKAGE}.sha256" ]]; then
+      LOCAL_CHECKSUM="${LOCAL_PACKAGE}.sha256"
+    fi
+    cp "$LOCAL_PACKAGE" "$PACKAGE_FILE"
   fi
 
-  echo "Using local Codex Manage runtime package: $LOCAL_PACKAGE"
-  cp "$LOCAL_PACKAGE" "$PACKAGE_FILE"
-
   if [[ -n "$LOCAL_CHECKSUM" ]]; then
+    need_command sha256sum
     if [[ ! -f "$LOCAL_CHECKSUM" ]]; then
       echo "Local checksum file not found: $LOCAL_CHECKSUM" >&2
       exit 1
@@ -284,7 +330,13 @@ else
   echo "Keeping existing $ENV_FILE."
 fi
 
-NODE_PATH="$(command -v node)"
+NODE_PATH="$(detect_node_path)"
+if [[ -z "$NODE_PATH" ]]; then
+  echo "Required command not found: node" >&2
+  echo "Install Node.js for $SERVICE_USER, or make node available in PATH before rerunning." >&2
+  exit 1
+fi
+
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]

@@ -90,26 +90,27 @@ curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scrip
   | sudo bash -s -- --user deploy --version 1.0.1
 ```
 
-私有仓库不能匿名访问 `raw.githubusercontent.com`，GitHub 会返回 404。如果不想在服务器配置 GitHub token，先在本地或 CI 页面下载运行包，再把运行包和安装脚本上传到服务器：
+私有仓库不能匿名访问 `raw.githubusercontent.com`，GitHub 会返回 404。如果不想在服务器配置 GitHub token，先在本地或 CI 页面下载运行包，再把运行包和安装脚本上传到服务器。
+
+从 GitHub Actions Artifacts 下载到本地时通常是 `.zip`，可以直接传给 `--package`：
 
 ```bash
 scp scripts/install-runtime.sh \
-  codex-manage-runtime.tgz \
-  codex-manage-runtime.tgz.sha256 \
+  codex-manage-runtime-1.0.1-<12位commit>.zip \
   deploy@server:/tmp/
 
 ssh deploy@server
 sudo bash /tmp/install-runtime.sh \
   --user deploy \
-  --package /tmp/codex-manage-runtime.tgz
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
 ```
 
-如果 `/tmp/codex-manage-runtime.tgz.sha256` 同时存在，安装脚本会自动校验；如果只上传 tgz，也可以安装，但会跳过校验。
+如果手里是 Release asset 里的 `codex-manage-runtime.tgz`，也可以上传 tgz 和同名 `.sha256` 后安装。`--user deploy` 里的 `deploy` 必须替换成真实存在、且已经登录 Codex 的 Linux 用户。
 
 安装脚本会：
 
-- 从 GitHub Release 下载 `codex-manage-runtime.tgz`，或使用 `--package` 指定的本地 tgz。
-- 下载并校验 `codex-manage-runtime.tgz.sha256`；本地包模式会自动使用同路径的 `.sha256` 文件。
+- 从 GitHub Release 下载 `codex-manage-runtime.tgz`，或使用 `--package` 指定的本地 `.tgz` / Actions artifact `.zip`。
+- 下载并校验 `codex-manage-runtime.tgz.sha256`；本地 tgz 模式会自动使用同路径的 `.sha256` 文件，artifact zip 模式会使用 zip 内的 `.sha256` 文件。
 - 安装到 `/opt/codex-manage/releases/<version>-<commit>`。
 - 切换 `/opt/codex-manage/current`。
 - 首次安装时生成 `/etc/codex-manage/codex-manage.env`。
@@ -128,7 +129,7 @@ curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scrip
 ```bash
 sudo bash /tmp/install-runtime.sh \
   --user deploy \
-  --package /tmp/codex-manage-runtime.tgz \
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip \
   --no-start
 ```
 
@@ -184,12 +185,11 @@ sudoedit /etc/codex-manage/codex-manage.env
 
 ## 手动安装运行包
 
-推荐使用安装脚本的本地包模式。将 tarball、校验文件和安装脚本上传到服务器：
+推荐使用安装脚本的本地包模式。将 Actions artifact zip 和安装脚本上传到服务器：
 
 ```bash
 scp scripts/install-runtime.sh \
-  codex-manage-runtime.tgz \
-  codex-manage-runtime.tgz.sha256 \
+  codex-manage-runtime-1.0.1-<12位commit>.zip \
   deploy@server:/tmp/
 ```
 
@@ -198,10 +198,10 @@ scp scripts/install-runtime.sh \
 ```bash
 sudo bash /tmp/install-runtime.sh \
   --user deploy \
-  --package /tmp/codex-manage-runtime.tgz
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
 ```
 
-如果不使用安装脚本，也可以手动安装到版本目录：
+如果手里是 Release asset 的 `codex-manage-runtime.tgz`，也可以传 `--package /tmp/codex-manage-runtime.tgz`。如果不使用安装脚本，也可以手动安装到版本目录：
 
 ```bash
 sudo mkdir -p /opt/codex-manage/releases
@@ -341,7 +341,7 @@ curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scrip
 ```bash
 sudo bash /tmp/install-runtime.sh \
   --user deploy \
-  --package /tmp/codex-manage-runtime.tgz
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
 ```
 
 也可以手动上传新 tarball 后安装到新版本目录，然后切换 `current`：
