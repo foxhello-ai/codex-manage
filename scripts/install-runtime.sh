@@ -3,6 +3,8 @@ set -euo pipefail
 
 REPO="foxhello-ai/codex-manage"
 VERSION="latest"
+LOCAL_PACKAGE=""
+LOCAL_CHECKSUM=""
 SERVICE_USER="${SUDO_USER:-deploy}"
 SERVICE_GROUP=""
 INSTALL_DIR="/opt/codex-manage"
@@ -14,7 +16,7 @@ START_SERVICE="1"
 
 usage() {
   cat <<'EOF'
-Install Codex Manage runtime package from GitHub Releases.
+Install Codex Manage runtime package from GitHub Releases or a local tarball.
 
 Usage:
   install-runtime.sh [options]
@@ -22,6 +24,8 @@ Usage:
 Options:
   --repo OWNER/REPO       GitHub repository. Default: foxhello-ai/codex-manage
   --version VERSION      Release version, for example 1.0.1 or v1.0.1. Default: latest
+  --package FILE         Local codex-manage-runtime.tgz path. Skips GitHub download
+  --checksum FILE        Optional sha256 file for --package. Default: FILE.sha256 when present
   --user USER            Linux user that owns the real Codex sessions. Default: $SUDO_USER or deploy
   --group GROUP          Linux group for installed files. Default: user's primary group
   --install-dir DIR      Install directory. Default: /opt/codex-manage
@@ -33,7 +37,7 @@ Options:
   -h, --help             Show this help
 
 Environment:
-  GITHUB_TOKEN or GH_TOKEN can be set for higher GitHub API/download rate limits.
+  GITHUB_TOKEN or GH_TOKEN can be set for higher GitHub download rate limits.
 EOF
 }
 
@@ -45,6 +49,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --version)
       VERSION="$2"
+      shift 2
+      ;;
+    --package)
+      LOCAL_PACKAGE="$2"
+      shift 2
+      ;;
+    --checksum)
+      LOCAL_CHECKSUM="$2"
       shift 2
       ;;
     --user)
@@ -103,11 +115,16 @@ need_command() {
   fi
 }
 
-need_command curl
 need_command tar
-need_command sha256sum
 need_command systemctl
 need_command node
+
+if [[ -z "$LOCAL_PACKAGE" ]]; then
+  need_command curl
+  need_command sha256sum
+elif [[ -n "$LOCAL_CHECKSUM" || -f "${LOCAL_PACKAGE}.sha256" ]]; then
+  need_command sha256sum
+fi
 
 if ! id "$SERVICE_USER" >/dev/null 2>&1; then
   echo "Linux user not found: $SERVICE_USER" >&2
@@ -149,7 +166,8 @@ generate_secret() {
 curl_download() {
   local url="$1"
   local output="$2"
-  local token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  local token
+  token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
   local args=(-fsSL --retry 3 --retry-delay 2)
   if [[ -n "$token" ]]; then
     args+=(-H "Authorization: Bearer $token")
@@ -157,27 +175,55 @@ curl_download() {
   curl "${args[@]}" "$url" -o "$output"
 }
 
-if [[ "$VERSION" == "latest" ]]; then
-  DOWNLOAD_BASE="https://github.com/${REPO}/releases/latest/download"
-else
-  VERSION="${VERSION#v}"
-  DOWNLOAD_BASE="https://github.com/${REPO}/releases/download/v${VERSION}"
-fi
-
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 PACKAGE_FILE="$TMP_DIR/codex-manage-runtime.tgz"
 CHECKSUM_FILE="$TMP_DIR/codex-manage-runtime.tgz.sha256"
 
-echo "Downloading Codex Manage runtime from $DOWNLOAD_BASE"
-curl_download "$DOWNLOAD_BASE/codex-manage-runtime.tgz" "$PACKAGE_FILE"
-curl_download "$DOWNLOAD_BASE/codex-manage-runtime.tgz.sha256" "$CHECKSUM_FILE"
+if [[ -n "$LOCAL_PACKAGE" ]]; then
+  if [[ ! -f "$LOCAL_PACKAGE" ]]; then
+    echo "Local package not found: $LOCAL_PACKAGE" >&2
+    exit 1
+  fi
 
-(
-  cd "$TMP_DIR"
-  sha256sum -c codex-manage-runtime.tgz.sha256
-)
+  if [[ -z "$LOCAL_CHECKSUM" && -f "${LOCAL_PACKAGE}.sha256" ]]; then
+    LOCAL_CHECKSUM="${LOCAL_PACKAGE}.sha256"
+  fi
+
+  echo "Using local Codex Manage runtime package: $LOCAL_PACKAGE"
+  cp "$LOCAL_PACKAGE" "$PACKAGE_FILE"
+
+  if [[ -n "$LOCAL_CHECKSUM" ]]; then
+    if [[ ! -f "$LOCAL_CHECKSUM" ]]; then
+      echo "Local checksum file not found: $LOCAL_CHECKSUM" >&2
+      exit 1
+    fi
+    cp "$LOCAL_CHECKSUM" "$CHECKSUM_FILE"
+    (
+      cd "$TMP_DIR"
+      sha256sum -c codex-manage-runtime.tgz.sha256
+    )
+  else
+    echo "No checksum file provided or found at ${LOCAL_PACKAGE}.sha256; skipping checksum verification."
+  fi
+else
+  if [[ "$VERSION" == "latest" ]]; then
+    DOWNLOAD_BASE="https://github.com/${REPO}/releases/latest/download"
+  else
+    VERSION="${VERSION#v}"
+    DOWNLOAD_BASE="https://github.com/${REPO}/releases/download/v${VERSION}"
+  fi
+
+  echo "Downloading Codex Manage runtime from $DOWNLOAD_BASE"
+  curl_download "$DOWNLOAD_BASE/codex-manage-runtime.tgz" "$PACKAGE_FILE"
+  curl_download "$DOWNLOAD_BASE/codex-manage-runtime.tgz.sha256" "$CHECKSUM_FILE"
+
+  (
+    cd "$TMP_DIR"
+    sha256sum -c codex-manage-runtime.tgz.sha256
+  )
+fi
 
 EXTRACT_DIR="$TMP_DIR/extract"
 mkdir -p "$EXTRACT_DIR"
