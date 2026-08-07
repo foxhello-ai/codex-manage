@@ -246,6 +246,32 @@ describe("SessionService", () => {
     });
   });
 
+  it("can read lightweight session detail without turns", async () => {
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready" as const, pid: 1, lastError: null, initialized: true }),
+      request: async <T = unknown>(method: string, params?: unknown) => {
+        calls.push({ method, params });
+        return {
+          thread: {
+            id: "thread-1",
+            preview: "lightweight detail",
+            cwd: "/workspace/app",
+            createdAt: 1,
+            updatedAt: 2
+          }
+        } as T;
+      }
+    });
+
+    await service.getSessionDetail("thread-1", { includeTurns: false });
+
+    expect(calls).toEqual([{
+      method: "thread/read",
+      params: { threadId: "thread-1", includeTurns: false }
+    }]);
+  });
+
   it("accepts sessionId-only app-server records", async () => {
     const service = new SessionService(
       readyClient({
@@ -325,23 +351,7 @@ describe("SessionService", () => {
         })
       },
       {
-        list: async () => ({
-          models: [{
-            id: "gpt-5.6-sol",
-            model: "gpt-5.6-sol",
-            displayName: "GPT-5.6-Sol",
-            description: null,
-            hidden: false,
-            isDefault: true,
-            supportedReasoningEfforts: ["high"],
-            defaultReasoningEffort: "high",
-            upgradeModel: null,
-            upgradeCopy: null
-          }],
-          loadedAt: "2026-07-19T00:00:00.000Z",
-          stale: false,
-          lastError: null
-        })
+        isModelSupportedFromCache: () => false
       }
     );
 
@@ -378,23 +388,7 @@ describe("SessionService", () => {
         })
       },
       {
-        list: async () => ({
-          models: [{
-            id: "gpt-5.6-sol",
-            model: "gpt-5.6-sol",
-            displayName: "GPT-5.6-Sol",
-            description: null,
-            hidden: false,
-            isDefault: true,
-            supportedReasoningEfforts: ["high"],
-            defaultReasoningEffort: "high",
-            upgradeModel: null,
-            upgradeCopy: null
-          }],
-          loadedAt: "2026-07-19T00:00:00.000Z",
-          stale: false,
-          lastError: null
-        })
+        isModelSupportedFromCache: () => true
       },
       {
         getRuntime: () => ({
