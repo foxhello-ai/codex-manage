@@ -16,9 +16,8 @@ export function registerModelRoutes(app: FastifyInstance, modelCatalog: ModelCat
     }
 
     try {
-      const result = await modelCatalog.list({
-        forceRefresh: query.data.refresh === true || query.data.refresh === "true"
-      });
+      const forceRefresh = query.data.refresh === true || query.data.refresh === "true";
+      const result = await modelCatalog.list(forceRefresh ? { forceRefresh: true } : { allowStale: true });
       return reply.send(result);
     } catch (error) {
       if (error instanceof ModelDomainError) {

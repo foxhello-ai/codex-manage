@@ -28,7 +28,7 @@ function expandHome(path: string): string {
 
 export function loadConfig(): AppConfig {
   const defaultPassword = process.env.CODEX_WEB_PASSWORD === undefined;
-  const password = process.env.CODEX_WEB_PASSWORD ?? "fmzh2026";
+  const password = process.env.CODEX_WEB_PASSWORD ?? "admin";
   const sessionSecret = process.env.CODEX_WEB_SESSION_SECRET ?? randomBytes(32).toString("hex");
 
   return {

@@ -10,7 +10,7 @@ function testConfig(): AppConfig {
   return {
     host: "0.0.0.0",
     port: 3000,
-    password: "fmzh2026",
+    password: "admin",
     defaultPassword: false,
     sessionSecret: "test-secret-at-least-thirty-two-chars",
     codexCliPath: "codex",
@@ -71,7 +71,7 @@ describe("auth routes", () => {
       method: "POST",
       url: "/api/login",
       payload: {
-        password: "fmzh2026"
+        password: "admin"
       }
     });
     expect(login.statusCode).toBe(200);

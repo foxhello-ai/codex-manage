@@ -9,7 +9,7 @@
     "dev:client": "vite --host 0.0.0.0",
     "build": "npm run typecheck && npm run build:client && npm run build:server",
     "build:client": "vite build",
-    "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server/index.js",
+    "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --minify --legal-comments=none --outfile=dist/server/index.js",
     "start": "NODE_ENV=production node dist/server/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

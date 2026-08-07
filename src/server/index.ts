@@ -76,6 +76,9 @@ try {
     host: config.host,
     port: config.port
   });
+  void modelCatalog.list().catch((error) => {
+    app.log.warn({ err: error }, "Failed to prewarm model catalog");
+  });
 } catch (error) {
   app.log.error(error);
   codexConfigWatcher.stop();

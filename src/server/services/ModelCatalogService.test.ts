@@ -85,6 +85,45 @@ describe("ModelCatalogService", () => {
     expect(calls).toBe(2);
   });
 
+  it("returns expired cache immediately while refreshing in background", async () => {
+    let now = 5_000;
+    let resolveRefresh: ((value: unknown) => void) | undefined;
+    let calls = 0;
+    const client = readyClient(() => {
+      calls += 1;
+      if (calls === 1) return { data: [rawModel("alpha")], nextCursor: null };
+      return new Promise((resolve) => {
+        resolveRefresh = resolve;
+      });
+    });
+    const service = new ModelCatalogService(client, { now: () => now });
+
+    await service.list();
+    now += 61_000;
+
+    await expect(service.list({ allowStale: true })).resolves.toMatchObject({
+      stale: true,
+      models: [{ model: "alpha" }]
+    });
+    expect(calls).toBe(2);
+    resolveRefresh?.({ data: [rawModel("beta")], nextCursor: null });
+    await expect(service.list({ forceRefresh: true })).resolves.toMatchObject({
+      stale: false,
+      models: [{ model: "beta" }]
+    });
+  });
+
+  it("checks model support without triggering a catalog request", async () => {
+    const client = readyClient(() => ({ data: [rawModel("alpha")], nextCursor: null }));
+    const service = new ModelCatalogService(client);
+
+    expect(service.isModelSupportedFromCache("alpha")).toBeNull();
+    expect(client.requests).toHaveLength(0);
+    await service.list();
+    expect(service.isModelSupportedFromCache("alpha")).toBe(true);
+    expect(service.isModelSupportedFromCache("missing")).toBe(false);
+  });
+
   it("coalesces concurrent refreshes", async () => {
     let resolveResponse: ((value: unknown) => void) | undefined;
     const client = readyClient(() => new Promise((resolve) => {

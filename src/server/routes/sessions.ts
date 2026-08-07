@@ -17,6 +17,10 @@ const SessionParams = z.object({
   id: z.string().min(1)
 });
 
+const SessionDetailQuery = z.object({
+  turns: z.union([z.literal("true"), z.literal("false"), z.boolean()]).optional()
+});
+
 const MetadataBody = z.object({
   remarkTitle: z.string().max(120).nullable()
 });
@@ -271,9 +275,15 @@ export function registerSessionRoutes(
     if (!params.success) {
       return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
     }
+    const query = SessionDetailQuery.safeParse(request.query ?? {});
+    if (!query.success) {
+      return sendError(reply, 400, "INVALID_SESSION_QUERY", "会话详情查询参数不正确");
+    }
 
     try {
-      const session = await sessionService.getSessionDetail(params.data.id);
+      const session = await sessionService.getSessionDetail(params.data.id, {
+        includeTurns: query.data.turns !== false && query.data.turns !== "false"
+      });
       return reply.send({ session });
     } catch (error) {
       if (error instanceof Error && error.message === "Session not found") {

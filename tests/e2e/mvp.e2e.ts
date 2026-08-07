@@ -1,7 +1,7 @@
 import { expect, test, type Page, type TestInfo, type WebSocketRoute } from "@playwright/test";
 import type { RuntimeSnapshot, SessionModelState, SessionStatus } from "../../src/shared/models";
 
-const password = process.env.CODEX_E2E_PASSWORD ?? "fmzh2026";
+const password = process.env.CODEX_E2E_PASSWORD ?? "admin";
 const acceptanceDir = "docs/acceptance/2026-07-15";
 
 function modelState(patch: Partial<SessionModelState> = {}): SessionModelState {

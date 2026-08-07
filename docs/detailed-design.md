@@ -119,7 +119,7 @@ Codex 集成：
 ```text
 CODEX_WEB_HOST=0.0.0.0
 CODEX_WEB_PORT=4310
-CODEX_WEB_PASSWORD=fmzh2026
+CODEX_WEB_PASSWORD=admin
 CODEX_CLI_PATH=codex
 CODEX_SESSIONS_DIR=~/.codex/sessions
 CODEX_WEB_SESSION_SECRET=<auto-or-env>
@@ -129,7 +129,7 @@ CODEX_WEB_SESSION_SECRET=<auto-or-env>
 
 - 监听地址：`0.0.0.0`
 - 监听端口：`4310`
-- 默认密码：`fmzh2026`
+- 默认密码：`admin`
 - Codex CLI：`codex`
 - 会话目录：`~/.codex/sessions`
 

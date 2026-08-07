@@ -7,7 +7,7 @@ function testConfig(): AppConfig {
   return {
     host: "0.0.0.0",
     port: 5902,
-    password: "fmzh2026",
+    password: "admin",
     defaultPassword: true,
     sessionSecret: "test-secret-at-least-thirty-two-chars",
     codexCliPath: "/usr/local/bin/codex",

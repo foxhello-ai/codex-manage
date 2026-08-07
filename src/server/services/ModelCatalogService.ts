@@ -40,13 +40,27 @@ export class ModelCatalogService {
     this.now = options.now ?? Date.now;
   }
 
-  async list(query: { forceRefresh?: boolean } = {}): Promise<ModelCatalogResponse> {
+  async list(query: { forceRefresh?: boolean; allowStale?: boolean } = {}): Promise<ModelCatalogResponse> {
     if (!query.forceRefresh && this.cache && this.cache.expiresAtMs > this.now()) {
       return this.snapshot(this.cache, false, null);
     }
 
-    if (this.refreshPromise) return this.refreshPromise;
+    if (!query.forceRefresh && query.allowStale && this.cache) {
+      void this.startRefresh();
+      return this.snapshot(this.cache, true, null);
+    }
 
+    return this.startRefresh();
+  }
+
+  isModelSupportedFromCache(model: string): boolean | null {
+    const normalized = model.trim();
+    if (!normalized || !this.cache) return null;
+    return this.cache.models.some((option) => option.model === normalized);
+  }
+
+  private startRefresh(): Promise<ModelCatalogResponse> {
+    if (this.refreshPromise) return this.refreshPromise;
     this.refreshPromise = this.refresh().finally(() => {
       this.refreshPromise = null;
     });
