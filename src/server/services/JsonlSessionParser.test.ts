@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -103,6 +103,49 @@ describe("JsonlSessionParser", () => {
       }
     });
   });
+
+  it("parses only the rollout file whose filename matches the session", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "codex-jsonl-parser-index-"));
+    const targetId = "019fda14-8295-7252-be38-ed0795e6502f";
+    const otherId = "019fda14-8295-7252-be38-ed0795e65030";
+    await writeFile(join(dir, `rollout-2026-08-07T10-36-45-${targetId}.jsonl`), jsonl([
+      { type: "session_meta", payload: { id: targetId } },
+      {
+        type: "response_item",
+        timestamp: "2026-08-07T10:36:46Z",
+        payload: {
+          type: "function_call",
+          name: "exec_command",
+          call_id: "target-call",
+          arguments: JSON.stringify({ cmd: "npm test", workdir: "/target" })
+        }
+      }
+    ]));
+    await writeFile(join(dir, `rollout-2026-08-07T10-36-45-${otherId}.jsonl`), jsonl([
+      { type: "session_meta", payload: { id: otherId } },
+      "not json",
+      {
+        type: "response_item",
+        payload: {
+          type: "function_call",
+          name: "exec_command",
+          call_id: "other-call",
+          arguments: JSON.stringify({ cmd: "should not parse", workdir: "/other" })
+        }
+      }
+    ]));
+
+    await expect(new JsonlSessionParser(dir).listCommands(targetId)).resolves.toMatchObject({
+      commands: [{ callId: "target-call" }],
+      diagnostics: {
+        scannedFiles: 1,
+        parsedLines: 2,
+        parseErrors: 0,
+        matchedSessionFile: true
+      }
+    });
+  });
+
   it("reads the last historical model state with malformed-line tolerance", async () => {
     const dir = await mkdtemp(join(tmpdir(), "codex-jsonl-model-state-"));
     await writeFile(join(dir, "session.jsonl"), jsonl([
@@ -160,6 +203,30 @@ describe("JsonlSessionParser", () => {
     await expect(new JsonlSessionParser(dir).readModelState("thread-1")).resolves.toMatchObject({
       state: { model: null, modelProvider: null, reasoningEffort: null, updatedAt: null },
       diagnostics: { matchedSessionFile: false }
+    });
+  });
+
+  it("invalidates the model cache when the rollout file grows", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "codex-jsonl-model-cache-"));
+    const sessionId = "019fda14-8295-7252-be38-ed0795e6502f";
+    const file = join(dir, `rollout-2026-08-07T10-36-45-${sessionId}.jsonl`);
+    await writeFile(file, jsonl([
+      { type: "session_meta", payload: { id: sessionId, model_provider: "openai" } },
+      { type: "turn_context", payload: { model: "gpt-5.1", reasoning_effort: "medium" } }
+    ]));
+    const parser = new JsonlSessionParser(dir);
+
+    await expect(parser.readModelState(sessionId)).resolves.toMatchObject({
+      state: { model: "gpt-5.1", reasoningEffort: "medium" }
+    });
+
+    await appendFile(file, jsonl([
+      { type: "turn_context", payload: { model: "gpt-5.2", reasoning_effort: "high" } }
+    ]));
+
+    await expect(parser.readModelState(sessionId)).resolves.toMatchObject({
+      state: { model: "gpt-5.2", reasoningEffort: "high" },
+      diagnostics: { parsedLines: 3 }
     });
   });
 
