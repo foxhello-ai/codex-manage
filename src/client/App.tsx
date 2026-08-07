@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
+import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionModel } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, HealthStatus, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
 import { modelSwitchDisabledReason } from "./modelSelection";
@@ -178,7 +178,6 @@ function Dashboard({
   const [loadingDiagnostics, setLoadingDiagnostics] = useState(initialRoute.kind === "settings");
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
   const [runtimeReloadNotice, setRuntimeReloadNotice] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [search, setSearch] = useState("");
   const [loadingSessions, setLoadingSessions] = useState(true);
@@ -218,13 +217,21 @@ function Dashboard({
   const retryMessageRef = useRef<string | null>(null);
   const runtimeReloadGenerationRef = useRef<number | null>(null);
 
-  const listenAddress = useMemo(() => {
-    if (!currentConfig) return "读取中";
-    return `${currentConfig.host}:${currentConfig.port}`;
-  }, [currentConfig]);
-  const appServerStatus = currentConfig?.appServer
-    ? `${currentConfig.appServer.status}${currentConfig.appServer.initialized ? " / initialized" : ""}`
-    : "未连接";
+  const dashboardActions = (
+    <div className="topbarActions">
+      <button
+        className="iconButton"
+        type="button"
+        aria-label="打开设置和诊断"
+        title="设置和诊断"
+        onClick={handleOpenSettings}
+        disabled={viewMode === "settings"}
+      >
+        <span aria-hidden="true">⚙</span>
+      </button>
+      <button className="ghostButton" onClick={onLogout}>登出</button>
+    </div>
+  );
   const selectedSession = sessions.find((session) => isSameSession(session, selectedSessionId))
     ?? (isSameSession(sessionDetail, selectedSessionId) ? sessionDetail : null);
   const currentModelState = runtime && runtime.status !== "history"
@@ -333,22 +340,6 @@ function Dashboard({
   useEffect(() => {
     retryMessageRef.current = retryMessage;
   }, [retryMessage]);
-
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function handleKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") setDrawerOpen(false);
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [drawerOpen]);
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -704,7 +695,6 @@ function Dashboard({
     }
 
     if (route.kind === "settings") {
-      setDrawerOpen(false);
       setRouteError(null);
       setViewMode("settings");
       void loadDiagnostics();
@@ -712,7 +702,6 @@ function Dashboard({
     }
 
     if (route.kind === "invalid") {
-      setDrawerOpen(false);
       resetSessionDetailState(null);
       setRouteError(route.message);
       setViewMode("invalid");
@@ -720,7 +709,6 @@ function Dashboard({
     }
 
     resetSessionDetailState(route.sessionId);
-    setDrawerOpen(false);
     setRouteError(null);
     setViewMode("detail");
     void refreshCurrentSession(route.sessionId);
@@ -730,11 +718,6 @@ function Dashboard({
     const path = buildSessionDetailPath(session.id);
     if (window.location.pathname !== path) window.history.pushState(null, "", path);
     applySessionRoute({ kind: "detail", sessionId: session.id });
-  }
-
-  function handleMetadataSaved(updated: SessionSummary) {
-    setSessions((current) => current.map((session) => (isSameSession(session, updated.id) ? updated : session)));
-    setSessionDetail((current) => (current && isSameSession(current, updated.id) ? { ...current, ...updated } : current));
   }
 
   useEffect(() => {
@@ -871,7 +854,6 @@ function Dashboard({
   function handleBackToList() {
     if (window.location.pathname !== "/") window.history.pushState(null, "", "/");
     setRouteError(null);
-    setDrawerOpen(false);
     setViewMode("list");
   }
 
@@ -893,19 +875,20 @@ function Dashboard({
         onSearchSubmit={handleSearchSubmit}
         onRefresh={() => loadSessions(search)}
         onSelect={handleSelectSession}
-        onMetadataSaved={handleMetadataSaved}
       />
     );
   }
 
-  return (
-    <Shell
-      title="Codex Manage"
-      reserveFloatingStatus={viewMode === "detail" && Boolean(selectedSession)}
-      action={(
-        <div className="topbarActions">
+  function renderV0Sidebar() {
+    return (
+      <aside className="v0Sidebar" aria-label="codex 任务列表">
+        <header className="v0ProjectHeader">
+          <button className="v0ProjectIdentity" type="button" aria-label="codex 项目">
+            <span className="v0Avatar" aria-hidden="true">C</span>
+            <strong>codex</strong>
+          </button>
           <button
-            className="iconButton"
+            className="v0IconButton"
             type="button"
             aria-label="打开设置和诊断"
             title="设置和诊断"
@@ -914,181 +897,155 @@ function Dashboard({
           >
             <span aria-hidden="true">⚙</span>
           </button>
-          <button className="ghostButton" onClick={onLogout}>登出</button>
+        </header>
+
+        <div className="v0SidebarBody">
+          {renderSessionBrowser()}
         </div>
-      )}
+
+        <NewTaskDock />
+      </aside>
+    );
+  }
+
+  function renderV0EmptyCanvas() {
+    return (
+      <section className="v0Canvas v0CanvasEmpty" aria-label="任务详情空态">
+        <div className="v0EmptyPrompt">
+          <span className="v0EmptyIcon" aria-hidden="true" />
+          <p>从左侧选择一个任务查看对话详情</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <Shell
+      title="Codex Manage"
+      hideTopbar
+      reserveFloatingStatus={false}
     >
       {defaultPassword ? (
-        <div className="warning" role="status">
+        <div className="v0Warning" role="status">
           当前密码可通过 CODEX_WEB_PASSWORD 覆盖。
         </div>
       ) : null}
 
-      {viewMode === "list" ? (
-        <>
-          <section className="toolbar">
-            <div>
-              <h2>会话管理</h2>
-              <p className="muted">查看 ~/.codex/sessions 中的历史会话，恢复会话并继续任务。</p>
-            </div>
-            <div className="toolbarActions">
-              <button
-                className="iconButton mobileOnly"
-                type="button"
-                aria-label="打开会话列表"
-                title="会话列表"
-                onClick={() => setDrawerOpen(true)}
-              >
-                <span aria-hidden="true">☰</span>
-              </button>
-              <button className="ghostButton" onClick={() => loadSessions(search)} disabled={loadingSessions}>
-                {loadingSessions ? "刷新中" : "刷新"}
-              </button>
+      <div className={`v0Workspace${viewMode === "detail" ? " hasDetail" : ""}${viewMode === "settings" ? " hasSettings" : ""}`}>
+        {renderV0Sidebar()}
+
+        {viewMode === "list" ? (
+          renderV0EmptyCanvas()
+        ) : viewMode === "detail" ? (
+          <section className="v0Canvas v0CanvasDetail" aria-label="任务详情">
+            <div className="v0DetailSurface">
+              <section className="v0DetailHeader">
+                <div className="detailTitleBar">
+                  <button className="v0BackButton" aria-label="返回会话列表" title="返回会话列表" onClick={handleBackToList}>
+                    <span aria-hidden="true">←</span>
+                  </button>
+                  <div>
+                    <p className="detailEyebrow">当前会话</p>
+                    <h2 title={selectedSession?.title ?? selectedSessionId ?? "会话加载失败"}>
+                      {selectedSession?.title ?? (loadingDetail ? "正在加载会话..." : "会话加载失败")}
+                    </h2>
+                  </div>
+                </div>
+                <div className="toolbarActions">
+                  {dashboardActions}
+                  <button className="ghostButton" onClick={handleRefresh} disabled={loadingSessions || loadingDetail || loadingCommands}>
+                    {loadingSessions || loadingDetail || loadingCommands ? "刷新中" : "刷新"}
+                  </button>
+                </div>
+              </section>
+
+              {selectedSession ? (
+                <MobileRuntimeStatus
+                  sessionTitle={selectedSession.title}
+                  runtime={runtime}
+                  wsStatus={wsStatus}
+                  pendingApprovalCount={pendingApprovals.length}
+                />
+              ) : null}
+
+              <section className="sessionDetail" aria-labelledby="session-detail-title">
+                <h2 id="session-detail-title" className="srOnly">当前会话详情</h2>
+                {selectedSession ? (
+                  <SessionDetailPanel
+                    fallbackSession={selectedSession}
+                    detail={sessionDetail}
+                    loading={loadingDetail}
+                    error={detailError}
+                    commands={commands}
+                    commandDiagnostics={commandDiagnostics}
+                    loadingCommands={loadingCommands}
+                    commandsError={commandsError}
+                    runtime={runtime}
+                    permissionMode={permissionMode}
+                    runtimeError={runtimeError}
+                    pendingApprovals={pendingApprovals}
+                    liveCommands={liveCommands}
+                    liveMessages={liveMessages}
+                    liveErrors={liveErrors}
+                    wsStatus={wsStatus}
+                    modelState={currentModelState}
+                    updatingModel={updatingModel}
+                    onResume={handleResume}
+                    onPermissionModeChange={handlePermissionModeChange}
+                    onOpenModelPicker={handleOpenModelPicker}
+                    onSendInput={handleSendInput}
+                    onOpenRetry={() => setRetryDialogOpen(true)}
+                    onSubmitApproval={handleSubmitApproval}
+                  />
+                ) : loadingDetail ? (
+                  <div className="emptyState">正在加载会话详情...</div>
+                ) : (
+                  <div className="routeErrorState">
+                    <div className="errorBanner">{detailError ?? "会话不存在或无法读取"}</div>
+                    <button className="ghostButton" type="button" onClick={handleBackToList}>返回会话列表</button>
+                  </div>
+                )}
+              </section>
             </div>
           </section>
-
-          <section className="infoGrid compact" aria-label="当前配置">
-            <InfoItem label="监听地址" value={listenAddress} />
-            <InfoItem label="Codex 版本" value={currentConfig?.codexCliVersion ?? currentConfig?.codexVersionError ?? "读取中"} />
-            <InfoItem label="App Server" value={appServerStatus} />
-          </section>
-
-          <section className="sessionSection desktopSessionPanel" aria-label="会话列表">
-            {renderSessionBrowser()}
-          </section>
-        </>
-      ) : viewMode === "detail" ? (
-        <>
-          <section className="toolbar detailToolbar">
-            <div className="detailTitleBar">
-              <button className="iconButton" aria-label="返回会话列表" title="返回会话列表" onClick={handleBackToList}>
-                <span aria-hidden="true">←</span>
-              </button>
-              <div>
-                <p className="detailEyebrow">当前会话</p>
-                <h2 title={selectedSession?.title ?? selectedSessionId ?? "会话加载失败"}>
-                  {selectedSession?.title ?? (loadingDetail ? "正在加载会话..." : "会话加载失败")}
-                </h2>
-              </div>
-            </div>
-            <div className="toolbarActions">
-              <button className="ghostButton" onClick={handleRefresh} disabled={loadingSessions || loadingDetail || loadingCommands}>
-                {loadingSessions || loadingDetail || loadingCommands ? "刷新中" : "刷新"}
-              </button>
-            </div>
-          </section>
-
-          {selectedSession ? (
-            <MobileRuntimeStatus
-              sessionTitle={selectedSession.title}
-              runtime={runtime}
-              wsStatus={wsStatus}
-              pendingApprovalCount={pendingApprovals.length}
-            />
-          ) : null}
-
-          <section className="sessionDetail" aria-labelledby="session-detail-title">
-            <h2 id="session-detail-title" className="srOnly">当前会话详情</h2>
-            {selectedSession ? (
-              <SessionDetailPanel
-                fallbackSession={selectedSession}
-                detail={sessionDetail}
-                loading={loadingDetail}
-                error={detailError}
-                commands={commands}
-                commandDiagnostics={commandDiagnostics}
-                loadingCommands={loadingCommands}
-                commandsError={commandsError}
-                runtime={runtime}
-                permissionMode={permissionMode}
-                runtimeError={runtimeError}
-                pendingApprovals={pendingApprovals}
-                liveCommands={liveCommands}
-                liveMessages={liveMessages}
-                liveErrors={liveErrors}
-                wsStatus={wsStatus}
-                modelState={currentModelState}
-                updatingModel={updatingModel}
-                onResume={handleResume}
-                onPermissionModeChange={handlePermissionModeChange}
-                onOpenModelPicker={handleOpenModelPicker}
-                onSendInput={handleSendInput}
-                onOpenRetry={() => setRetryDialogOpen(true)}
-                onSubmitApproval={handleSubmitApproval}
+        ) : viewMode === "settings" ? (
+          <section className="v0Canvas v0CanvasDetail" aria-label="设置和诊断">
+            <div className="v0DetailSurface">
+              <SettingsPage
+                config={currentConfig}
+                health={health}
+                loading={loadingDiagnostics}
+                error={diagnosticsError}
+                reloadNotice={runtimeReloadNotice}
+                onBack={handleBackToList}
+                onRefresh={loadDiagnostics}
               />
-            ) : loadingDetail ? (
-              <div className="emptyState">正在加载会话详情...</div>
-            ) : (
-              <div className="routeErrorState">
-                <div className="errorBanner">{detailError ?? "会话不存在或无法读取"}</div>
-                <button className="ghostButton" type="button" onClick={handleBackToList}>返回会话列表</button>
-              </div>
-            )}
-          </section>
-        </>
-      ) : viewMode === "settings" ? (
-        <SettingsPage
-          config={currentConfig}
-          health={health}
-          loading={loadingDiagnostics}
-          error={diagnosticsError}
-          reloadNotice={runtimeReloadNotice}
-          onBack={handleBackToList}
-          onRefresh={loadDiagnostics}
-        />
-      ) : (
-        <>
-          <section className="toolbar detailToolbar">
-            <div className="detailTitleBar">
-              <button className="iconButton" aria-label="返回会话列表" title="返回会话列表" onClick={handleBackToList}>
-                <span aria-hidden="true">←</span>
-              </button>
-              <div>
-                <p className="detailEyebrow">会话链接</p>
-                <h2>无法打开会话</h2>
-              </div>
             </div>
           </section>
-          <section className="sessionDetail" aria-label="会话链接错误">
-            <div className="routeErrorState">
-              <div className="errorBanner">{routeError ?? "会话链接格式不正确"}</div>
-              <button className="ghostButton" type="button" onClick={handleBackToList}>返回会话列表</button>
+        ) : (
+          <section className="v0Canvas v0CanvasDetail" aria-label="会话链接错误">
+            <div className="v0DetailSurface">
+              <section className="v0DetailHeader">
+                <div className="detailTitleBar">
+                  <button className="v0BackButton" aria-label="返回会话列表" title="返回会话列表" onClick={handleBackToList}>
+                    <span aria-hidden="true">←</span>
+                  </button>
+                  <div>
+                    <p className="detailEyebrow">会话链接</p>
+                    <h2>无法打开会话</h2>
+                  </div>
+                </div>
+              </section>
+              <section className="sessionDetail" aria-label="会话链接错误">
+                <div className="routeErrorState">
+                  <div className="errorBanner">{routeError ?? "会话链接格式不正确"}</div>
+                  <button className="ghostButton" type="button" onClick={handleBackToList}>返回会话列表</button>
+                </div>
+              </section>
             </div>
           </section>
-        </>
-      )}
-
-      {viewMode === "list" && drawerOpen ? (
-        <div className="drawerBackdrop" role="presentation" onClick={() => setDrawerOpen(false)}>
-          <aside
-            className="sessionDrawer"
-            role="dialog"
-            aria-modal="true"
-            aria-label="会话列表"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="drawerHeader">
-              <div>
-                <h2>会话列表</h2>
-                <p className="muted">共 {sessions.length} 个会话</p>
-              </div>
-              <button className="iconButton" type="button" aria-label="关闭会话列表" title="关闭" onClick={() => setDrawerOpen(false)}>
-                <span aria-hidden="true">×</span>
-              </button>
-            </div>
-            {renderSessionBrowser(false)}
-          </aside>
-        </div>
-      ) : null}
-
-      {viewMode === "detail" && selectedSession ? (
-        <FloatingRuntimeStatus
-          sessionTitle={selectedSession.title}
-          runtime={runtime}
-          wsStatus={wsStatus}
-          pendingApprovalCount={pendingApprovals.length}
-        />
-      ) : null}
+        )}
+      </div>
 
       {viewMode === "detail" && selectedSession ? (
         <ModelSelector
@@ -1118,7 +1075,6 @@ function Dashboard({
 
 
 const DEFAULT_VISIBLE_TURNS = 5;
-const DEFAULT_VISIBLE_GROUP_SESSIONS = 5;
 const MAX_VISIBLE_LIVE_MESSAGES = 20;
 const MAX_VISIBLE_LIVE_COMMANDS = 20;
 const MAX_LIVE_COMMAND_OUTPUT_CHARS = 12000;
@@ -1441,40 +1397,24 @@ function SessionDetailPanel({
   const session = detail ?? fallbackSession;
   const [expandedMessage, setExpandedMessage] = useState<{ title: string; text: string; meta?: string } | null>(null);
   const [visibleTurnCount, setVisibleTurnCount] = useState(DEFAULT_VISIBLE_TURNS);
-  const [showHistoryDuringLive, setShowHistoryDuringLive] = useState(false);
   const hasLiveOutput = liveMessages.length > 0 || liveErrors.length > 0 || liveCommands.some((command) => !isLiveCommandCompleted(command));
-  const showHistory = !hasLiveOutput || showHistoryDuringLive;
 
   useEffect(() => {
     setVisibleTurnCount(DEFAULT_VISIBLE_TURNS);
-    setShowHistoryDuringLive(false);
   }, [session.id]);
 
   async function handleSendInput(text: string) {
-    setShowHistoryDuringLive(false);
     await onSendInput(text);
   }
 
   return (
-    <div className="detailStack">
-      <div className="detailScrollContent">
+    <div className="detailStack v0ConversationStack">
+      <div className="detailScrollContent v0ConversationScroll">
         {runtime?.permissionMode === "full_access" ? (
           pendingApprovals.length > 0 ? <div className="errorBanner">完全权限模式收到未预期的审批请求，系统未自动处理。</div> : null
         ) : (
           <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
         )}
-        {!showHistoryDuringLive ? (
-          <LiveOutputPanel
-            liveMessages={liveMessages}
-            liveCommands={liveCommands}
-            liveErrors={liveErrors}
-            runtimeStatus={runtime?.status ?? "history"}
-            canRetry={Boolean(liveErrors.some((notice) => !notice.willRetry) && liveMessages.some((message) => message.role === "user"))}
-            onChooseModel={onOpenModelPicker}
-            onRetry={onOpenRetry}
-            onShowHistory={() => setShowHistoryDuringLive(true)}
-          />
-        ) : null}
 
         <div className="sessionHero">
           <div>
@@ -1500,38 +1440,36 @@ function SessionDetailPanel({
           onOpenModelPicker={onOpenModelPicker}
         />
 
-        {hasLiveOutput && !showHistory ? <div className="historyHiddenNotice">实时输出进行中，历史会话内容已隐藏。</div> : null}
-        {showHistory ? (
-          <div className="historyContent">
-            {hasLiveOutput ? (
-              <div className="historyHeader">
-                <div>
-                  <h3>历史会话内容</h3>
-                  <p className="muted">实时输出已隐藏。</p>
-                </div>
-                <button className="ghostButton" type="button" onClick={() => setShowHistoryDuringLive(false)}>
-                  返回实时输出
-                </button>
-              </div>
-            ) : null}
-            {loading ? <div className="emptyState">正在加载详情...</div> : null}
-            {error ? <div className="errorBanner">{error}</div> : null}
-            {detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
-            {detail && detail.turns.length > 0 ? (
-              <SessionTimeline
-                detail={detail}
-                visibleTurnCount={visibleTurnCount}
-                onLoadMore={() => setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS)}
-                onOpenMessage={setExpandedMessage}
-              />
-            ) : null}
-            <SessionCommandsPanel
-              commands={commands}
-              diagnostics={commandDiagnostics}
-              loading={loadingCommands}
-              error={commandsError}
+        <div className="historyContent v0HistoryContent">
+          {loading ? <div className="emptyState">正在加载详情...</div> : null}
+          {error ? <div className="errorBanner">{error}</div> : null}
+          {detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
+          {detail && detail.turns.length > 0 ? (
+            <SessionTimeline
+              detail={detail}
+              visibleTurnCount={visibleTurnCount}
+              onLoadMore={() => setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS)}
+              onOpenMessage={setExpandedMessage}
             />
-          </div>
+          ) : null}
+          <SessionCommandsPanel
+            commands={commands}
+            diagnostics={commandDiagnostics}
+            loading={loadingCommands}
+            error={commandsError}
+          />
+        </div>
+
+        {hasLiveOutput ? (
+          <LiveOutputPanel
+            liveMessages={liveMessages}
+            liveCommands={liveCommands}
+            liveErrors={liveErrors}
+            runtimeStatus={runtime?.status ?? "history"}
+            canRetry={Boolean(liveErrors.some((notice) => !notice.willRetry) && liveMessages.some((message) => message.role === "user"))}
+            onChooseModel={onOpenModelPicker}
+            onRetry={onOpenRetry}
+          />
         ) : null}
       </div>
       <TaskInput runtime={runtime} onSend={handleSendInput} />
@@ -1868,8 +1806,7 @@ function LiveOutputPanel({
   runtimeStatus,
   canRetry,
   onChooseModel,
-  onRetry,
-  onShowHistory
+  onRetry
 }: {
   liveMessages: LiveMessage[];
   liveCommands: LiveCommand[];
@@ -1878,7 +1815,6 @@ function LiveOutputPanel({
   canRetry: boolean;
   onChooseModel: () => void;
   onRetry: () => void;
-  onShowHistory: () => void;
 }) {
   const outputBodyRef = useRef<HTMLDivElement | null>(null);
   const runningCommands = useMemo(() => liveCommands.filter((command) => !isLiveCommandCompleted(command)), [liveCommands]);
@@ -1901,9 +1837,6 @@ function LiveOutputPanel({
       <div className="panelHeaderCompact">
         <h3>实时输出</h3>
         <div className="panelHeaderActions">
-          <button className="ghostButton" type="button" onClick={onShowHistory}>
-            查看历史会话内容
-          </button>
           <span>{visibleCount}</span>
         </div>
       </div>
@@ -2004,6 +1937,7 @@ function tailText(text: string, maxChars: number): string {
 function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void> }) {
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const submittingRef = useRef(false);
   const disabled = submitting || runtime?.status === "waiting_approval" || runtime?.status === "starting";
 
@@ -2033,17 +1967,110 @@ function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSen
 
   return (
     <form className="taskInput" onSubmit={handleSubmit}>
-      <textarea
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={runtime?.status === "waiting_approval" ? "请先处理审批" : "输入继续任务内容"}
-        disabled={disabled}
-        aria-keyshortcuts="Control+Enter Meta+Enter"
-        rows={3}
-      />
-      <button type="submit" disabled={disabled || text.trim().length === 0}>{submitting ? "发送中" : "发送"}</button>
+      <div className="v0Composer">
+        <div className="v0AttachAnchor">
+          <button
+            className="v0ComposerIconButton"
+            type="button"
+            aria-label={attachOpen ? "关闭添加上下文菜单" : "添加上下文"}
+            aria-expanded={attachOpen}
+            onClick={() => setAttachOpen((current) => !current)}
+          >
+            <span aria-hidden="true">+</span>
+          </button>
+          <AttachSheet open={attachOpen} title="添加上下文" onClose={() => setAttachOpen(false)} />
+        </div>
+        <textarea
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={runtime?.status === "waiting_approval" ? "请先处理审批" : "输入继续任务内容"}
+          disabled={disabled}
+          aria-keyshortcuts="Control+Enter Meta+Enter"
+          rows={2}
+        />
+        <button className="v0ComposerSend" type="submit" disabled={disabled || text.trim().length === 0}>
+          {submitting ? "发送中" : "发送"}
+        </button>
+      </div>
     </form>
+  );
+}
+
+function NewTaskDock() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <section className="v0NewTaskDock" aria-label="新建任务">
+      <div className="v0NewTaskAnchor">
+        <AttachSheet open={open} title="新建任务" onClose={() => setOpen(false)} />
+        <button
+          className="v0NewTaskButton"
+          type="button"
+          aria-expanded={open}
+          aria-label={open ? "关闭新建任务菜单" : "打开新建任务菜单"}
+          onClick={() => setOpen((current) => !current)}
+        >
+          <span aria-hidden="true">+</span>
+          <strong>新建任务</strong>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function AttachSheet({
+  open,
+  title,
+  onClose
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const actions = [
+    { icon: "▣", title: "新增上下文", description: "前端预览态，后端新建接口接入后可提交任务。" },
+    { icon: "⌘", title: "粘贴需求", description: "把产品说明、报错或验收标准加入任务。" },
+    { icon: "↥", title: "上传文件", description: "预留上传入口，当前不会发送文件。" },
+    { icon: "</>", title: "粘贴代码/链接", description: "关联代码片段、PR 或外部资料。" }
+  ];
+
+  return (
+    <>
+      <button className="v0AttachBackdrop" type="button" aria-label="关闭菜单" onClick={onClose} />
+      <section className="v0AttachSheet" role="menu" aria-label={title}>
+        <span className="v0AttachHandle" aria-hidden="true" />
+        <div className="v0AttachHeader">
+          <strong>{title}</strong>
+          <span>仅 UI 预览</span>
+        </div>
+        <div className="v0AttachActions">
+          {actions.map((action) => (
+            <button className="v0AttachAction" type="button" role="menuitem" onClick={onClose} key={action.title}>
+              <span className="v0AttachIcon" aria-hidden="true">{action.icon}</span>
+              <span>
+                <strong>{action.title}</strong>
+                <small>{action.description}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+        <button className="v0AttachCancel" type="button" onClick={onClose}>取消</button>
+      </section>
+    </>
   );
 }
 
@@ -2270,8 +2297,7 @@ function SessionBrowser({
   onSearchChange,
   onSearchSubmit,
   onRefresh,
-  onSelect,
-  onMetadataSaved
+  onSelect
 }: {
   sessions: SessionSummary[];
   search: string;
@@ -2283,31 +2309,24 @@ function SessionBrowser({
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onRefresh: () => void;
   onSelect: (session: SessionSummary) => void;
-  onMetadataSaved: (session: SessionSummary) => void;
 }) {
+  void onRefresh;
+
   return (
-    <>
-      <div className={`sectionHeader${showHeading ? "" : " noHeading"}`}>
-        {showHeading ? (
-          <div>
-            <h2>会话列表</h2>
-            <p className="muted">共 {sessions.length} 个会话</p>
-          </div>
-        ) : null}
-        <form className="searchForm" onSubmit={onSearchSubmit}>
+    <div className="v0TaskBrowser">
+      <div className={`v0BrowserHeader${showHeading ? "" : " noHeading"}`}>
+        <form className="v0SearchForm" onSubmit={onSearchSubmit}>
           <input
             aria-label="搜索会话"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="搜索 ID、标题、备注或工作目录"
+            placeholder="搜索任务"
           />
-          <button type="submit">搜索</button>
-          <button className="ghostButton" type="button" onClick={onRefresh} disabled={loadingSessions}>
-            {loadingSessions ? "刷新中" : "刷新"}
-          </button>
+          <button className="srOnly" type="submit">搜索</button>
         </form>
       </div>
 
+      {showHeading ? <div className="v0TaskListLabel">任务</div> : null}
       {sessionError ? <div className="errorBanner">{sessionError}</div> : null}
       {loadingSessions ? <div className="emptyState">正在加载会话...</div> : null}
       {!loadingSessions && sessions.length === 0 ? <div className="emptyState">没有匹配的会话</div> : null}
@@ -2316,220 +2335,57 @@ function SessionBrowser({
           sessions={sessions}
           selectedSessionId={selectedSessionId}
           onSelect={onSelect}
-          onMetadataSaved={onMetadataSaved}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 
 function SessionList({
   sessions,
   selectedSessionId,
-  onSelect,
-  onMetadataSaved
+  onSelect
 }: {
   sessions: SessionSummary[];
   selectedSessionId: string | null;
   onSelect: (session: SessionSummary) => void;
-  onMetadataSaved: (session: SessionSummary) => void;
 }) {
-  const groups = groupSessionsByWorkspace(sessions);
-  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(() => new Set());
-
-  function toggleWorkspace(workspace: string) {
-    setExpandedWorkspaces((current) => {
-      const next = new Set(current);
-      if (next.has(workspace)) {
-        next.delete(workspace);
-      } else {
-        next.add(workspace);
-      }
-      return next;
-    });
-  }
-
   return (
-    <div className="sessionList">
-      {groups.map((group) => {
-        const expanded = expandedWorkspaces.has(group.workspace);
-        const visibleSessions = expanded ? group.sessions : group.sessions.slice(0, DEFAULT_VISIBLE_GROUP_SESSIONS);
-        const hiddenCount = group.sessions.length - visibleSessions.length;
-
-        return (
-          <section className="sessionWorkspaceGroup" key={group.workspace} aria-label={`${group.workspace} 的会话`}>
-            <div className="workspaceGroupHeader">
-              <div>
-                <h3>{group.workspace}</h3>
-                <p className="muted">
-                  {group.sessions.length} 个会话，默认显示最近 {Math.min(group.sessions.length, DEFAULT_VISIBLE_GROUP_SESSIONS)} 个
-                </p>
-              </div>
-            </div>
-            <div className="workspaceGroupList">
-              {visibleSessions.map((session) => (
-                <SessionItem
-                  key={session.id}
-                  session={session}
-                  selected={isSameSession(session, selectedSessionId)}
-                  onSelect={onSelect}
-                  onMetadataSaved={onMetadataSaved}
-                />
-              ))}
-            </div>
-            {group.sessions.length > DEFAULT_VISIBLE_GROUP_SESSIONS ? (
-              <button className="ghostButton workspaceToggleButton" type="button" onClick={() => toggleWorkspace(group.workspace)}>
-                {expanded ? "收起" : `展开更多 ${hiddenCount} 个会话`}
-              </button>
-            ) : null}
-          </section>
-        );
-      })}
+    <div className="v0SessionList">
+      {sessions.map((session) => (
+        <SessionItem
+          key={session.id}
+          session={session}
+          selected={isSameSession(session, selectedSessionId)}
+          onSelect={onSelect}
+        />
+      ))}
     </div>
   );
-}
-
-function groupSessionsByWorkspace(sessions: SessionSummary[]): { workspace: string; sessions: SessionSummary[] }[] {
-  const groups = new Map<string, SessionSummary[]>();
-
-  for (const session of sessions) {
-    const workspace = session.workspace.trim() || "未知工作目录";
-    const group = groups.get(workspace);
-    if (group) {
-      group.push(session);
-    } else {
-      groups.set(workspace, [session]);
-    }
-  }
-
-  return [...groups.entries()].map(([workspace, groupedSessions]) => ({
-    workspace,
-    sessions: groupedSessions
-  }));
 }
 
 function SessionItem({
   session,
   selected,
-  onSelect,
-  onMetadataSaved
+  onSelect
 }: {
   session: SessionSummary;
   selected: boolean;
   onSelect: (session: SessionSummary) => void;
-  onMetadataSaved: (session: SessionSummary) => void;
 }) {
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(session.remarkTitle ?? session.title);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const skipTitleBlurRef = useRef(false);
-
-  useEffect(() => {
-    if (!editingTitle) {
-      setTitleDraft(session.remarkTitle ?? session.title);
-    }
-  }, [editingTitle, session.remarkTitle, session.title]);
-
-  async function saveRemark(nextTitle: string | null) {
-    if ((session.remarkTitle ?? null) === nextTitle) return;
-
-    setSaving(true);
-    setError(null);
-
-    try {
-      const response = await updateSessionMetadata(session.id, nextTitle);
-      onMetadataSaved(response.session);
-      setTitleDraft(response.session.remarkTitle ?? response.session.title);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "备注保存失败");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function beginTitleEdit() {
-    setError(null);
-    setTitleDraft(session.remarkTitle ?? session.title);
-    setEditingTitle(true);
-  }
-
-  function cancelTitleEdit() {
-    skipTitleBlurRef.current = true;
-    setTitleDraft(session.remarkTitle ?? session.title);
-    setEditingTitle(false);
-  }
-
-  function finishTitleEdit() {
-    if (skipTitleBlurRef.current) {
-      skipTitleBlurRef.current = false;
-      return;
-    }
-
-    setEditingTitle(false);
-    const trimmed = titleDraft.trim();
-    const nextTitle = trimmed.length === 0 || (!session.remarkTitle && trimmed === session.defaultTitle) ? null : trimmed;
-    saveRemark(nextTitle);
-  }
-
-  function handleTitleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      event.currentTarget.blur();
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      cancelTitleEdit();
-    }
-  }
-
   return (
-    <article className={`sessionItem${selected ? " selected" : ""}`}>
-      <div className="sessionMain">
-        <div className="sessionTitleRow">
-          {editingTitle ? (
-            <input
-              className="titleEditInput"
-              aria-label={`设置 ${session.title} 的备注标题`}
-              autoFocus
-              maxLength={120}
-              value={titleDraft}
-              onBlur={finishTitleEdit}
-              onChange={(event) => setTitleDraft(event.target.value)}
-              onKeyDown={handleTitleKeyDown}
-            />
-          ) : (
-            <button
-              className="titleEditButton"
-              type="button"
-              aria-label={`编辑 ${session.title} 的备注标题`}
-              title={session.defaultTitle}
-              onClick={beginTitleEdit}
-              disabled={saving}
-            >
-              <span>{session.title}</span>
-              <small className="titleEditIcon" aria-hidden="true">{saving ? "…" : "✎"}</small>
-            </button>
-          )}
-          <StatusBadge status={session.status} />
-        </div>
-        {session.remarkTitle ? <p className="remarkHint">默认标题：{session.defaultTitle}</p> : null}
-        <p className="sessionSummary">{session.summary}</p>
-        <div className="sessionMeta">
-          <span>{session.workspace}</span>
-          <span>{formatDateTime(session.updatedAt)}</span>
-        </div>
-        {error ? <div className="errorText">{error}</div> : null}
-      </div>
-      <div className="sessionActions">
-        <button className="ghostButton" onClick={() => onSelect(session)}>
-          {selected ? "已选择" : "进入"}
-        </button>
-        <div className="sessionId" title={session.id}>
-          {session.id}
-        </div>
-      </div>
+    <article className={`v0SessionItem${selected ? " selected" : ""}`}>
+      <button className="v0SessionButton" type="button" onClick={() => onSelect(session)}>
+        <span className={`v0StatusDot ${session.status}`} aria-hidden="true" />
+        <span className="v0SessionMain">
+          <strong>{session.title}</strong>
+          <span className="v0SessionMeta">
+            <span>{statusLabel(session.status)}</span>
+            <span>{formatRelativeTime(session.updatedAt)}</span>
+          </span>
+        </span>
+        <span className="v0Chevron" aria-hidden="true">›</span>
+      </button>
     </article>
   );
 }
@@ -2707,33 +2563,27 @@ function Shell({
   title,
   action,
   children,
-  reserveFloatingStatus = false
+  reserveFloatingStatus = false,
+  hideTopbar = false
 }: {
   title: string;
   action?: React.ReactNode;
   children: React.ReactNode;
   reserveFloatingStatus?: boolean;
+  hideTopbar?: boolean;
 }) {
   return (
     <main className={`appShell${reserveFloatingStatus ? " reserveFloatingStatus" : ""}`}>
-      <header className="topbar">
-        <h1>{title}</h1>
-        {action}
-      </header>
+      {hideTopbar ? null : (
+        <header className="topbar">
+          <h1>{title}</h1>
+          {action}
+        </header>
+      )}
       <div className="content">{children}</div>
     </main>
   );
 }
-
-function InfoItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="infoItem">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -2918,4 +2768,18 @@ function formatDateTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+
+function formatRelativeTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "未知时间";
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 60_000) return "刚刚";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} 天前`;
+  return formatDateTime(value);
 }
