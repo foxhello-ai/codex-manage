@@ -5,6 +5,7 @@
 ## 证据等级
 
 - **已验证发布**：tag、构建物、SHA-256 和环境验收齐全。
+- **发布确认，证据待补**：已由发布负责人确认实际发布，但历史 tag、构建物、环境验收或回滚记录不完整；不得当作可复现发布。
 - **已构建待验收**：构建物存在，但外部验收或签名缺失。
 - **冻结基线**：版本和提交明确，缺 tag/构建物证据。
 - **Git 推定历史**：仅能根据版本变更提交回溯范围。
@@ -27,7 +28,7 @@
 | v1.0.3 | 版本变更 `b92bc2a` | 下载站构建配置、桌面更新产物托管、更新源迁移到 Control API 域名 | Git 推定历史 |
 | v1.0.4 | 版本变更 `73923c2` | Admin 默认 API 域名、Desktop/Control API 兼容回归、app-server 自动重载稳定性 | Git 推定历史 |
 | v1.0.5 | 版本变更 `5f8b5df` | macOS 更新安装可执行化、桌面客户体验优化 | Git 推定历史 |
-| v1.0.6 | 版本变更 `3ac606b` | 浮动工具和二维码配对弹窗优化 | 冻结基线，已确认不再向该版本加入后续提交 |
+| v1.0.6 | 版本变更 `3ac606b` | 浮动工具和二维码配对弹窗优化；与 Cloud Platform v1.0.6 同期发布 | 发布确认，证据待补；已确认不再向该版本加入后续提交 |
 | v1.0.7 | `3ac606b` 之后的提交 | 待在 Linear 确认版本范围；当前仅为候选迭代 | 计划中 |
 
 详见 [`desktop-v1.0.6.md`](desktop-v1.0.6.md)。现有 [`release-v1.0.0.md`](release-v1.0.0.md) 和 [`release-v1.0.1.md`](release-v1.0.1.md) 保留为历史材料，但它们的版本名称混用了 Web、Desktop 与后续增量，不能作为 Desktop 版本范围的唯一证据。
@@ -36,7 +37,12 @@
 
 ## Cloud Platform
 
-目前 Cloud Platform 通过镜像 tag 与 Docker Compose 默认镜像版本部署，尚无独立语义版本或规范 Git tag。下一次涉及 Control API、Tunnel Worker、Admin Web 或迁移的正式部署前，必须先创建 Cloud Platform 的版本需求文档并记录镜像 digest、迁移、环境验收和回滚镜像。
+| 版本 | 发布关系与 Git 证据 | 范围 | 证据等级 |
+| --- | --- | --- | --- |
+| v1.0.6 | 与 Desktop v1.0.6 同期发布；Desktop 冻结提交为 `3ac606b` | Control API、Tunnel Worker、Admin Web、PostgreSQL 与部署编排的当期生产组合 | 发布确认，证据待补；尚未回补不可变镜像 digest、精确部署 commit、迁移执行记录、环境验收和回滚镜像 |
+| v1.0.7 | 与 Desktop v1.0.7 同步规划；支付和运行时域名配置为候选范围 | Control API、Tunnel Worker、Admin Web、支付、运行配置与 SMTP | 计划中；即使同步发布日期，仍须独立记录 Cloud tag、镜像 digest、迁移和回滚 |
+
+详见 [`cloud-v1.0.6.md`](cloud-v1.0.6.md)。下一次涉及 Control API、Tunnel Worker、Admin Web 或迁移的正式部署前，必须先创建 Cloud Platform 的版本需求文档并记录镜像 digest、迁移、环境验收和回滚镜像。
 
 ## 历史 tag 说明
 
