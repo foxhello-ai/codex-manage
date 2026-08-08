@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { createInterface, type Interface } from "node:readline";
 import { delimiter, dirname, isAbsolute } from "node:path";
+import { createInterface, type Interface } from "node:readline";
 
 export type JsonRpcId = number;
 

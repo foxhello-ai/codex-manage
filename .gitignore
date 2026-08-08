@@ -9,6 +9,7 @@ logs/
 .codex-manage/
 test-results/
 playwright-report/
+coverage/
 apps/desktop/dist/
 apps/desktop/release/
 apps/control-api/dist/

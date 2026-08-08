@@ -121,8 +121,9 @@ export function reloadRuntime(): Promise<RuntimeReloadResponse> {
   });
 }
 
-export function getSessionDetail(sessionId: string): Promise<SessionDetailResponse> {
-  return apiRequest<SessionDetailResponse>(`/api/sessions/${encodeURIComponent(sessionId)}`);
+export function getSessionDetail(sessionId: string, includeTurns = true): Promise<SessionDetailResponse> {
+  const query = includeTurns ? "" : "?turns=false";
+  return apiRequest<SessionDetailResponse>(`/api/sessions/${encodeURIComponent(sessionId)}${query}`);
 }
 
 export function getSessionCommands(sessionId: string): Promise<SessionCommandsResponse> {

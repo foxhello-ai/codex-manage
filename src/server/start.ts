@@ -13,13 +13,14 @@ export async function startLocalWebServer(
   config: AppConfig,
   options: CreateLocalWebApplicationOptions = {}
 ): Promise<StartedLocalWebServer> {
-  const { app, runtime } = await createLocalWebApplication(config, options);
+  const { app, runtime, startBackgroundTasks } = await createLocalWebApplication(config, options);
 
   await runtime.start();
 
   try {
     const url = await app.listen({ host: config.host, port: config.port });
     const address = app.server.address() as AddressInfo | null;
+    startBackgroundTasks();
 
     return {
       host: config.host,

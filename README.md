@@ -100,3 +100,414 @@ Cloudflare API Token 至少需要 Account Cloudflare Tunnel Edit 和 Zone DNS Ed
 - [需求文档](docs/desktop-cloud-platform/requirements.md)
 - [总体架构](docs/desktop-cloud-platform/architecture.md)
 - [实施计划](docs/desktop-cloud-platform/implementation-plan.md)
+
+## Linux 单体 Web 运行包
+
+`main` 分支提供单体 Web 版本：一个 Fastify 服务托管 React 页面，并在同一台 Linux 主机上启动宿主机的 `codex app-server`。它不包含桌面客户端、Cloudflare Tunnel、运营后台、支付或云端控制面。
+
+推荐部署方式是：GitHub Actions 构建无源码运行包，Linux 服务器用同一个系统用户通过 systemd 启动。不要用 Docker 做主部署。
+
+## 构建运行包
+
+GitHub Actions 工作流：`.github/workflows/build-runtime-package.yml`。
+
+触发方式：
+
+- 推送到 `main` 自动构建，并在对应 Actions run 的 Artifacts 中保留运行包。
+- 手动运行 `Build Runtime Package`，默认版本号是 `1.0.1`，同时创建 GitHub Release。
+
+推送触发时，运行包在 GitHub Actions run 页面底部的 Artifacts 区域下载，名称类似：
+
+```text
+codex-manage-runtime-1.0.1-<12位commit>
+```
+
+手动发布时，运行包会上传到 GitHub Release：
+
+```text
+https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.1
+```
+
+Release asset 固定命名为：
+
+```text
+codex-manage-runtime.tgz
+codex-manage-runtime.tgz.sha256
+```
+
+Release 版本号不可静默覆盖；如果 `v1.0.1` 已存在，workflow 会失败。需要重发时应使用新版本号，或先删除旧 Release。
+
+也可以直接下载：
+
+```bash
+curl -fL -o codex-manage-runtime.tgz \
+  https://github.com/foxhello-ai/codex-manage/releases/download/v1.0.1/codex-manage-runtime.tgz
+```
+
+运行包内容：
+
+```text
+dist/
+node_modules/ production dependencies
+package.json
+package-lock.json
+build-info.txt
+```
+
+运行包不包含本仓库的 `.git`、`src`、测试文件、文档目录和 sourcemap。`node_modules` 来自 npm 生产依赖，按依赖包自身发布内容进入运行包。注意：前端和服务端会被打包成 JavaScript，运行包使用方仍然可以查看构建后的 JS，因此这不是代码加密方案。
+
+查看构建来源：
+
+```bash
+cat /opt/codex-manage/current/build-info.txt
+```
+
+## 服务器前置条件
+
+在 Linux 服务器上准备一个专用用户，例如 `deploy`。这个用户必须同时满足：
+
+- 已安装并登录 `codex`。
+- 能访问 `~/.codex/sessions`。
+- 能访问需要继续处理的项目目录。
+- 拥有项目所需工具链，例如 `git`、`node`、`npm`、`mvn`、`ssh`、私有脚本等。
+
+关键点：systemd 服务必须用这个同一个 Linux 用户启动。这样已有会话里的绝对路径、宿主机工具链、SSH key、MCP 配置和未来新建目录都能按宿主机真实环境工作。
+
+`install-runtime.sh` 的 `--user` 可以省略：
+
+- 用普通用户执行 `sudo bash install-runtime.sh ...` 时，默认使用发起 sudo 的用户。
+- 已经在 root shell 中执行 `bash install-runtime.sh ...` 时，默认使用 `root`。
+- 如果 Codex 会话属于其他用户，必须显式传 `--user <用户名>`。
+
+示例：
+
+```bash
+sudo useradd -m -s /bin/bash deploy
+sudo -iu deploy
+codex login
+codex doctor
+```
+
+如果已有 Codex 会话本来就是 `deploy` 用户创建的，不需要迁移会话目录。如果已有会话属于另一个用户，应当用那个用户运行服务，或者为不同用户分别部署独立实例。
+
+## 一条命令安装
+
+服务器上已有 `deploy` 用户并已用该用户登录 Codex 时，可以直接执行。公开仓库使用：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scripts/install-runtime.sh \
+  | sudo bash -s -- --user deploy --version 1.0.1
+```
+
+私有仓库不能匿名访问 `raw.githubusercontent.com`，GitHub 会返回 404。如果不想在服务器配置 GitHub token，先在本地或 CI 页面下载运行包，再把运行包和安装脚本上传到服务器。
+
+从 GitHub Actions Artifacts 下载到本地时通常是 `.zip`，可以直接传给 `--package`：
+
+```bash
+scp scripts/install-runtime.sh \
+  codex-manage-runtime-1.0.1-<12位commit>.zip \
+  deploy@server:/tmp/
+
+ssh deploy@server
+sudo bash /tmp/install-runtime.sh \
+  --user deploy \
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
+```
+
+如果当前登录服务器的用户就是已登录 Codex 的用户，可以省略 `--user`：
+
+```bash
+sudo bash /tmp/install-runtime.sh \
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
+```
+
+如果手里是 Release asset 里的 `codex-manage-runtime.tgz`，也可以上传 tgz 和同名 `.sha256` 后安装。`--user deploy` 里的 `deploy` 必须替换成真实存在、且已经登录 Codex 的 Linux 用户。
+
+安装脚本会：
+
+- 从 GitHub Release 下载 `codex-manage-runtime.tgz`，或使用 `--package` 指定的本地 `.tgz` / Actions artifact `.zip`。
+- 下载并校验 `codex-manage-runtime.tgz.sha256`；本地 tgz 模式会自动使用同路径的 `.sha256` 文件，artifact zip 模式会使用 zip 内的 `.sha256` 文件。
+- 安装到 `/opt/codex-manage/releases/<version>-<commit>`。
+- 切换 `/opt/codex-manage/current`。
+- 首次安装时生成 `/etc/codex-manage/codex-manage.env`。
+- 在 `/opt/codex-manage/` 下创建 `env`、`service`、`build-info.txt` 运维入口链接。
+- 创建并启动 `codex-manage.service`。
+
+如果只想安装文件和 systemd unit，但暂不启动服务：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scripts/install-runtime.sh \
+  | sudo bash -s -- --user deploy --version 1.0.1 --no-start
+```
+
+本地包模式：
+
+```bash
+sudo bash /tmp/install-runtime.sh \
+  --user deploy \
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip \
+  --no-start
+```
+
+安装最新 Release：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scripts/install-runtime.sh \
+  | sudo bash -s -- --user deploy
+```
+
+执行远程脚本前，生产环境建议先打开脚本审阅。公开仓库：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scripts/install-runtime.sh
+```
+
+私有仓库直接审阅上传到服务器的脚本：
+
+```bash
+less /tmp/install-runtime.sh
+```
+
+## 运维入口
+
+安装后所有常用入口都可以从 `/opt/codex-manage` 找到：
+
+```text
+/opt/codex-manage/
+  current -> /opt/codex-manage/releases/<version>-<commit>
+  releases/
+  env -> /etc/codex-manage/codex-manage.env
+  service -> /etc/systemd/system/codex-manage.service
+  build-info.txt -> /opt/codex-manage/current/build-info.txt
+```
+
+路径设计是有意分开的：
+
+- `/opt/codex-manage` 放应用运行包和版本切换入口。
+- `/etc/codex-manage/codex-manage.env` 放机器级配置和密钥，root 管理，权限更收敛。
+- `/etc/systemd/system/codex-manage.service` 放 systemd unit，符合 Linux 服务管理习惯。
+- `/opt/codex-manage/env` 和 `/opt/codex-manage/service` 是查找入口，方便运维从安装目录反查配置和服务文件。
+
+常用检查命令：
+
+```bash
+ls -l /opt/codex-manage
+cat /opt/codex-manage/build-info.txt
+sudo systemctl cat codex-manage
+sudo systemctl status codex-manage
+sudo systemctl restart codex-manage
+sudo journalctl -u codex-manage -f
+sudoedit /etc/codex-manage/codex-manage.env
+```
+
+修改 `/etc/codex-manage/codex-manage.env` 后，执行 `sudo systemctl restart codex-manage` 让配置生效。
+
+## 手动安装运行包
+
+推荐使用安装脚本的本地包模式。将 Actions artifact zip 和安装脚本上传到服务器：
+
+```bash
+scp scripts/install-runtime.sh \
+  codex-manage-runtime-1.0.1-<12位commit>.zip \
+  deploy@server:/tmp/
+```
+
+然后在服务器上执行：
+
+```bash
+sudo bash /tmp/install-runtime.sh \
+  --user deploy \
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
+```
+
+如果当前用户就是 Codex 用户，可以省略 `--user`。
+
+如果手里是 Release asset 的 `codex-manage-runtime.tgz`，也可以传 `--package /tmp/codex-manage-runtime.tgz`。如果不使用安装脚本，也可以手动安装到版本目录：
+
+```bash
+sudo mkdir -p /opt/codex-manage/releases
+sudo mkdir -p /home/deploy/.codex-manage
+
+release="1.0.1-<12位commit>"
+sudo mkdir -p "/opt/codex-manage/releases/$release"
+sudo tar -xzf "/tmp/codex-manage-runtime.tgz" \
+  -C "/opt/codex-manage/releases/$release" \
+  --strip-components=1
+
+sudo chown -R deploy:deploy /opt/codex-manage /home/deploy/.codex-manage
+sudo ln -sfn "/opt/codex-manage/releases/$release" /opt/codex-manage/current
+sudo ln -sfn /opt/codex-manage/current/build-info.txt /opt/codex-manage/build-info.txt
+```
+
+## 配置环境变量
+
+创建 `/etc/codex-manage/codex-manage.env`：
+
+```bash
+sudo mkdir -p /etc/codex-manage
+sudo tee /etc/codex-manage/codex-manage.env >/dev/null <<'EOF'
+NODE_ENV=production
+CODEX_WEB_HOST=127.0.0.1
+CODEX_WEB_PORT=4310
+CODEX_WEB_PASSWORD=replace-with-strong-password
+CODEX_WEB_SESSION_SECRET=replace-with-long-random-secret
+CODEX_CLI_PATH=/usr/local/bin/codex
+CODEX_SESSIONS_DIR=/home/deploy/.codex/sessions
+CODEX_MANAGE_METADATA_FILE=/home/deploy/.codex-manage/session-metadata.json
+EOF
+
+sudo chmod 600 /etc/codex-manage/codex-manage.env
+sudo ln -sfn /etc/codex-manage/codex-manage.env /opt/codex-manage/env
+```
+
+按服务器实际安装位置调整 `CODEX_CLI_PATH`：
+
+```bash
+sudo -iu deploy command -v codex
+```
+
+生产环境必须修改 `CODEX_WEB_PASSWORD` 和 `CODEX_WEB_SESSION_SECRET`。
+
+## systemd 服务
+
+创建 `/etc/systemd/system/codex-manage.service`：
+
+```ini
+[Unit]
+Description=Codex Manage Web
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/codex-manage/current
+Environment=HOME=/home/deploy
+EnvironmentFile=/etc/codex-manage/codex-manage.env
+ExecStart=/usr/bin/node dist/server/index.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+创建服务文件查找入口：
+
+```bash
+sudo ln -sfn /etc/systemd/system/codex-manage.service /opt/codex-manage/service
+```
+
+启动：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now codex-manage
+sudo systemctl status codex-manage
+```
+
+日志：
+
+```bash
+journalctl -u codex-manage -f
+```
+
+健康检查：
+
+```bash
+curl http://127.0.0.1:4310/api/health
+```
+
+## 反向代理
+
+建议只让服务监听 `127.0.0.1:4310`，公网入口交给 Nginx、Caddy 或云负载均衡处理 HTTPS。
+
+Nginx 示例：
+
+```nginx
+server {
+    listen 80;
+    server_name codex.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:4310;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+访问：
+
+```text
+https://codex.example.com
+```
+
+## 升级
+
+可以重新执行安装脚本升级到指定版本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scripts/install-runtime.sh \
+  | sudo bash -s -- --user deploy --version 1.0.1
+```
+
+私有仓库或离线服务器可以上传新运行包后升级：
+
+```bash
+sudo bash /tmp/install-runtime.sh \
+  --user deploy \
+  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
+```
+
+也可以手动上传新 tarball 后安装到新版本目录，然后切换 `current`：
+
+```bash
+release="1.0.1-<新的12位commit>"
+sudo mkdir -p "/opt/codex-manage/releases/$release"
+sudo tar -xzf "/tmp/codex-manage-runtime.tgz" \
+  -C "/opt/codex-manage/releases/$release" \
+  --strip-components=1
+sudo chown -R deploy:deploy "/opt/codex-manage/releases/$release"
+sudo ln -sfn "/opt/codex-manage/releases/$release" /opt/codex-manage/current
+sudo systemctl restart codex-manage
+```
+
+回滚到旧版本：
+
+```bash
+sudo ln -sfn /opt/codex-manage/releases/<旧版本目录> /opt/codex-manage/current
+sudo systemctl restart codex-manage
+```
+
+## 为什么不用 Docker 做主部署
+
+Codex Manage 要接管宿主机真实 Codex 会话，而会话依赖宿主机绝对路径、用户权限、工具链、SSH key、MCP 配置和未来新建目录。Docker 方案需要不断挂载这些路径，最终会变成复杂且脆弱的半隔离环境。
+
+systemd 方案直接以同一个 Linux 用户运行，能天然读取已有会话，也能处理未来新目录；同时服务器只部署无源码运行包，不需要 `git clone` 仓库。
+
+## 常用环境变量
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `CODEX_WEB_HOST` | `0.0.0.0` | Web 服务监听地址 |
+| `CODEX_WEB_PORT` | `4310` | Web 服务端口 |
+| `CODEX_WEB_PASSWORD` | `admin` | 登录密码，生产环境必须覆盖 |
+| `CODEX_WEB_SESSION_SECRET` | 随机值 | Cookie 签名密钥，生产环境必须固定 |
+| `CODEX_CLI_PATH` | `codex` | 宿主机 Codex CLI 路径 |
+| `CODEX_SESSIONS_DIR` | `~/.codex/sessions` | Codex 会话目录 |
+| `CODEX_MANAGE_METADATA_FILE` | `.codex-manage/session-metadata.json` | Codex Manage 会话元数据 |
+
+## 生产建议
+
+- 不要在生产机 `git clone` 仓库；只上传运行包。
+- systemd `User` 必须是实际使用 Codex 的 Linux 用户。
+- 不要使用默认密码 `admin`。
+- 不要把 `/etc/codex-manage/codex-manage.env` 放宽到普通用户可读。
+- 用 HTTPS 暴露服务，不要直接公网裸露 `4310`。
+- 升级前先查看 `build-info.txt`，确认运行包来自预期 commit。

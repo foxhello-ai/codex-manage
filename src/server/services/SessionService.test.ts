@@ -83,38 +83,45 @@ describe("SessionService", () => {
       getSnapshot: () => ({ status: "ready" as const, pid: 1, lastError: null, initialized: true }),
       request: async <T = unknown>(method: string, params?: unknown) => {
         calls.push({ method, params });
-        const cursor = (params as { cursor?: string | null }).cursor;
-        return (cursor === "page-2"
-          ? {
-              data: [
-                {
-                  sessionId: "session-2",
-                  preview: "deep match",
-                  cwd: "/workspace/deep",
-                  createdAt: 2,
-                  updatedAt: 3
-                }
-              ],
-              nextCursor: null
+        if ((params as { cursor?: string | null }).cursor === "page-2") {
+          return {
+            data: [
+              {
+                id: "thread-2",
+                sessionId: "session-2",
+                preview: "second page target",
+                cwd: "/workspace/target",
+                createdAt: 1,
+                updatedAt: 3
+              }
+            ],
+            nextCursor: null
+          } as T;
+        }
+        return {
+          data: [
+            {
+              id: "thread-1",
+              sessionId: "session-1",
+              preview: "first page",
+              cwd: "/workspace/first",
+              createdAt: 1,
+              updatedAt: 2
             }
-          : {
-              data: [{ id: "thread-1", preview: "first page", cwd: "/workspace/first", createdAt: 1, updatedAt: 2 }],
-              nextCursor: "page-2"
-            }) as T;
+          ],
+          nextCursor: "page-2"
+        } as T;
       }
     });
 
-    const sessions = await service.listSessions({ search: "deep" });
-
-    expect(calls.map((call) => (call.params as { cursor?: string | null }).cursor)).toEqual([null, "page-2"]);
-    expect(sessions).toMatchObject([
+    await expect(service.listSessions({ search: "target" })).resolves.toMatchObject([
       {
-        id: "session-2",
+        id: "thread-2",
         sessionId: "session-2",
-        title: "deep match",
-        workspace: "/workspace/deep"
+        title: "second page target"
       }
     ]);
+    expect(calls.map((call) => (call.params as { cursor?: string | null }).cursor)).toEqual([null, "page-2"]);
   });
 
   it("uses remark title as display title and searches it locally", async () => {
@@ -239,6 +246,51 @@ describe("SessionService", () => {
     });
   });
 
+  it("can read lightweight session detail without turns", async () => {
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready" as const, pid: 1, lastError: null, initialized: true }),
+      request: async <T = unknown>(method: string, params?: unknown) => {
+        calls.push({ method, params });
+        return {
+          thread: {
+            id: "thread-1",
+            preview: "lightweight detail",
+            cwd: "/workspace/app",
+            createdAt: 1,
+            updatedAt: 2
+          }
+        } as T;
+      }
+    });
+
+    await service.getSessionDetail("thread-1", { includeTurns: false });
+
+    expect(calls).toEqual([{
+      method: "thread/read",
+      params: { threadId: "thread-1", includeTurns: false }
+    }]);
+  });
+
+  it("accepts sessionId-only app-server records", async () => {
+    const service = new SessionService(
+      readyClient({
+        data: [{ sessionId: "session-only-1", preview: "session only", cwd: "/a", createdAt: 1, updatedAt: 2 }]
+      }),
+      metadataStore({
+        "session-only-1": { remarkTitle: "兼容标题" }
+      })
+    );
+
+    await expect(service.listSessions()).resolves.toMatchObject([
+      {
+        id: "session-only-1",
+        sessionId: "session-only-1",
+        title: "兼容标题"
+      }
+    ]);
+  });
+
   it("maps active and failed statuses", async () => {
     const service = new SessionService(
       readyClient({
@@ -299,23 +351,7 @@ describe("SessionService", () => {
         })
       },
       {
-        list: async () => ({
-          models: [{
-            id: "gpt-5.6-sol",
-            model: "gpt-5.6-sol",
-            displayName: "GPT-5.6-Sol",
-            description: null,
-            hidden: false,
-            isDefault: true,
-            supportedReasoningEfforts: ["high"],
-            defaultReasoningEffort: "high",
-            upgradeModel: null,
-            upgradeCopy: null
-          }],
-          loadedAt: "2026-07-19T00:00:00.000Z",
-          stale: false,
-          lastError: null
-        })
+        isModelSupportedFromCache: () => false
       }
     );
 
@@ -352,23 +388,7 @@ describe("SessionService", () => {
         })
       },
       {
-        list: async () => ({
-          models: [{
-            id: "gpt-5.6-sol",
-            model: "gpt-5.6-sol",
-            displayName: "GPT-5.6-Sol",
-            description: null,
-            hidden: false,
-            isDefault: true,
-            supportedReasoningEfforts: ["high"],
-            defaultReasoningEffort: "high",
-            upgradeModel: null,
-            upgradeCopy: null
-          }],
-          loadedAt: "2026-07-19T00:00:00.000Z",
-          stale: false,
-          lastError: null
-        })
+        isModelSupportedFromCache: () => true
       },
       {
         getRuntime: () => ({

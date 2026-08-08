@@ -2,7 +2,7 @@ import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, 
 import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, pairLocalAuth, reloadRuntime, resumeSession, sendSessionInput, setupLocalAuth, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, HealthStatus, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
-import { modelSwitchDisabledReason } from "./modelSelection";
+import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
 import { isTaskSendShortcut, shouldAutoFollowLiveOutput } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 
@@ -296,10 +296,14 @@ function Dashboard({
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(initialRoute.kind === "detail");
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [historyLoadedSessionId, setHistoryLoadedSessionId] = useState<string | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [commands, setCommands] = useState<SessionCommand[]>([]);
   const [commandDiagnostics, setCommandDiagnostics] = useState<SessionCommandDiagnostics | null>(null);
-  const [loadingCommands, setLoadingCommands] = useState(initialRoute.kind === "detail");
+  const [loadingCommands, setLoadingCommands] = useState(false);
   const [commandsError, setCommandsError] = useState<string | null>(null);
+  const [commandsLoadedSessionId, setCommandsLoadedSessionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DashboardView>(initialRoute.kind === "list" ? "list" : initialRoute.kind);
   const [routeError, setRouteError] = useState<string | null>(initialRoute.kind === "invalid" ? initialRoute.message : null);
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
@@ -321,6 +325,8 @@ function Dashboard({
   const [retryDialogOpen, setRetryDialogOpen] = useState(false);
   const lastEventSeqRef = useRef(0);
   const selectedSessionIdRef = useRef<string | null>(initialRoute.kind === "detail" ? initialRoute.sessionId : null);
+  const historyLoadedSessionIdRef = useRef<string | null>(null);
+  const historyLoadingSessionIdRef = useRef<string | null>(null);
   const liveMessagesRef = useRef<LiveMessage[]>([]);
   const retryMessageRef = useRef<string | null>(null);
   const runtimeReloadGenerationRef = useRef<number | null>(null);
@@ -404,8 +410,9 @@ function Dashboard({
     setRuntime((current) => current ? { ...current, status: "history", activeTurnId: null, lastError: null } : current);
     const reloadedAt = currentConfig?.runtimeReload?.reloadedAt;
     const trigger = currentConfig?.runtimeReload?.trigger;
+    const reloadTypeText = trigger && trigger !== "manual" ? "自动" : "";
     setRuntimeReloadNotice(
-      `Codex 运行时已${trigger === "desktop_auto" ? "自动" : ""}刷新${reloadedAt ? `：${formatDateTime(reloadedAt)}` : ""}`
+      `Codex 运行时已${reloadTypeText}刷新${reloadedAt ? `：${formatDateTime(reloadedAt)}` : ""}`
     );
     void loadModelCatalog(true);
     if (selectedSessionIdRef.current) {
@@ -420,7 +427,7 @@ function Dashboard({
         const nextConfig = await getPublicConfig();
         if (active) setCurrentConfig(nextConfig);
       } catch {
-        // Runtime reload detection is best-effort; visible errors stay in diagnostics.
+        // 自动刷新检测是后台能力，诊断页保留显式错误展示。
       }
     }
     const timer = setInterval(() => void pollRuntimeConfig(), 10_000);
@@ -482,20 +489,44 @@ function Dashboard({
     loadSessions(search);
   }
 
-  async function loadSessionDetail(sessionId: string, options: { silent?: boolean } = {}) {
-    if (!options.silent) setLoadingDetail(true);
-    setDetailError(null);
+  async function loadSessionDetail(sessionId: string, options: { silent?: boolean; includeTurns?: boolean } = {}) {
+    const includeTurns = options.includeTurns ?? false;
+    if (includeTurns && historyLoadingSessionIdRef.current === sessionId) return;
+    if (includeTurns) historyLoadingSessionIdRef.current = sessionId;
+    if (!options.silent) {
+      if (includeTurns) setLoadingHistory(true);
+      else setLoadingDetail(true);
+    }
+    if (includeTurns) setHistoryError(null);
+    else setDetailError(null);
 
     try {
-      const response = await getSessionDetail(sessionId);
+      const response = await getSessionDetail(sessionId, includeTurns);
       if (selectedSessionIdRef.current !== sessionId) return;
       setSessionDetail(response.session);
+      if (includeTurns) {
+        historyLoadedSessionIdRef.current = sessionId;
+        setHistoryLoadedSessionId(sessionId);
+      } else if (historyLoadedSessionIdRef.current !== sessionId) {
+        void loadSessionDetail(sessionId, { includeTurns: true, silent: options.silent });
+      }
     } catch (caught) {
       if (selectedSessionIdRef.current !== sessionId) return;
-      if (!options.silent) setSessionDetail(null);
-      setDetailError(caught instanceof Error ? caught.message : "会话详情加载失败");
+      const message = caught instanceof Error ? caught.message : includeTurns ? "历史会话加载失败" : "会话详情加载失败";
+      if (includeTurns) {
+        setHistoryError(message);
+      } else {
+        if (!options.silent) setSessionDetail(null);
+        setDetailError(message);
+      }
     } finally {
-      if (!options.silent && selectedSessionIdRef.current === sessionId) setLoadingDetail(false);
+      if (includeTurns && historyLoadingSessionIdRef.current === sessionId) {
+        historyLoadingSessionIdRef.current = null;
+      }
+      if (!options.silent && selectedSessionIdRef.current === sessionId) {
+        if (includeTurns) setLoadingHistory(false);
+        else setLoadingDetail(false);
+      }
     }
   }
 
@@ -509,6 +540,7 @@ function Dashboard({
       if (selectedSessionIdRef.current !== sessionId) return;
       setCommands(response.commands);
       setCommandDiagnostics(response.diagnostics);
+      setCommandsLoadedSessionId(sessionId);
     } catch (caught) {
       if (selectedSessionIdRef.current !== sessionId) return;
       if (!options.silent) setCommands([]);
@@ -520,31 +552,39 @@ function Dashboard({
 
   function syncRuntimeSnapshot(nextRuntime: RuntimeSnapshot) {
     setRuntime(nextRuntime);
-    setSessionDetail((current) => current && current.id === nextRuntime.threadId
-      ? { ...current, status: nextRuntime.status, modelState: nextRuntime.modelSelection }
+    setSessionDetail((current) => current && isSameSession(current, nextRuntime.threadId)
+      ? {
+          ...current,
+          status: nextRuntime.status,
+          modelState: modelStateAfterRuntimeSnapshot(current.modelState, nextRuntime)
+        }
       : current);
     if (nextRuntime.status !== "history") {
       setPermissionMode(nextRuntime.permissionMode);
     }
   }
 
-  async function loadRuntime(sessionId: string, options: { silent?: boolean } = {}) {
+  async function loadRuntime(sessionId: string, options: { silent?: boolean } = {}): Promise<RuntimeSnapshot | null> {
     if (!options.silent) setRuntimeError(null);
     try {
       const response = await getSessionRuntime(sessionId);
-      if (selectedSessionIdRef.current !== sessionId) return;
+      if (selectedSessionIdRef.current !== sessionId) return null;
       syncRuntimeSnapshot(response.runtime);
       lastEventSeqRef.current = Math.max(lastEventSeqRef.current, response.runtime.eventSeq);
+      return response.runtime;
     } catch (caught) {
-      if (selectedSessionIdRef.current !== sessionId) return;
+      if (selectedSessionIdRef.current !== sessionId) return null;
       if (!options.silent) setRuntimeError(caught instanceof Error ? caught.message : "运行状态加载失败");
+      return null;
     }
   }
 
   async function refreshCurrentSession(sessionId: string, options: { silent?: boolean } = {}) {
     await Promise.all([
-      loadSessionDetail(sessionId, options),
-      loadSessionCommands(sessionId, options),
+      loadSessionDetail(sessionId, {
+        ...options,
+        includeTurns: historyLoadedSessionIdRef.current === sessionId
+      }),
       loadRuntime(sessionId, options)
     ]);
   }
@@ -553,7 +593,14 @@ function Dashboard({
     for (let attempt = 0; attempt < 24; attempt += 1) {
       await delay(attempt === 0 ? 800 : 2000);
       if (selectedSessionIdRef.current !== sessionId) return;
-      await refreshCurrentSession(sessionId, { silent: true });
+      const nextRuntime = await loadRuntime(sessionId, { silent: true });
+      if (nextRuntime && ["waiting_input", "exited", "failed"].includes(nextRuntime.status)) {
+        await loadSessionDetail(sessionId, {
+          silent: true,
+          includeTurns: historyLoadedSessionIdRef.current === sessionId
+        });
+        return;
+      }
     }
   }
 
@@ -592,7 +639,7 @@ function Dashboard({
       const response = await updateSessionModel(sessionId, input);
       if (selectedSessionIdRef.current !== sessionId) return;
       syncRuntimeSnapshot(response.runtime);
-      setSessionDetail((current) => current && current.id === sessionId
+      setSessionDetail((current) => current && isSameSession(current, sessionId)
         ? { ...current, modelState: response.selection }
         : current);
       setModelPickerOpen(false);
@@ -805,8 +852,16 @@ function Dashboard({
     selectedSessionIdRef.current = sessionId;
     setSelectedSessionId(sessionId);
     setSessionDetail(null);
+    historyLoadedSessionIdRef.current = null;
+    historyLoadingSessionIdRef.current = null;
+    setHistoryLoadedSessionId(null);
+    setLoadingHistory(false);
+    setHistoryError(null);
     setCommands([]);
     setCommandDiagnostics(null);
+    setLoadingCommands(false);
+    setCommandsError(null);
+    setCommandsLoadedSessionId(null);
     setRuntime(null);
     setPermissionMode("default");
     setPendingApprovals([]);
@@ -860,8 +915,8 @@ function Dashboard({
   }
 
   function handleMetadataSaved(updated: SessionSummary) {
-    setSessions((current) => current.map((session) => (session.id === updated.id ? updated : session)));
-    setSessionDetail((current) => (current && current.id === updated.id ? { ...current, ...updated } : current));
+    setSessions((current) => current.map((session) => (isSameSession(session, updated.id) ? updated : session)));
+    setSessionDetail((current) => (current && isSameSession(current, updated.id) ? { ...current, ...updated } : current));
   }
 
   useEffect(() => {
@@ -991,8 +1046,18 @@ function Dashboard({
   async function handleRefresh() {
     await loadSessions(search);
     if (selectedSessionIdRef.current) {
-      await refreshCurrentSession(selectedSessionIdRef.current);
+      const sessionId = selectedSessionIdRef.current;
+      await Promise.all([
+        refreshCurrentSession(sessionId),
+        commandsLoadedSessionId === sessionId ? loadSessionCommands(sessionId) : Promise.resolve()
+      ]);
     }
+  }
+
+  async function handleLoadHistory() {
+    const sessionId = selectedSessionIdRef.current;
+    if (!sessionId || loadingHistory || historyLoadedSessionIdRef.current === sessionId) return;
+    await loadSessionDetail(sessionId, { includeTurns: true });
   }
 
   function handleBackToList() {
@@ -1099,8 +1164,8 @@ function Dashboard({
               </div>
             </div>
             <div className="toolbarActions">
-              <button className="ghostButton" onClick={handleRefresh} disabled={loadingSessions || loadingDetail || loadingCommands}>
-                {loadingSessions || loadingDetail || loadingCommands ? "刷新中" : "刷新"}
+              <button className="ghostButton" onClick={handleRefresh} disabled={loadingSessions || loadingDetail || loadingHistory || loadingCommands}>
+                {loadingSessions || loadingDetail || loadingHistory || loadingCommands ? "刷新中" : "刷新"}
               </button>
             </div>
           </section>
@@ -1122,10 +1187,14 @@ function Dashboard({
                 detail={sessionDetail}
                 loading={loadingDetail}
                 error={detailError}
+                historyLoaded={historyLoadedSessionId === selectedSession.id}
+                loadingHistory={loadingHistory}
+                historyError={historyError}
                 commands={commands}
                 commandDiagnostics={commandDiagnostics}
                 loadingCommands={loadingCommands}
                 commandsError={commandsError}
+                commandsLoaded={commandsLoadedSessionId === selectedSession.id}
                 runtime={runtime}
                 permissionMode={permissionMode}
                 runtimeError={runtimeError}
@@ -1141,6 +1210,12 @@ function Dashboard({
                 onOpenModelPicker={handleOpenModelPicker}
                 onSendInput={handleSendInput}
                 onOpenRetry={() => setRetryDialogOpen(true)}
+                onLoadHistory={handleLoadHistory}
+                onLoadCommands={() => {
+                  if (!loadingCommands && commandsLoadedSessionId !== selectedSession.id) {
+                    void loadSessionCommands(selectedSession.id);
+                  }
+                }}
                 onSubmitApproval={handleSubmitApproval}
               />
             ) : loadingDetail ? (
@@ -1159,10 +1234,10 @@ function Dashboard({
           health={health}
           loading={loadingDiagnostics}
           error={diagnosticsError}
+          reloadNotice={runtimeReloadNotice}
           onBack={handleBackToList}
           onRefresh={loadDiagnostics}
           onReloadRuntime={handleReloadRuntime}
-          reloadNotice={runtimeReloadNotice}
           reloadingRuntime={runtimeReloading}
         />
       ) : (
@@ -1534,10 +1609,14 @@ function SessionDetailPanel({
   detail,
   loading,
   error,
+  historyLoaded,
+  loadingHistory,
+  historyError,
   commands,
   commandDiagnostics,
   loadingCommands,
   commandsError,
+  commandsLoaded,
   runtime,
   permissionMode,
   runtimeError,
@@ -1553,16 +1632,22 @@ function SessionDetailPanel({
   onOpenModelPicker,
   onSendInput,
   onOpenRetry,
+  onLoadHistory,
+  onLoadCommands,
   onSubmitApproval
 }: {
   fallbackSession: SessionSummary;
   detail: SessionDetail | null;
   loading: boolean;
   error: string | null;
+  historyLoaded: boolean;
+  loadingHistory: boolean;
+  historyError: string | null;
   commands: SessionCommand[];
   commandDiagnostics: SessionCommandDiagnostics | null;
   loadingCommands: boolean;
   commandsError: string | null;
+  commandsLoaded: boolean;
   runtime: RuntimeSnapshot | null;
   permissionMode: SessionPermissionMode;
   runtimeError: string | null;
@@ -1578,6 +1663,8 @@ function SessionDetailPanel({
   onOpenModelPicker: () => void;
   onSendInput: (text: string) => Promise<void>;
   onOpenRetry: () => void;
+  onLoadHistory: () => Promise<void>;
+  onLoadCommands: () => void;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
   const session = detail ?? fallbackSession;
@@ -1658,8 +1745,19 @@ function SessionDetailPanel({
             ) : null}
             {loading ? <div className="emptyState">正在加载详情...</div> : null}
             {error ? <div className="errorBanner">{error}</div> : null}
-            {detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
-            {detail && detail.turns.length > 0 ? (
+            {historyError ? <div className="errorBanner">{historyError}</div> : null}
+            {detail && !historyLoaded ? (
+              <div className="emptyState">
+                <p>{loadingHistory ? "正在加载最新历史消息..." : "历史消息暂未加载。"}</p>
+                {!loadingHistory ? (
+                  <button className="ghostButton" type="button" onClick={() => void onLoadHistory()}>
+                    重新加载历史消息
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {historyLoaded && detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
+            {historyLoaded && detail && detail.turns.length > 0 ? (
               <SessionTimeline
                 detail={detail}
                 visibleTurnCount={visibleTurnCount}
@@ -1672,6 +1770,8 @@ function SessionDetailPanel({
               diagnostics={commandDiagnostics}
               loading={loadingCommands}
               error={commandsError}
+              loaded={commandsLoaded}
+              onOpen={onLoadCommands}
             />
           </div>
         ) : null}
@@ -2193,27 +2293,38 @@ function SessionCommandsPanel({
   commands,
   diagnostics,
   loading,
-  error
+  error,
+  loaded,
+  onOpen
 }: {
   commands: SessionCommand[];
   diagnostics: SessionCommandDiagnostics | null;
   loading: boolean;
   error: string | null;
+  loaded: boolean;
+  onOpen: () => void;
 }) {
   return (
-    <details className="commandsPanel" aria-labelledby="commands-title">
+    <details
+      className="commandsPanel"
+      aria-labelledby="commands-title"
+      onToggle={(event) => {
+        if (event.currentTarget.open && !loaded && !loading) onOpen();
+      }}
+    >
       <summary className="commandsSummary">
         <div>
           <h3 id="commands-title">历史命令</h3>
           <p className="muted">
-            {loading ? "正在加载历史命令..." : `共 ${commands.length} 条命令`}
+            {loading ? "正在加载历史命令..." : loaded ? `共 ${commands.length} 条命令` : "展开后加载历史命令"}
             {diagnostics && !diagnostics.matchedSessionFile ? "，未匹配到 JSONL 文件" : ""}
           </p>
         </div>
       </summary>
       <div className="commandsPanelBody">
         {error ? <div className="errorBanner">{error}</div> : null}
-        {!loading && !error && commands.length === 0 ? <div className="emptyState">暂无历史命令</div> : null}
+        {!loaded && !loading && !error ? <div className="emptyState">展开面板后读取对应会话的 JSONL 文件。</div> : null}
+        {loaded && !loading && !error && commands.length === 0 ? <div className="emptyState">暂无历史命令</div> : null}
         {commands.length > 0 ? (
           <div className="commandList">
             {commands.map((command) => (
@@ -2513,7 +2624,7 @@ function SessionList({
                 <SessionItem
                   key={session.id}
                   session={session}
-                  selected={session.id === selectedSessionId}
+                  selected={isSameSession(session, selectedSessionId)}
                   onSelect={onSelect}
                   onMetadataSaved={onMetadataSaved}
                 />
@@ -2897,6 +3008,13 @@ function emptyModelState(): SessionModelState {
   };
 }
 
+function isSameSession(
+  session: Pick<SessionSummary, "id" | "sessionId"> | null | undefined,
+  sessionId: string | null | undefined
+): boolean {
+  return Boolean(session && sessionId && (session.id === sessionId || session.sessionId === sessionId));
+}
+
 function modelChangeStatusLabel(status: RuntimeSnapshot["modelChangeStatus"]): string {
   switch (status) {
     case "pending":
@@ -2975,10 +3093,6 @@ function upsertById<T extends { id: string }>(items: T[], item: T): T[] {
   const next = [...items];
   next[index] = { ...next[index], ...item };
   return next;
-}
-
-function isSameSession(session: Pick<SessionSummary, "id" | "sessionId"> | null | undefined, sessionId: string | null): boolean {
-  return Boolean(session && sessionId && (session.id === sessionId || session.sessionId === sessionId));
 }
 
 function appendLiveMessage(messages: LiveMessage[], nextMessage: LiveMessage): LiveMessage[] {

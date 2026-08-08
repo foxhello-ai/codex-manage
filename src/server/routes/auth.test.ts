@@ -12,7 +12,7 @@ function testConfig(): AppConfig {
     runtimeMode: "standalone",
     host: "0.0.0.0",
     port: 3000,
-    password: "fmzh2026",
+    password: "admin",
     defaultPassword: false,
     sessionSecret: "test-secret-at-least-thirty-two-chars",
     codexCliPath: "codex",
@@ -91,7 +91,7 @@ describe("auth routes", () => {
       method: "POST",
       url: "/api/login",
       payload: {
-        password: "fmzh2026"
+        password: "admin"
       }
     });
     expect(login.statusCode).toBe(200);
@@ -131,7 +131,7 @@ describe("auth routes", () => {
     const login = await app.inject({
       method: "POST",
       url: "/api/login",
-      payload: { password: "fmzh2026" }
+      payload: { password: "admin" }
     });
     const loginCookieHeader = login.headers["set-cookie"];
     const loginCookie = Array.isArray(loginCookieHeader) ? loginCookieHeader[0] : loginCookieHeader;

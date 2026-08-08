@@ -68,8 +68,9 @@ type ListSessionsParams = {
   limit?: number;
 };
 
-const DEFAULT_SESSION_SCAN_LIMIT = 1000;
-const SESSION_PAGE_SIZE = 100;
+type GetSessionDetailParams = {
+  includeTurns?: boolean;
+};
 
 type MetadataStore = {
   getAll(): Promise<Record<string, { remarkTitle: string | null }>>;
@@ -85,12 +86,15 @@ type MetadataStore = {
   update(sessionId: string, metadata: { remarkTitle: string | null }): Promise<{ remarkTitle: string | null }>;
 };
 
+const DEFAULT_SESSION_SCAN_LIMIT = 1000;
+const SESSION_PAGE_SIZE = 100;
+
 export class SessionService {
   constructor(
     private readonly appServer: Pick<CodexAppServerClient, "request" | "getSnapshot">,
     private readonly metadataStore?: MetadataStore,
     private readonly jsonlParser?: Pick<JsonlSessionParser, "readModelState">,
-    private readonly modelCatalog?: Pick<ModelCatalogService, "list">,
+    private readonly modelCatalog?: Pick<ModelCatalogService, "isModelSupportedFromCache">,
     private readonly runtimeManager?: Pick<RuntimeManager, "getRuntime">
   ) {}
 
@@ -130,12 +134,12 @@ export class SessionService {
     return params.limit ? matched.slice(0, params.limit) : matched;
   }
 
-  async getSessionDetail(sessionId: string): Promise<SessionDetail> {
+  async getSessionDetail(sessionId: string, params: GetSessionDetailParams = {}): Promise<SessionDetail> {
     this.assertReady();
 
     const response = await this.appServer.request<ThreadReadResponse>("thread/read", {
       threadId: sessionId,
-      includeTurns: true
+      includeTurns: params.includeTurns ?? true
     });
 
     const metadata = await this.readMetadata();
@@ -146,7 +150,6 @@ export class SessionService {
 
     const thread = response.thread && typeof response.thread === "object" ? (response.thread as Record<string, unknown>) : {};
     const modelState = await this.buildModelState(sessionId, readString(thread.modelProvider));
-
 
     return {
       ...summary,
@@ -182,16 +185,9 @@ export class SessionService {
     const actualModel = runtime?.model ?? historical?.state.model ?? null;
     const actualModelProvider = runtime?.modelProvider ?? historical?.state.modelProvider ?? threadModelProvider;
     const actualReasoningEffort = runtime?.reasoningEffort ?? historical?.state.reasoningEffort ?? null;
-    let actualModelSupported: boolean | null = null;
-
-    if (actualModel && this.modelCatalog) {
-      try {
-        const catalog = await this.modelCatalog.list();
-        actualModelSupported = catalog.models.some((model) => model.model === actualModel);
-      } catch {
-        actualModelSupported = null;
-      }
-    }
+    const actualModelSupported = actualModel && this.modelCatalog
+      ? this.modelCatalog.isModelSupportedFromCache(actualModel)
+      : null;
 
     const persisted = metadata?.modelSelection ?? {
       mode: "follow_session" as const,

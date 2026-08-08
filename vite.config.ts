@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     port: 5902,
     strictPort: true,
-    allowedHosts: ["codex.foxhello.com", "codex.foxhello.cn"],
+    allowedHosts: ["codex.example.com", "codex.example.cn"],
     proxy: {
       "/api": {
         target: "http://127.0.0.1:" + apiPort,

@@ -712,6 +712,7 @@ h2 {
 }
 
 .errorBanner,
+.successBanner,
 .emptyState {
   border: 1px solid #d9e0e7;
   border-radius: 8px;
@@ -726,11 +727,9 @@ h2 {
 }
 
 .successBanner {
-  border: 1px solid #b8dec6;
-  border-radius: 8px;
-  padding: 12px 14px;
-  color: #17623d;
-  background: #f1faf5;
+  border-color: #9ccbb2;
+  color: #155d39;
+  background: #eaf7f0;
 }
 
 .routeErrorState {

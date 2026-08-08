@@ -27,24 +27,26 @@ describe("loadConfig", () => {
     delete process.env.CODEX_MANAGE_DATABASE_FILE;
     delete process.env.CODEX_WEB_CLIENT_DIR;
 
-    const config = loadConfig();
+    try {
+      const config = loadConfig();
 
-    expect(config.host).toBe("0.0.0.0");
-    expect(config.port).toBe(4310);
-    expect(config.password).toBe("fmzh2026");
-    expect(config.defaultPassword).toBe(true);
-    expect(config.codexCliPath).toBe("codex");
-    expect(config.sessionsDir).toContain(".codex/sessions");
-    expect(config.userDataDir).toContain(".codex-manage");
-    expect(config.metadataFile).toContain(".codex-manage/session-metadata.json");
-    expect(config.localDatabaseFile).toContain(".codex-manage/local.db");
-    expect(config.clientDir).toContain("dist/client");
-
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
+      expect(config.host).toBe("0.0.0.0");
+      expect(config.port).toBe(4310);
+      expect(config.password).toBe("fmzh2026");
+      expect(config.defaultPassword).toBe(true);
+      expect(config.codexCliPath).toBe("codex");
+      expect(config.sessionsDir).toContain(".codex/sessions");
+      expect(config.userDataDir).toContain(".codex-manage");
+      expect(config.metadataFile).toContain(".codex-manage/session-metadata.json");
+      expect(config.localDatabaseFile).toContain(".codex-manage/local.db");
+      expect(config.clientDir).toContain("dist/client");
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
       }
     }
   });

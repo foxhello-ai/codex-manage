@@ -5,7 +5,7 @@ import { RuntimeReloadBlockedError, type AppRuntime } from "../services/AppRunti
 import type { ModelCatalogService } from "../services/ModelCatalogService";
 
 const ReloadRequest = z.object({
-  trigger: z.enum(["manual", "desktop_auto"]).default("manual"),
+  trigger: z.enum(["manual", "desktop_auto", "config_watcher"]).default("manual"),
   reason: z.string().trim().max(200).nullable().default(null)
 });
 
@@ -19,6 +19,7 @@ export function registerRuntimeRoutes(
     if (!parsed.success) {
       return sendError(reply, 400, "INVALID_RUNTIME_RELOAD_BODY", "运行时刷新请求格式不正确", parsed.error.flatten());
     }
+
     try {
       const result = await runtime.reloadAppServer(parsed.data);
       modelCatalog.invalidate();

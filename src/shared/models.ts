@@ -32,7 +32,7 @@ export type AppServerSnapshot = {
 export type RuntimeReloadSnapshot = {
   generation: number;
   reloadedAt: string | null;
-  trigger: "manual" | "desktop_auto" | null;
+  trigger: "manual" | "desktop_auto" | "config_watcher" | null;
   reason: string | null;
   lastError: string | null;
 };
@@ -64,7 +64,7 @@ export type RuntimeReloadResponse = {
   runtime: {
     generation: number;
     reloadedAt: string;
-    trigger: "manual" | "desktop_auto";
+    trigger: "manual" | "desktop_auto" | "config_watcher";
     reason: string | null;
     codexCliVersion: string | null;
     appServer: AppServerSnapshot;

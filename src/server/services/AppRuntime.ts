@@ -4,7 +4,7 @@ import { CodexAppServerClient, type CodexAppServerSnapshot } from "./CodexAppSer
 import { detectCodexVersion } from "./codexVersion";
 import { RuntimeManager, type RuntimeReloadBlocker } from "./RuntimeManager";
 
-export type RuntimeReloadTrigger = "manual" | "desktop_auto";
+export type RuntimeReloadTrigger = "manual" | "desktop_auto" | "config_watcher";
 
 export type RuntimeReloadSnapshot = {
   generation: number;

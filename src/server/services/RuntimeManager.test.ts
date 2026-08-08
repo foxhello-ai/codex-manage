@@ -106,6 +106,9 @@ describe("RuntimeManager", () => {
     expect(manager.getReloadBlockers()).toEqual([
       { threadId: "thread-1", status: "running", reason: "active_runtime" }
     ]);
+    expect(manager.prepareForAppServerReload()).toEqual([
+      { threadId: "thread-1", status: "running", reason: "active_runtime" }
+    ]);
 
     appServer.emit("notification", {
       method: "thread/status/changed",
@@ -143,7 +146,9 @@ describe("RuntimeManager", () => {
     const manager = new RuntimeManager(appServer as any);
 
     await manager.resumeThread("thread-1");
+
     expect(manager.prepareForAppServerReload()).toEqual([]);
+    appServer.emit("exit", { code: 0, signal: null });
     manager.finishAppServerReload(true);
 
     expect(manager.getRuntime("thread-1")).toMatchObject({

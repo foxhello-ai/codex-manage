@@ -104,35 +104,40 @@ describe("session routes", () => {
   });
 
   it("returns session detail", async () => {
+    let detailOptions: { includeTurns?: boolean } | undefined;
     const app = buildApp({
       listSessions: async () => [],
       updateMetadata: async () => {
         throw new Error("not used");
       },
-      getSessionDetail: async (sessionId: string) => ({
-        id: sessionId,
-        sessionId,
-        title: "详情标题",
-        defaultTitle: "详情标题",
-        remarkTitle: null,
-        summary: "摘要",
-        workspace: "/workspace/app",
-        createdAt: "2026-07-14T03:33:20.000Z",
-        updatedAt: "2026-07-14T03:38:20.000Z",
-        status: "history",
-        cliVersion: "codex-cli 0.144.3",
-        source: "cli",
-        path: "/sessions/thread-1.jsonl",
-        modelProvider: "openai",
-        historyMode: "full",
-        modelState: { ...emptyModelState(), actualModelProvider: "openai" },
-        turns: []
-      })
+      getSessionDetail: async (sessionId: string, options?: { includeTurns?: boolean }) => {
+        detailOptions = options;
+        return {
+          id: sessionId,
+          sessionId,
+          title: "详情标题",
+          defaultTitle: "详情标题",
+          remarkTitle: null,
+          summary: "摘要",
+          workspace: "/workspace/app",
+          createdAt: "2026-07-14T03:33:20.000Z",
+          updatedAt: "2026-07-14T03:38:20.000Z",
+          status: "history",
+          cliVersion: "codex-cli 0.144.3",
+          source: "cli",
+          path: "/sessions/thread-1.jsonl",
+          modelProvider: "openai",
+          historyMode: "full",
+          modelState: { ...emptyModelState(), actualModelProvider: "openai" },
+          turns: []
+        };
+      }
     });
 
-    const response = await app.inject({ method: "GET", url: "/api/sessions/thread-1" });
+    const response = await app.inject({ method: "GET", url: "/api/sessions/thread-1?turns=false" });
 
     expect(response.statusCode).toBe(200);
+    expect(detailOptions).toEqual({ includeTurns: false });
     expect(response.json()).toMatchObject({
       session: {
         id: "thread-1",
