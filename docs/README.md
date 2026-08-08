@@ -1,0 +1,33 @@
+# Codex Manage 文档索引
+
+本文档将仓库资料按用途归类。产品范围与当前交付状态以项目级文档为准；按日期记录的实施笔记、验收截图和故障记录用于追溯具体变更。
+
+## 项目级资料
+
+| 类别 | 入口 | 用途 |
+| --- | --- | --- |
+| 项目治理与迭代 | [`governance/`](governance/) | 三条发布线、版本目标迭代、需求/Issue 生命周期、发布门禁与模板 |
+| 发布台账 | [`releases/README.md`](releases/README.md) | 版本、提交、标签、构建物、验收证据与历史缺口 |
+| 产品概览与开发说明 | [`../README.md`](../README.md) | 产品边界、目录、开发、构建和 Linux 运行包说明 |
+| Web/H5 基线 | [`codex-web-requirements.md`](codex-web-requirements.md)、[`detailed-design.md`](detailed-design.md)、[`task-plan.md`](task-plan.md)、[`technical-research.md`](technical-research.md) | 原始 Web 会话管理产品需求、技术设计与实施规划 |
+| 模型切换 | [`model-change-requirements.md`](model-change-requirements.md)、[`model-change-detailed-design.md`](model-change-detailed-design.md)、[`model-change-task-plan.md`](model-change-task-plan.md) | 模型选择与切换需求、设计和任务规划 |
+| 桌面与云平台 | [`desktop-cloud-platform/requirements.md`](desktop-cloud-platform/requirements.md)、[`architecture.md`](desktop-cloud-platform/architecture.md)、[`implementation-plan.md`](desktop-cloud-platform/implementation-plan.md) | Desktop & Cloud Platform V1 的需求、架构和分阶段计划 |
+| 当前状态 | [`desktop-cloud-platform/implementation-status.md`](desktop-cloud-platform/implementation-status.md) | 交付范围、阶段状态、外部验收门禁和已知缺口 |
+| 验收与部署 | [`desktop-cloud-platform/acceptance-report.md`](desktop-cloud-platform/acceptance-report.md)、[`deployment-guide.md`](desktop-cloud-platform/deployment-guide.md) | 已完成验证、未完成的外部验收和生产部署步骤 |
+| 发布记录 | [`releases/`](releases/) | 安装包版本、校验和、签名状态和发布后补丁 |
+| 待办 | [`backlog.md`](backlog.md) | 未关闭的产品/体验待办 |
+
+## 变更与追溯资料
+
+- [`implementation-notes/`](implementation-notes/)：按日期的调研、实现和问题修复记录。若项目级状态与笔记冲突，以日期更晚、且包含实现和验证记录的笔记为准，并在项目级文档中回写确认结论。
+- [`incidents/`](incidents/)：故障记录索引。
+- [`acceptance/`](acceptance/)：Web/H5 与模型切换的验收截图。
+- [`desktop-cloud-platform/electron-update-change-request.md`](desktop-cloud-platform/electron-update-change-request.md)：Electron 更新变更需求，已审核、待设计实现。
+- [`desktop-cloud-platform/issue-reporting-change-request.md`](desktop-cloud-platform/issue-reporting-change-request.md)：问题反馈与自动上报变更需求，已审核、待设计实现。
+
+## 当前同步基线（2026-08-08）
+
+- 本地代码、验收和发布文档为技术事实来源；Linear 的 Codex Manage 项目保存便于协作的项目摘要、状态、发布与开放事项，不替代仓库中可审计的完整技术文档。
+- Desktop & Cloud Platform 的核心 P1–P8 已完成代码验收；公开 GA 仍受真实外部环境验收、跨平台签名发布和生产运维门禁限制。
+- `cc switch` 后的 app-server 重载代码已于 2026-07-25 记录为完成，尚需 macOS/Windows 实机安装包回归；该较新记录应覆盖同日实施状态文档中“仍需新增 reload 能力”的过期表述。
+- 自 2026-08-08 起，项目按 Linux Runtime、Desktop、Cloud Platform 三条独立发布线管理；需求与风险共享，但版本、构建物、验收与回滚记录不得混用。具体规则见 [`governance/`](governance/)。
