@@ -9,7 +9,7 @@
 | 项目治理与迭代 | [`governance/`](governance/) | 三条发布线、版本目标迭代、需求/Issue 生命周期、发布门禁与模板 |
 | 发布台账 | [`releases/README.md`](releases/README.md) | 版本、提交、标签、构建物、验收证据与历史缺口 |
 | 产品概览与开发说明 | [`../README.md`](../README.md) | 产品边界、目录、开发、构建和 Linux 运行包说明 |
-| 产品全局架构 | [`../README.md#产品全局架构与分支边界`](../README.md#产品全局架构与分支边界) | Web/H5、Desktop、本地服务、Cloud Platform、Tunnel、支付与运营后台的关系，以及 1.0.7 候选分支边界 |
+| 产品全局架构 | [`../README.md#产品全局架构与分支边界`](../README.md#产品全局架构与分支边界) | Web/H5、Linux Runtime 与 Desktop Runtime 的并列用户侧执行面，独立 Tunnel 模块、Cloud Platform、支付与运营后台的关系，以及 1.0.7 候选分支边界 |
 | Web/H5 基线 | [`codex-web-requirements.md`](codex-web-requirements.md)、[`detailed-design.md`](detailed-design.md)、[`task-plan.md`](task-plan.md)、[`technical-research.md`](technical-research.md) | 原始 Web 会话管理产品需求、技术设计与实施规划 |
 | 模型切换 | [`model-change-requirements.md`](model-change-requirements.md)、[`model-change-detailed-design.md`](model-change-detailed-design.md)、[`model-change-task-plan.md`](model-change-task-plan.md) | 模型选择与切换需求、设计和任务规划 |
 | 桌面与云平台 | [`desktop-cloud-platform/implementation-status.md`](desktop-cloud-platform/implementation-status.md)；完整需求、架构和实施计划仍在 [`feature/f-20260721-desktop`](https://github.com/foxhello-ai/codex-manage/tree/feature/f-20260721-desktop/docs/desktop-cloud-platform) | Desktop & Cloud Platform V1 的需求、架构、实施计划与当前状态；未合并资料不得被误认为 `main` 当前代码 |
