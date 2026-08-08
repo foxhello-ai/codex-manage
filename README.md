@@ -2,6 +2,34 @@
 
 `main` 分支提供单体 Web 版本：一个 Fastify 服务托管 React 页面，并在同一台 Linux 主机上启动宿主机的 `codex app-server`。它不包含桌面客户端、Cloudflare Tunnel、运营后台、支付或云端控制面。
 
+## 产品全局架构与分支边界
+
+下图描述的是产品全貌，不表示所有组件已经合入当前 `main`。`main` 是 Linux Runtime 与 Web/H5 的稳定线；Desktop、Cloud Platform 及其支付、域名配置能力仍以各自的候选分支为实现来源，合并与发布必须经版本门禁确认。
+
+```mermaid
+flowchart LR
+  User["用户"] --> Web["Web / H5\nReact + Fastify\nmain / UI 候选"]
+  User --> Desktop["macOS / Windows Desktop\nElectron"]
+  Desktop <--> Local["本地服务\nFastify + SQLite + 认证"]
+  Local <--> Codex["宿主机 Codex app-server"]
+  Desktop <--> API["Cloud Control API\n认证、设备、权益、配置"]
+  Local <-->|"Quick / Named Tunnel" Cloudflare["Cloudflare\nTunnel + DNS"]
+  Worker["Tunnel Worker"] <--> Cloudflare
+  API <--> DB[("PostgreSQL\n用户、设备、订单、配置")]
+  Admin["运营后台\nAdmin Web"] <--> API
+  API <--> Pay["微信支付 / 支付宝\n1.0.7 候选"]
+  API <--> SMTP["SMTP / 短信 Webhook\n验证码"]
+  Worker <--> DB
+```
+
+| 实现来源 | 1.0.7 候选内容 | 进入联合发布前的条件 |
+| --- | --- | --- |
+| `origin/feature/f-20260728-pay` | 支付模块、Control API 支付链路、Desktop 套餐购买、运营后台支付管理 | 商户参数和回调联调、真实小额订单、幂等与权限验收；未完成前保持购买关闭 |
+| `origin/feature/f-20260730-domain` | Desktop 运行时域名配置、Control API/Worker 动态系统配置、后台配置页、SMTP 验证码 | 新旧域名灰度、桌面配置刷新、迁移/回滚、SMTP 发送与安全验收 |
+| `origin/feature/f-20260804-ui` | Web/H5 会话工作台视觉与交互重构 | UI/UX 审计、关键任务流与移动端可用性回归、无障碍和视觉验收 |
+
+Desktop 与 Cloud Platform 的 `v1.0.6` 已由项目负责人确认同期发布；两条发布线仍分别保存版本、构建物、环境验收与回滚证据。详见 [`docs/releases/README.md`](docs/releases/README.md) 和 [`docs/governance/`](docs/governance/)。
+
 推荐部署方式是：GitHub Actions 构建无源码运行包，Linux 服务器用同一个系统用户通过 systemd 启动。不要用 Docker 做主部署。
 
 ## 构建运行包
