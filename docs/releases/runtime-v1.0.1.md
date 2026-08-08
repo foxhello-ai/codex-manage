@@ -3,7 +3,8 @@
 ## 身份与证据
 
 - 发布线：Linux Runtime。
-- Git tag：`v1.0.1`，解析到提交 `7ee315b`（2026-08-03）。
+- 原始 Git tag：`v1.0.1`，解析到提交 `7ee315b`（2026-08-03）。
+- 规范历史基线 tag：`runtime/v1.0.1`，同样指向 `7ee315b`；该 annotated tag 于 2026-08-08 补录，仅固定 Runtime 源码参考点。
 - 版本来源：`.github/workflows/build-runtime-package.yml` 的手动 workflow 输入与生成的 `build-info.txt`；根 `package.json` 仍为 `1.0.0`，因此不得用该文件单独判断 Runtime 发布版本。
 - 当前证据等级：冻结基线。仓库内没有对应 GitHub Release 资产、构建 run URL 或 SHA-256 副本可供离线复核。
 
