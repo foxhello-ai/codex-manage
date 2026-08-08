@@ -1,4 +1,4 @@
-import type { ModelOption, SessionStatus } from "../shared/models";
+import type { ModelOption, RuntimeSnapshot, SessionModelState, SessionStatus } from "../shared/models";
 
 export function filterAndSortModels(models: ModelOption[], search: string): ModelOption[] {
   const term = search.trim().toLocaleLowerCase();
@@ -30,4 +30,11 @@ export function modelSwitchDisabledReason(status: SessionStatus): string | null 
     default:
       return null;
   }
+}
+
+export function modelStateAfterRuntimeSnapshot(
+  current: SessionModelState,
+  runtime: RuntimeSnapshot
+): SessionModelState {
+  return runtime.status === "history" ? current : runtime.modelSelection;
 }

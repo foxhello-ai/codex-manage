@@ -2,7 +2,7 @@ import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, 
 import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, HealthStatus, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
-import { modelSwitchDisabledReason } from "./modelSelection";
+import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
 import { isTaskSendShortcut, shouldAutoFollowLiveOutput } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 
@@ -219,6 +219,7 @@ function Dashboard({
   const lastEventSeqRef = useRef(0);
   const selectedSessionIdRef = useRef<string | null>(initialRoute.kind === "detail" ? initialRoute.sessionId : null);
   const historyLoadedSessionIdRef = useRef<string | null>(null);
+  const historyLoadingSessionIdRef = useRef<string | null>(null);
   const liveMessagesRef = useRef<LiveMessage[]>([]);
   const retryMessageRef = useRef<string | null>(null);
   const runtimeReloadGenerationRef = useRef<number | null>(null);
@@ -362,6 +363,8 @@ function Dashboard({
 
   async function loadSessionDetail(sessionId: string, options: { silent?: boolean; includeTurns?: boolean } = {}) {
     const includeTurns = options.includeTurns ?? false;
+    if (includeTurns && historyLoadingSessionIdRef.current === sessionId) return;
+    if (includeTurns) historyLoadingSessionIdRef.current = sessionId;
     if (!options.silent) {
       if (includeTurns) setLoadingHistory(true);
       else setLoadingDetail(true);
@@ -376,6 +379,8 @@ function Dashboard({
       if (includeTurns) {
         historyLoadedSessionIdRef.current = sessionId;
         setHistoryLoadedSessionId(sessionId);
+      } else if (historyLoadedSessionIdRef.current !== sessionId) {
+        void loadSessionDetail(sessionId, { includeTurns: true, silent: options.silent });
       }
     } catch (caught) {
       if (selectedSessionIdRef.current !== sessionId) return;
@@ -387,6 +392,9 @@ function Dashboard({
         setDetailError(message);
       }
     } finally {
+      if (includeTurns && historyLoadingSessionIdRef.current === sessionId) {
+        historyLoadingSessionIdRef.current = null;
+      }
       if (!options.silent && selectedSessionIdRef.current === sessionId) {
         if (includeTurns) setLoadingHistory(false);
         else setLoadingDetail(false);
@@ -417,7 +425,11 @@ function Dashboard({
   function syncRuntimeSnapshot(nextRuntime: RuntimeSnapshot) {
     setRuntime(nextRuntime);
     setSessionDetail((current) => current && isSameSession(current, nextRuntime.threadId)
-      ? { ...current, status: nextRuntime.status, modelState: nextRuntime.modelSelection }
+      ? {
+          ...current,
+          status: nextRuntime.status,
+          modelState: modelStateAfterRuntimeSnapshot(current.modelState, nextRuntime)
+        }
       : current);
     if (nextRuntime.status !== "history") {
       setPermissionMode(nextRuntime.permissionMode);
@@ -713,6 +725,7 @@ function Dashboard({
     setSelectedSessionId(sessionId);
     setSessionDetail(null);
     historyLoadedSessionIdRef.current = null;
+    historyLoadingSessionIdRef.current = null;
     setHistoryLoadedSessionId(null);
     setLoadingHistory(false);
     setHistoryError(null);
@@ -1592,10 +1605,12 @@ function SessionDetailPanel({
             {historyError ? <div className="errorBanner">{historyError}</div> : null}
             {detail && !historyLoaded ? (
               <div className="emptyState">
-                <p>基础详情已加载，历史消息按需读取。</p>
-                <button className="ghostButton" type="button" onClick={() => void onLoadHistory()} disabled={loadingHistory}>
-                  {loadingHistory ? "正在加载历史消息..." : "加载历史消息"}
-                </button>
+                <p>{loadingHistory ? "正在加载最新历史消息..." : "历史消息暂未加载。"}</p>
+                {!loadingHistory ? (
+                  <button className="ghostButton" type="button" onClick={() => void onLoadHistory()}>
+                    重新加载历史消息
+                  </button>
+                ) : null}
               </div>
             ) : null}
             {historyLoaded && detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
