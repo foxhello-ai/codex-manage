@@ -12,6 +12,7 @@
 | 产品全局架构 | [`../README.md#产品全局架构与分支边界`](../README.md#产品全局架构与分支边界) | Web/H5、Linux Runtime 与 Desktop Runtime 的并列用户侧执行面，独立 Tunnel 模块、Cloud Platform、支付与运营后台的关系，以及 1.0.7 候选分支边界 |
 | Web/H5 基线 | [`codex-web-requirements.md`](codex-web-requirements.md)、[`detailed-design.md`](detailed-design.md)、[`task-plan.md`](task-plan.md)、[`technical-research.md`](technical-research.md) | 原始 Web 会话管理产品需求、技术设计与实施规划 |
 | 模型切换 | [`model-change-requirements.md`](model-change-requirements.md)、[`model-change-detailed-design.md`](model-change-detailed-design.md)、[`model-change-task-plan.md`](model-change-task-plan.md) | 模型选择与切换需求、设计和任务规划 |
+| V4 UI 审核 | [`v4-ui-review-2026-08-13.md`](v4-ui-review-2026-08-13.md) | V1/V4 UI 审核结论、实现差距、保留资产与中间内容清理边界 |
 | 桌面与云平台 | [`desktop-cloud-platform/implementation-status.md`](desktop-cloud-platform/implementation-status.md)；完整需求、架构和实施计划仍在 [`feature/f-20260721-desktop`](https://github.com/foxhello-ai/codex-manage/tree/feature/f-20260721-desktop/docs/desktop-cloud-platform) | Desktop & Cloud Platform V1 的需求、架构、实施计划与当前状态；未合并资料不得被误认为 `main` 当前代码 |
 | 当前状态 | [`desktop-cloud-platform/implementation-status.md`](desktop-cloud-platform/implementation-status.md) | 交付范围、阶段状态、外部验收门禁和已知缺口 |
 | 验收与部署 | [`desktop-cloud-platform/acceptance-report.md`](desktop-cloud-platform/acceptance-report.md)、[`deployment-guide.md`](desktop-cloud-platform/deployment-guide.md) | 已完成验证、未完成的外部验收和生产部署步骤 |
