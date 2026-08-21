@@ -668,6 +668,12 @@ h2 {
   width: min(88%, 860px);
 }
 
+.turnItems .messageItem.fileChangeItem,
+.liveOutputBody .messageItem.fileChangeItem {
+  justify-self: start;
+  width: min(88%, 860px);
+}
+
 .messageHeader {
   display: flex;
   align-items: center;
@@ -3462,6 +3468,12 @@ textarea::placeholder {
   background: #2a2a2c;
 }
 
+.fileChangeItem {
+  border-color: #3a3a3c;
+  color: #f5f5f7;
+  background: #2a2a2c;
+}
+
 .modelOption > code,
 .modelOption .modelEfforts,
 .markdownContent code,
@@ -4540,8 +4552,24 @@ textarea::placeholder {
   }
 
   .detailToolbar .toolbarActions {
+    flex: 0 0 auto;
     align-items: center;
     gap: 8px;
+  }
+
+  .detailToolbar .toolbarActions > .detailMoreButton {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    align-self: center;
+    border: 0;
+    border-radius: 12px;
+    padding: 0;
+    color: #f5f5f7;
+    background: #363638;
+    font-size: 1.2rem;
+    line-height: 1;
   }
 
   .detailToolbar .toolbarActions > .ghostButton {
@@ -5352,7 +5380,9 @@ textarea::placeholder {
   .turnItems .messageItem.user,
   .liveOutputBody .messageItem.user,
   .turnItems .messageItem.agent,
-  .liveOutputBody .messageItem.agent {
+  .liveOutputBody .messageItem.agent,
+  .turnItems .messageItem.fileChangeItem,
+  .liveOutputBody .messageItem.fileChangeItem {
     width: min(94%, 100%);
   }
 }
@@ -5589,76 +5619,71 @@ textarea::placeholder {
   }
 
   .composerRuntimeBar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 7px 10px;
-    border-radius: 14px;
-    padding: 9px 12px;
+    min-height: 34px;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    border: 0;
+    border-radius: 0;
+    padding: 0 16px;
+    background: transparent;
   }
 
   .composerRuntimeState {
+    display: none;
+  }
+
+  .composerRuntimeModel {
+    order: 3;
+    flex: 1 1 auto;
     min-width: 0;
+    justify-content: flex-end;
+    gap: 4px;
   }
 
-  .composerRuntimeState strong {
-    font-size: 0.78rem;
-  }
-
-  .composerRuntimeState > span:not(.composerRuntimeDot) {
+  .composerRuntimeModel > span,
+  .composerRuntimeModel small {
+    font-size: 0.62rem;
     overflow: hidden;
-    font-size: 0.68rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .composerRuntimeModel {
-    grid-column: 1;
-    grid-row: 1;
-    min-width: 0;
-    flex: none;
-  }
-
   .composerRuntimeModel strong {
-    font-size: 0.76rem;
-  }
-
-  .composerRuntimeModel small {
-    font-size: 0.68rem;
+    max-width: 132px;
+    font-size: 0.7rem;
   }
 
   .composerRuntimeBadges {
-    grid-column: 1;
-    grid-row: 2;
+    order: 2;
     min-width: 0;
+    flex: 0 0 auto;
   }
 
   .composerRuntimeBadges span {
-    padding: 2px 7px;
-    font-size: 0.66rem;
+    padding: 2px 6px;
+    font-size: 0.62rem;
   }
 
   .composerModelButton {
-    grid-column: 2;
-    grid-row: 1;
-    min-height: 32px;
-    padding: 0 10px;
-    font-size: 0.7rem;
+    order: 4;
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 0.65rem;
   }
 
   .composerPermissionButton {
-    grid-column: 2;
-    grid-row: 2;
-    min-height: 32px;
-    padding: 0 10px;
-    font-size: 0.7rem;
+    order: 1;
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 0.65rem;
   }
 
   .composerApprovalButton {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    min-height: 32px;
-    padding: 0 10px;
-    font-size: 0.7rem;
+    order: 2;
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 0.65rem;
   }
 
   .composerDock > .approvalPanel {

@@ -1173,7 +1173,7 @@ function Dashboard({
               </div>
               <div className="toolbarActions">
                 <button
-                  className="ghostButton"
+                  className={compactViewport ? "iconButton detailMoreButton" : "ghostButton"}
                   type="button"
                   aria-label={compactViewport ? "切换模型" : undefined}
                   onClick={compactViewport ? handleOpenModelPicker : handleRefresh}
@@ -1181,7 +1181,7 @@ function Dashboard({
                     ? Boolean(modelSwitchDisabledReason(runtime?.status ?? "history")) || updatingModel
                     : loadingSessions || loadingDetail || loadingHistory}
                 >
-                  {compactViewport ? "更多操作" : loadingSessions || loadingDetail || loadingHistory ? "刷新中" : "刷新"}
+                  {compactViewport ? <span aria-hidden="true">⋯</span> : loadingSessions || loadingDetail || loadingHistory ? "刷新中" : "刷新"}
                 </button>
               </div>
             </section>
