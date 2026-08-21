@@ -1105,16 +1105,6 @@ function Dashboard({
               >
                 <span aria-hidden="true">☰</span>
               </button>
-              <button
-                className="iconButton"
-                type="button"
-                aria-label="刷新会话"
-                title="刷新"
-                onClick={() => loadSessions(search)}
-                disabled={loadingSessions}
-              >
-                <span aria-hidden="true">↻</span>
-              </button>
             </div>
 
             <section className="mobileDashboardWelcome workspaceWelcome" aria-labelledby="mobile-workspace-welcome-title">
@@ -1127,7 +1117,14 @@ function Dashboard({
               {!loadingSessions && !sessionError && sessions.length === 0 ? (
                 <div className="workspaceWelcomeHint">还没有可显示的会话。请先在 Codex CLI 中创建会话，再返回这里刷新。</div>
               ) : null}
-              {!loadingSessions && !sessionError ? <RecentSessions sessions={sessions} onSelect={handleSelectSession} /> : null}
+              {!loadingSessions && !sessionError ? (
+                <RecentSessions
+                  sessions={sessions}
+                  onSelect={handleSelectSession}
+                  onRefresh={() => loadSessions(search)}
+                  refreshing={loadingSessions}
+                />
+              ) : null}
             </section>
           </div>
         </>
@@ -2891,10 +2888,14 @@ function DesktopWorkspaceHome({
 
 function RecentSessions({
   sessions,
-  onSelect
+  onSelect,
+  onRefresh,
+  refreshing = false
 }: {
   sessions: SessionSummary[];
   onSelect: (session: SessionSummary) => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const [recentExpanded, setRecentExpanded] = useState(false);
   const recentSessions = useMemo(() => sortSessionsByUpdatedAt(sessions).slice(0, 10), [sessions]);
@@ -2910,7 +2911,21 @@ function RecentSessions({
     <section className="workspaceRecent" aria-label="最近会话">
       <div className="workspaceRecentHeading">
         <h3>最近使用</h3>
-        <span>从侧边栏查看全部</span>
+        <div className="workspaceRecentHeadingActions">
+          <span>从侧边栏查看全部</span>
+          {onRefresh ? (
+            <button
+              className="iconButton workspaceRecentRefresh"
+              type="button"
+              aria-label="刷新最近会话"
+              title="刷新最近会话"
+              onClick={onRefresh}
+              disabled={refreshing}
+            >
+              <span aria-hidden="true">↻</span>
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className={`workspaceRecentList${recentExpanded ? " expanded" : ""}`}>
         {visibleRecentSessions.map((session) => (

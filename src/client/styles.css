@@ -4226,7 +4226,7 @@ textarea::placeholder {
 
   .mobileDashboardTopActions {
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 8px;
   }
 
@@ -4274,7 +4274,7 @@ textarea::placeholder {
 
   .mobileDashboardWelcome .workspaceRecentHeading {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
   }
@@ -4285,7 +4285,29 @@ textarea::placeholder {
     font-size: 0.84rem;
   }
 
-  .mobileDashboardWelcome .workspaceRecentHeading span {
+  .mobileDashboardWelcome .workspaceRecentHeadingActions {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentHeadingActions > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentRefresh {
+    width: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+    font-size: 1rem;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentHeadingActions > span {
     color: #8e8e93;
     font-size: 0.75rem;
   }
@@ -4863,6 +4885,8 @@ textarea::placeholder {
 
   .mobileDrawerSessionBrowser .sectionHeader,
   .mobileDrawerSessionBrowser .sectionHeader.noHeading {
+    width: 100%;
+    min-width: 0;
     display: grid;
     align-items: stretch;
     gap: 10px;
@@ -4870,7 +4894,14 @@ textarea::placeholder {
 
   .mobileDrawerSessionBrowser .searchForm {
     width: 100%;
+    max-width: none;
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mobileDrawerSessionBrowser .sessionViewTabs,
+  .mobileDrawerSessionBrowser .sessionList {
+    width: 100%;
+    min-width: 0;
   }
 
   .mobileDrawerSessionBrowser .sessionList {
