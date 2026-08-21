@@ -237,13 +237,6 @@ function Dashboard({
   const drawerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const compactViewport = useCompactViewport();
 
-  const listenAddress = useMemo(() => {
-    if (!currentConfig) return "读取中";
-    return `${currentConfig.host}:${currentConfig.port}`;
-  }, [currentConfig]);
-  const appServerStatus = currentConfig?.appServer
-    ? `${currentConfig.appServer.status}${currentConfig.appServer.initialized ? " / initialized" : ""}`
-    : "未连接";
   const selectedSession = sessions.find((session) => isSameSession(session, selectedSessionId))
     ?? (isSameSession(sessionDetail, selectedSessionId) ? sessionDetail : null);
   const currentModelState = runtime && runtime.status !== "history"
@@ -1099,38 +1092,42 @@ function Dashboard({
           />
 
           <div className="mobileDashboardHome">
-            <section className="toolbar mobileDashboardToolbar">
-              <div>
-                <h2>会话管理</h2>
-                <p className="muted">查看 ~/.codex/sessions 中的历史会话，恢复会话并继续任务。</p>
-              </div>
-              <div className="toolbarActions mobileDashboardToolbarActions">
-                <button
-                  className="iconButton mobileOnly"
-                  type="button"
-                  aria-label="打开会话列表"
-                  title="会话列表"
-                  onClick={(event) => {
-                    drawerTriggerRef.current = event.currentTarget;
-                    setDrawerOpen(true);
-                  }}
-                >
-                  <span aria-hidden="true">☰</span>
-                </button>
-                <button className="ghostButton" onClick={() => loadSessions(search)} disabled={loadingSessions}>
-                  {loadingSessions ? "刷新中" : "刷新"}
-                </button>
-              </div>
-            </section>
+            <div className="mobileDashboardTopActions" aria-label="首页操作">
+              <button
+                className="iconButton mobileOnly"
+                type="button"
+                aria-label="打开会话列表"
+                title="会话列表"
+                onClick={(event) => {
+                  drawerTriggerRef.current = event.currentTarget;
+                  setDrawerOpen(true);
+                }}
+              >
+                <span aria-hidden="true">☰</span>
+              </button>
+              <button
+                className="iconButton"
+                type="button"
+                aria-label="刷新会话"
+                title="刷新"
+                onClick={() => loadSessions(search)}
+                disabled={loadingSessions}
+              >
+                <span aria-hidden="true">↻</span>
+              </button>
+            </div>
 
-            <section className="mobileSessionBrowser" aria-label="会话列表">
-              {renderSessionBrowser()}
-            </section>
+            <section className="mobileDashboardWelcome workspaceWelcome" aria-labelledby="mobile-workspace-welcome-title">
+              <p className="workspaceWelcomeEyebrow">CODEX MANAGE</p>
+              <h2 id="mobile-workspace-welcome-title">选择一个会话开始工作</h2>
+              <p className="workspaceWelcomeDescription">从侧边栏浏览、搜索并继续本机 Codex 会话。打开后，任务进度与输入框会保留在此工作区。</p>
 
-            <section className="infoGrid compact mobileDashboardInfo" aria-label="当前配置">
-              <InfoItem label="监听地址" value={listenAddress} />
-              <InfoItem label="Codex 版本" value={currentConfig?.codexCliVersion ?? currentConfig?.codexVersionError ?? "读取中"} />
-              <InfoItem label="App Server" value={appServerStatus} />
+              {loadingSessions ? <div className="workspaceWelcomeLoading" role="status">正在准备你的工作台…</div> : null}
+              {!loadingSessions && sessionError ? <div className="workspaceWelcomeHint">会话暂时无法加载，请点击刷新重试。</div> : null}
+              {!loadingSessions && !sessionError && sessions.length === 0 ? (
+                <div className="workspaceWelcomeHint">还没有可显示的会话。请先在 Codex CLI 中创建会话，再返回这里刷新。</div>
+              ) : null}
+              {!loadingSessions && !sessionError ? <RecentSessions sessions={sessions} onSelect={handleSelectSession} /> : null}
             </section>
           </div>
         </>
@@ -2849,14 +2846,6 @@ function DesktopWorkspaceHome({
   onSelect: (session: SessionSummary) => void;
   onMetadataSaved: (session: SessionSummary) => void;
 }) {
-  const [recentExpanded, setRecentExpanded] = useState(false);
-  const recentSessions = useMemo(() => sortSessionsByUpdatedAt(sessions).slice(0, 10), [sessions]);
-  const visibleRecentSessions = recentExpanded ? recentSessions : recentSessions.slice(0, 5);
-
-  useEffect(() => {
-    if (recentSessions.length <= 5) setRecentExpanded(false);
-  }, [recentSessions.length]);
-
   return (
     <ResizableWorkspaceLayout
       className="desktopWorkspaceHome"
@@ -2892,41 +2881,61 @@ function DesktopWorkspaceHome({
           {!loadingSessions && !sessionError && sessions.length === 0 ? (
             <div className="workspaceWelcomeHint">还没有可显示的会话。请先在 Codex CLI 中创建会话，再返回这里刷新。</div>
           ) : null}
-          {!loadingSessions && !sessionError && recentSessions.length > 0 ? (
-            <section className="workspaceRecent" aria-label="最近会话">
-              <div className="workspaceRecentHeading">
-                <h3>最近使用</h3>
-                <span>从左栏查看全部</span>
-              </div>
-              <div className={`workspaceRecentList${recentExpanded ? " expanded" : ""}`}>
-                {visibleRecentSessions.map((session) => (
-                  <button
-                    className="workspaceRecentSession"
-                    key={session.id}
-                    type="button"
-                    onClick={() => onSelect(session)}
-                    aria-label={`打开会话：${session.title}`}
-                  >
-                    <span className={`workspaceRecentStatus ${session.status}`} aria-hidden="true" />
-                    <span className="workspaceRecentCopy">
-                      <strong>{session.title}</strong>
-                      <small>{workspaceDisplayName(session.workspace)} · {formatDateTime(session.updatedAt)}</small>
-                    </span>
-                    {session.status !== "history" ? <span className="workspaceRecentMeta">{statusLabel(session.status)}</span> : null}
-                  </button>
-                ))}
-              </div>
-              {recentSessions.length > 5 ? (
-                <button className="workspaceRecentToggle" type="button" onClick={() => setRecentExpanded((current) => !current)}>
-                  {recentExpanded ? "收起" : `显示全部 ${recentSessions.length} 个`}
-                </button>
-              ) : null}
-            </section>
-          ) : null}
+          {!loadingSessions && !sessionError ? <RecentSessions sessions={sessions} onSelect={onSelect} /> : null}
         </section>
         </main>
       )}
     />
+  );
+}
+
+function RecentSessions({
+  sessions,
+  onSelect
+}: {
+  sessions: SessionSummary[];
+  onSelect: (session: SessionSummary) => void;
+}) {
+  const [recentExpanded, setRecentExpanded] = useState(false);
+  const recentSessions = useMemo(() => sortSessionsByUpdatedAt(sessions).slice(0, 10), [sessions]);
+  const visibleRecentSessions = recentExpanded ? recentSessions : recentSessions.slice(0, 5);
+
+  useEffect(() => {
+    if (recentSessions.length <= 5) setRecentExpanded(false);
+  }, [recentSessions.length]);
+
+  if (recentSessions.length === 0) return null;
+
+  return (
+    <section className="workspaceRecent" aria-label="最近会话">
+      <div className="workspaceRecentHeading">
+        <h3>最近使用</h3>
+        <span>从侧边栏查看全部</span>
+      </div>
+      <div className={`workspaceRecentList${recentExpanded ? " expanded" : ""}`}>
+        {visibleRecentSessions.map((session) => (
+          <button
+            className="workspaceRecentSession"
+            key={session.id}
+            type="button"
+            onClick={() => onSelect(session)}
+            aria-label={`打开会话：${session.title}`}
+          >
+            <span className={`workspaceRecentStatus ${session.status}`} aria-hidden="true" />
+            <span className="workspaceRecentCopy">
+              <strong>{session.title}</strong>
+              <small>{workspaceDisplayName(session.workspace)} · {formatDateTime(session.updatedAt)}</small>
+            </span>
+            {session.status !== "history" ? <span className="workspaceRecentMeta">{statusLabel(session.status)}</span> : null}
+          </button>
+        ))}
+      </div>
+      {recentSessions.length > 5 ? (
+        <button className="workspaceRecentToggle" type="button" onClick={() => setRecentExpanded((current) => !current)}>
+          {recentExpanded ? "收起" : `显示全部 ${recentSessions.length} 个`}
+        </button>
+      ) : null}
+    </section>
   );
 }
 

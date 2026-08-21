@@ -4224,74 +4224,165 @@ textarea::placeholder {
     gap: 16px;
   }
 
-  .mobileDashboardToolbar {
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .mobileDashboardToolbar > div:first-child {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .mobileDashboardToolbarActions {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr);
+  .mobileDashboardTopActions {
+    display: flex;
+    justify-content: flex-end;
     gap: 8px;
   }
 
-  .mobileDashboardToolbarActions > button {
-    width: 100%;
-    min-width: 0;
-    min-height: 44px;
-  }
-
-  .mobileDashboardToolbarActions > .iconButton {
+  .mobileDashboardTopActions > .iconButton {
     width: 44px;
     min-width: 44px;
+    min-height: 44px;
     padding: 0;
   }
 
-  .mobileSessionBrowser {
+  .mobileDashboardWelcome {
+    width: 100%;
+    display: grid;
+    gap: 14px;
+  }
+
+  .mobileDashboardWelcome h2 {
+    color: #f5f5f7;
+    font-size: 1.65rem;
+    letter-spacing: -0.035em;
+    line-height: 1.15;
+  }
+
+  .mobileDashboardWelcome .workspaceWelcomeDescription {
+    color: #aeaeb2;
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .mobileDashboardWelcome .workspaceWelcomeHint,
+  .mobileDashboardWelcome .workspaceWelcomeLoading {
+    border: 1px solid #3a3a3c;
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: #aeaeb2;
+    background: #28282a;
+    line-height: 1.5;
+  }
+
+  .mobileDashboardWelcome .workspaceRecent {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentHeading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentHeading h3 {
+    margin: 0;
+    color: #f5f5f7;
+    font-size: 0.84rem;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentHeading span {
+    color: #8e8e93;
+    font-size: 0.75rem;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentList {
+    display: grid;
+    border: 1px solid #3a3a3c;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #28282a;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentList.expanded {
+    max-height: min(480px, 52dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentToggle {
+    justify-self: start;
+    min-height: 32px;
+    border: 1px solid #49494d;
+    border-radius: 999px;
+    padding: 0 12px;
+    color: #aeaeb2;
+    background: #2a2a2c;
+    font-size: 0.72rem;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentSession {
+    min-width: 0;
+    min-height: 66px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-bottom: 1px solid #3a3a3c;
+    border-radius: 0;
+    padding: 12px 14px;
+    color: #f5f5f7;
+    background: transparent;
+    text-align: left;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentSession:last-child {
+    border-bottom: 0;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentStatus {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #8e8e93;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentStatus.running,
+  .mobileDashboardWelcome .workspaceRecentStatus.starting {
+    background: #30d158;
+    box-shadow: 0 0 0 4px rgb(48 209 88 / 15%);
+  }
+
+  .mobileDashboardWelcome .workspaceRecentStatus.waiting_approval,
+  .mobileDashboardWelcome .workspaceRecentStatus.waiting_input {
+    background: #ff9f0a;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentStatus.failed {
+    background: #ff453a;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentCopy {
     min-width: 0;
     display: grid;
-    gap: 12px;
+    gap: 4px;
   }
 
-  .mobileSessionBrowser .sectionHeader,
-  .mobileSessionBrowser .sectionHeader.noHeading {
-    display: grid;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .mobileSessionBrowser .searchForm {
-    width: 100%;
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .mobileSessionBrowser .sessionItem {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    padding: 12px;
-  }
-
-  .mobileSessionBrowser .sessionActions {
-    grid-template-columns: minmax(56px, auto) minmax(0, 1fr);
-    align-items: center;
-    gap: 8px;
-  }
-
-  .mobileSessionBrowser .sessionActions .ghostButton {
-    min-width: 56px;
-    min-height: 40px;
-    padding: 0 10px;
+  .mobileDashboardWelcome .workspaceRecentCopy strong,
+  .mobileDashboardWelcome .workspaceRecentCopy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .mobileSessionBrowser .workspaceGroupList {
-    padding-left: 0;
+  .mobileDashboardWelcome .workspaceRecentCopy strong {
+    color: #f5f5f7;
+    font-size: 0.9rem;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentCopy small,
+  .mobileDashboardWelcome .workspaceRecentMeta {
+    color: #8e8e93;
+    font-size: 0.72rem;
+  }
+
+  .mobileDashboardWelcome .workspaceRecentMeta {
+    white-space: nowrap;
   }
 
   .appShell.reserveFloatingStatus .content {
