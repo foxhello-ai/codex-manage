@@ -57,6 +57,8 @@ type SettingsWaiter = {
   timer: NodeJS.Timeout;
 };
 
+type TimedOutModelConfirmation = Pick<SettingsWaiter, "expectedModel" | "expectedEffort">;
+
 export type RuntimeReloadBlocker = {
   threadId: string;
   status: RuntimeStatus;
@@ -73,6 +75,7 @@ export class RuntimeManager {
   private readonly runtimes = new Map<string, RuntimeState>();
   private readonly operationChains = new Map<string, Promise<void>>();
   private readonly settingsWaiters = new Map<string, SettingsWaiter>();
+  private readonly timedOutModelConfirmations = new Map<string, TimedOutModelConfirmation>();
   private readonly modelConfirmationTimeoutMs: number;
   private appServerReloading = false;
 
@@ -343,7 +346,10 @@ export class RuntimeManager {
         seen.add(threadId);
         continue;
       }
-      if (runtime.modelChangeStatus === "pending" || runtime.modelChangeStatus === "confirming") {
+      if (
+        runtime.modelChangeStatus === "pending"
+        || (runtime.modelChangeStatus === "confirming" && this.settingsWaiters.has(threadId))
+      ) {
         blockers.push({ threadId, status: runtime.status, reason: "model_change" });
         seen.add(threadId);
       }
@@ -365,6 +371,7 @@ export class RuntimeManager {
     for (const threadId of this.settingsWaiters.keys()) {
       this.cancelSettingsWaiter(threadId);
     }
+    this.timedOutModelConfirmations.clear();
     return [];
   }
 
@@ -407,6 +414,11 @@ export class RuntimeManager {
         timedOut: false,
         resolve,
         timer: setTimeout(() => {
+          this.settingsWaiters.delete(threadId);
+          this.timedOutModelConfirmations.set(threadId, {
+            expectedModel: waiter.expectedModel,
+            expectedEffort: waiter.expectedEffort
+          });
           waiter.timedOut = true;
           const runtime = this.runtimes.get(threadId);
           if (runtime) {
@@ -428,9 +440,11 @@ export class RuntimeManager {
 
   private cancelSettingsWaiter(threadId: string) {
     const waiter = this.settingsWaiters.get(threadId);
-    if (!waiter) return;
-    clearTimeout(waiter.timer);
-    this.settingsWaiters.delete(threadId);
+    if (waiter) {
+      clearTimeout(waiter.timer);
+      this.settingsWaiters.delete(threadId);
+    }
+    this.timedOutModelConfirmations.delete(threadId);
   }
 
   private reconcileThreadSettings(threadId: string, settings: Record<string, unknown>) {
@@ -444,18 +458,19 @@ export class RuntimeManager {
     if (!runtime) return;
 
     const waiter = this.settingsWaiters.get(threadId);
+    const confirmation = waiter ?? this.timedOutModelConfirmations.get(threadId);
     const nextModel = actualModel ?? runtime.model;
     const nextProvider = actualModelProvider ?? runtime.modelProvider;
     const nextEffort = actualEffort ?? runtime.reasoningEffort;
     const mismatch = Boolean(
-      waiter
-      && ((actualModel && actualModel !== waiter.expectedModel)
-        || (waiter.expectedEffort && actualEffort && actualEffort !== waiter.expectedEffort))
+      confirmation
+      && ((actualModel && actualModel !== confirmation.expectedModel)
+        || (confirmation.expectedEffort && actualEffort && actualEffort !== confirmation.expectedEffort))
     );
     const matched = Boolean(
-      waiter
-      && nextModel === waiter.expectedModel
-      && (!waiter.expectedEffort || nextEffort === waiter.expectedEffort)
+      confirmation
+      && nextModel === confirmation.expectedModel
+      && (!confirmation.expectedEffort || nextEffort === confirmation.expectedEffort)
     );
 
     this.setRuntime(threadId, {
@@ -504,9 +519,10 @@ export class RuntimeManager {
         this.settingsWaiters.delete(threadId);
         waiter.resolve(matched ? "matched" : "mismatch");
       }
+      this.timedOutModelConfirmations.delete(threadId);
       if (matched) {
         this.eventHub.publish(threadId, "model_change_completed", {
-          requestedModel: waiter?.expectedModel ?? nextModel,
+          requestedModel: confirmation?.expectedModel ?? nextModel,
           actualModel: nextModel,
           modelProvider: nextProvider,
           reasoningEffort: nextEffort,
@@ -514,7 +530,7 @@ export class RuntimeManager {
         });
       } else {
         this.eventHub.publish(threadId, "model_change_failed", {
-          requestedModel: waiter?.expectedModel ?? null,
+          requestedModel: confirmation?.expectedModel ?? null,
           actualModel: nextModel,
           errorCode: "MODEL_SWITCH_MISMATCH",
           message: "app-server 实际模型与请求模型不一致"
