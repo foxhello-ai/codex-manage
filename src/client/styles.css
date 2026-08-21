@@ -5667,9 +5667,24 @@ textarea::placeholder {
 
   .composerModelButton {
     order: 4;
+    width: 28px;
+    min-width: 28px;
     min-height: 30px;
-    padding: 0 8px;
-    font-size: 0.65rem;
+    border: 0;
+    border-radius: 999px;
+    padding: 0;
+    color: #aeaeb2;
+    background: transparent;
+    font-size: 0;
+  }
+
+  .composerModelButtonLabel { display: none; }
+
+  .composerModelButtonChevron {
+    display: inline-block;
+    color: #d1d1d6;
+    font-size: 1.2rem;
+    line-height: 1;
   }
 
   .composerPermissionButton {
@@ -6435,5 +6450,160 @@ textarea::placeholder {
 
   .sessionIdValue code {
     max-width: 132px;
+  }
+}
+
+/* Compact H5 model controls: keep the composer light while preserving the full picker. */
+@media (max-width: 767px) {
+  .modelSelectorBackdrop {
+    place-items: end end;
+    padding: 0 12px;
+    background: rgb(0 0 0 / 28%);
+  }
+
+  .modelSelectorDialog {
+    width: min(360px, calc(100vw - 24px));
+    border-radius: 16px;
+  }
+
+  .composerPermissionButton,
+  .composerApprovalButton {
+    min-height: 28px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0 7px;
+    font-size: 0.64rem;
+    font-weight: 750;
+  }
+
+  .composerPermissionButton {
+    color: #ffb340;
+    background: transparent;
+  }
+
+  .composerApprovalButton {
+    color: #ffb340;
+    background: transparent;
+  }
+
+  .composerPermissionButton:hover,
+  .composerApprovalButton:hover {
+    color: #ffd27d;
+    background: #3d2b12;
+  }
+
+  .composerRuntimeModel {
+    gap: 4px;
+  }
+
+  .composerRuntimeModel > span {
+    display: none;
+  }
+
+  .composerRuntimeModel strong {
+    max-width: 132px;
+    font-size: 0.7rem;
+  }
+
+  .composerRuntimeModel small {
+    color: #aeaeb2;
+    font-size: 0.62rem;
+  }
+
+  .composerModelButton {
+    min-height: 28px;
+  }
+
+  .modelSelectorDialog {
+    max-height: min(74dvh, 560px);
+  }
+
+  .modelSelectorHeader {
+    min-height: 56px;
+    padding: 11px 14px;
+  }
+
+  .modelSelectorHeader h2 {
+    margin: 0;
+    font-size: 0.98rem;
+  }
+
+  .modelSelectorHeader p {
+    display: none;
+  }
+
+  .modelSelectorToolbar {
+    gap: 6px;
+    padding: 8px 14px;
+  }
+
+  .modelSelectorToolbar input,
+  .modelSelectorToolbar button {
+    min-height: 38px;
+  }
+
+  .modelSelectorToolbar input {
+    font-size: 0.78rem;
+  }
+
+  .modelSelectorToolbar button {
+    padding: 0 10px;
+    font-size: 0.72rem;
+  }
+
+  .modelSelectorList {
+    max-height: min(35dvh, 250px);
+    gap: 4px;
+    padding: 8px 14px;
+  }
+
+  .modelOption {
+    min-height: 62px;
+    display: grid;
+    gap: 3px;
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .modelOptionTitle strong {
+    font-size: 0.86rem;
+  }
+
+  .modelOptionTitle small {
+    padding: 1px 5px;
+    font-size: 0.64rem;
+  }
+
+  .modelOption > code {
+    font-size: 0.68rem;
+  }
+
+  .modelOption p {
+    display: none;
+  }
+
+  .modelSelectorFooter {
+    gap: 8px;
+    padding: 9px 14px calc(9px + env(safe-area-inset-bottom));
+  }
+
+  .modelSelectorFooter label {
+    gap: 4px;
+    font-size: 0.72rem;
+  }
+
+  .modelSelectorFooter select {
+    min-height: 38px;
+    font-size: 0.78rem;
+  }
+
+  .modelSelectorActions {
+    gap: 6px;
+  }
+
+  .modelSelectorActions button {
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 0.72rem;
   }
 }

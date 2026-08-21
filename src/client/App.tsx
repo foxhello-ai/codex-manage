@@ -1933,7 +1933,7 @@ function ComposerRuntimeBar({
         <div className="composerRuntimeModel" title={[model, effort].filter(Boolean).join(" · ") || "模型未识别"}>
           <span>模型</span>
           <strong>{model ?? "未识别"}</strong>
-          {effort ? <small>推理 {effort}</small> : null}
+          {effort ? <small>{effort}</small> : null}
         </div>
         {pendingApprovalCount > 0 ? (
           <div className="composerRuntimeBadges">
@@ -1961,7 +1961,7 @@ function ComposerRuntimeBar({
           disabled={Boolean(modelDisabledReason) || updatingModel}
           title={modelDisabledReason ?? "切换模型"}
         >
-          {updatingModel ? "切换中" : "模型选择"}
+          {updatingModel ? "切换中" : <><span className="composerModelButtonLabel">模型选择</span><span className="composerModelButtonChevron" aria-hidden="true">›</span></>}
         </button>
       </section>
       {confirmFullAccess ? (
