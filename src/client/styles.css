@@ -4877,25 +4877,81 @@ textarea::placeholder {
     gap: 12px;
   }
 
+  .mobileDrawerSessionBrowser .sessionWorkspaceGroup {
+    gap: 4px;
+  }
+
   .mobileDrawerSessionBrowser .sessionItem {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    border-color: #49494d;
-    border-radius: 12px;
-    padding: 12px;
-    background: #303034;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 9px 8px;
+    background: transparent;
+  }
+
+  .mobileDrawerSessionBrowser .sessionMain {
+    gap: 4px;
+  }
+
+  .mobileDrawerSessionBrowser .sessionTitleRow {
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .mobileDrawerSessionBrowser .titleEditButton span {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.86rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .mobileDrawerSessionBrowser .titleEditIcon,
+  .mobileDrawerSessionBrowser .sessionSummary,
+  .mobileDrawerSessionBrowser .remarkHint,
+  .mobileDrawerSessionBrowser .sessionId {
+    display: none;
+  }
+
+  .mobileDrawerSessionBrowser .sessionMeta {
+    gap: 4px;
+    color: #8e8e93;
+    font-size: 0.68rem;
+  }
+
+  .mobileDrawerSessionBrowser .sessionMeta span:first-child {
+    display: none;
   }
 
   .mobileDrawerSessionBrowser .sessionActions {
-    grid-template-columns: minmax(56px, auto) minmax(0, 1fr);
-    align-items: center;
-    gap: 8px;
+    display: grid;
+    align-content: center;
   }
 
   .mobileDrawerSessionBrowser .sessionActions .ghostButton {
-    min-width: 56px;
-    min-height: 40px;
-    padding: 0 10px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+  }
+
+  .mobileDrawerSessionBrowser .statusBadge {
+    padding: 2px 5px;
+    font-size: 0.64rem;
+  }
+
+  .mobileDrawerSessionBrowser .recentSessionList .sessionMeta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mobileDrawerSessionBrowser .recentSessionList .sessionMeta span:first-child {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
