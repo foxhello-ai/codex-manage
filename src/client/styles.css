@@ -6780,3 +6780,95 @@ textarea::placeholder {
     font-size: 0.72rem;
   }
 }
+
+/* Keep the Web composer runtime bar consistent with the compact H5 layout. */
+@media (min-width: 768px) {
+  .composerRuntimeBar {
+    min-height: 34px;
+    flex-wrap: nowrap;
+    gap: 6px;
+    border: 0;
+    border-radius: 0;
+    padding: 0 16px;
+    background: transparent;
+  }
+
+  .composerRuntimeModel {
+    order: 3;
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .composerRuntimeModel > span {
+    display: none;
+  }
+
+  .composerRuntimeModel strong {
+    max-width: min(42vw, 360px);
+    font-size: 0.7rem;
+  }
+
+  .composerRuntimeModel small {
+    color: #aeaeb2;
+    font-size: 0.62rem;
+  }
+
+  .composerRuntimeBadges {
+    order: 2;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  .composerRuntimeBadges span {
+    padding: 2px 6px;
+    font-size: 0.62rem;
+  }
+
+  .composerPermissionButton,
+  .composerApprovalButton {
+    min-height: 30px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0 8px;
+    font-size: 0.65rem;
+    font-weight: 750;
+  }
+
+  .composerPermissionButton {
+    order: 1;
+    color: #ffb340;
+    background: transparent;
+  }
+
+  .composerApprovalButton {
+    order: 2;
+    color: #ffb340;
+    background: transparent;
+  }
+
+  .composerModelButton {
+    order: 4;
+    width: 28px;
+    min-width: 28px;
+    min-height: 30px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0;
+    color: #aeaeb2;
+    background: transparent;
+    font-size: 0;
+  }
+
+  .composerModelButtonLabel {
+    display: none;
+  }
+
+  .composerModelButtonChevron {
+    display: inline-block;
+    color: #d1d1d6;
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+}
