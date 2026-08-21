@@ -1053,6 +1053,20 @@ function Dashboard({
   return (
     <Shell
       title="Codex Manage"
+      leadingAction={viewMode === "list" ? (
+        <button
+          className="iconButton mobileOnly"
+          type="button"
+          aria-label="打开会话列表"
+          title="会话列表"
+          onClick={(event) => {
+            drawerTriggerRef.current = event.currentTarget;
+            setDrawerOpen(true);
+          }}
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
+      ) : undefined}
       reserveFloatingStatus={viewMode === "detail" && Boolean(selectedSession) && compactViewport}
       desktopWorkspace={viewMode === "list" || (viewMode === "detail" && !compactViewport)}
       action={(
@@ -1092,21 +1106,6 @@ function Dashboard({
           />
 
           <div className="mobileDashboardHome">
-            <div className="mobileDashboardTopActions" aria-label="首页操作">
-              <button
-                className="iconButton mobileOnly"
-                type="button"
-                aria-label="打开会话列表"
-                title="会话列表"
-                onClick={(event) => {
-                  drawerTriggerRef.current = event.currentTarget;
-                  setDrawerOpen(true);
-                }}
-              >
-                <span aria-hidden="true">☰</span>
-              </button>
-            </div>
-
             <section className="mobileDashboardWelcome workspaceWelcome" aria-labelledby="mobile-workspace-welcome-title">
               <p className="workspaceWelcomeEyebrow">CODEX MANAGE</p>
               <h2 id="mobile-workspace-welcome-title">选择一个会话开始工作</h2>
@@ -1121,6 +1120,10 @@ function Dashboard({
                 <RecentSessions
                   sessions={sessions}
                   onSelect={handleSelectSession}
+                  onOpenDrawer={(trigger) => {
+                    drawerTriggerRef.current = trigger;
+                    setDrawerOpen(true);
+                  }}
                   onRefresh={() => loadSessions(search)}
                   refreshing={loadingSessions}
                 />
@@ -2889,11 +2892,13 @@ function DesktopWorkspaceHome({
 function RecentSessions({
   sessions,
   onSelect,
+  onOpenDrawer,
   onRefresh,
   refreshing = false
 }: {
   sessions: SessionSummary[];
   onSelect: (session: SessionSummary) => void;
+  onOpenDrawer?: (trigger: HTMLButtonElement) => void;
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
@@ -2912,7 +2917,17 @@ function RecentSessions({
       <div className="workspaceRecentHeading">
         <h3>最近使用</h3>
         <div className="workspaceRecentHeadingActions">
-          <span>从侧边栏查看全部</span>
+          {onOpenDrawer ? (
+            <button
+              className="workspaceRecentBrowse"
+              type="button"
+              onClick={(event) => onOpenDrawer(event.currentTarget)}
+            >
+              从侧边栏查看全部
+            </button>
+          ) : (
+            <span>从侧边栏查看全部</span>
+          )}
           {onRefresh ? (
             <button
               className="iconButton workspaceRecentRefresh"
@@ -3615,12 +3630,14 @@ function StatusBadge({ status }: { status: SessionStatus }) {
 
 function Shell({
   title,
+  leadingAction,
   action,
   children,
   reserveFloatingStatus = false,
   desktopWorkspace = false
 }: {
   title: string;
+  leadingAction?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
   reserveFloatingStatus?: boolean;
@@ -3629,7 +3646,10 @@ function Shell({
   return (
     <main className={`appShell${reserveFloatingStatus ? " reserveFloatingStatus" : ""}${desktopWorkspace ? " desktopWorkspaceShell" : ""}`}>
       <header className="topbar">
-        <h1>{title}</h1>
+        <div className="topbarLeading">
+          {leadingAction}
+          <h1>{title}</h1>
+        </div>
         {action}
       </header>
       <div className="content">{children}</div>
