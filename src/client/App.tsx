@@ -1308,7 +1308,6 @@ function Dashboard({
           submitting={updatingModel}
           error={modelActionError ?? modelCatalogError}
           onClose={() => setModelPickerOpen(false)}
-          onRefresh={() => loadModelCatalog(true)}
           onApply={handleApplyModel}
         />
       ) : null}
