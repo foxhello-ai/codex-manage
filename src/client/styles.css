@@ -4838,7 +4838,7 @@ textarea::placeholder {
     grid-template-columns: 20px minmax(0, 1fr) 44px;
     align-items: center;
     gap: 9px;
-    margin: 0 16px calc(12px + env(safe-area-inset-bottom));
+    margin: 0 16px;
     border-radius: 21px;
     padding: 8px 10px;
     background: #2a2a2c;
@@ -5616,7 +5616,7 @@ textarea::placeholder {
 
 @media (max-width: 767px) {
   .composerDock {
-    gap: 8px;
+    gap: 2px;
     border-top: 1px solid #3a3a3c;
     padding: 8px 0 calc(env(safe-area-inset-bottom));
     background: #1c1c1e;
@@ -6248,8 +6248,12 @@ textarea::placeholder {
 }
 
 @media (max-width: 767px) {
+  .historyViewport > .historyContent {
+    padding-right: 48px;
+  }
+
   .timelineScrollControls {
-    right: 12px;
+    right: 2px;
     bottom: 12px;
   }
 
