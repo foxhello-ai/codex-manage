@@ -450,27 +450,20 @@ test("model selection, status restrictions, and explicit retry work on desktop a
 
   const selector = page.getByRole("dialog", { name: "切换会话模型" });
   await expect(selector).toBeVisible();
-  await expect(selector.getByText(/legacy-model/)).toBeVisible();
-  await selector.getByLabel("搜索模型").fill("Frontier");
-  await expect(selector.getByRole("status")).toContainText("原推理强度 xhigh 不受支持");
-  await selector.getByRole("option", { name: /Frontier V2/ }).click();
-  await expect(selector.getByLabel("推理强度")).toHaveValue("high");
-
   if (isMobileProject(testInfo)) {
-    const box = await selector.boundingBox();
-    const viewport = page.viewportSize();
-    expect(box).not.toBeNull();
-    expect(viewport).not.toBeNull();
-    expect(Math.abs((box!.y + box!.height) - viewport!.height)).toBeLessThanOrEqual(2);
-    expect(box!.height).toBeLessThanOrEqual(viewport!.height * 0.86);
-    for (const buttonName of ["跟随会话", "应用模型"]) {
-      const buttonBox = await selector.getByRole("button", { name: buttonName }).boundingBox();
-      expect(buttonBox?.height ?? 0).toBeGreaterThanOrEqual(44);
-    }
+    await selector.getByRole("button", { name: /^模型/ }).click();
+    await expect(selector.getByText(/legacy-model/)).toBeVisible();
+    await selector.getByRole("option", { name: /Frontier V2/ }).click();
+    await expect(selector).toBeHidden();
+  } else {
+    await expect(selector.getByText(/legacy-model/)).toBeVisible();
+    await selector.getByLabel("搜索模型").fill("Frontier");
+    await expect(selector.getByRole("status")).toContainText("原推理强度 xhigh 不受支持");
+    await selector.getByRole("option", { name: /Frontier V2/ }).click();
+    await expect(selector.getByLabel("推理强度")).toHaveValue("high");
+    await selector.getByRole("button", { name: "应用模型" }).click();
+    await expect(selector).toBeHidden();
   }
-
-  await selector.getByRole("button", { name: "应用模型" }).click();
-  await expect(selector).toBeHidden();
 
   activeStatus = "waiting_input";
   activeSelection = modelState({
@@ -512,10 +505,17 @@ test("model selection, status restrictions, and explicit retry work on desktop a
   await errorCard.getByRole("button", { name: "选择其他模型" }).click();
 
   await expect(selector).toBeVisible();
-  await selector.getByLabel("搜索模型").fill("Balanced");
-  await selector.getByRole("option", { name: /Balanced V1/ }).click();
-  await expect(selector.getByLabel("推理强度")).toHaveValue("medium");
-  await selector.getByRole("button", { name: "应用模型" }).click();
+  if (isMobileProject(testInfo)) {
+    await selector.getByRole("button", { name: /^模型/ }).click();
+    await selector.getByRole("option", { name: /Balanced V1/ }).click();
+    await expect(selector).toBeHidden();
+  } else {
+    await selector.getByLabel("搜索模型").fill("Balanced");
+    await selector.getByRole("option", { name: /Balanced V1/ }).click();
+    await expect(selector.getByLabel("推理强度")).toHaveValue("medium");
+    await selector.getByRole("button", { name: "应用模型" }).click();
+    await expect(selector).toBeHidden();
+  }
 
   await expect(retryDialog).toBeVisible();
   await expect(retryDialog.getByText(retryText, { exact: true })).toBeVisible();

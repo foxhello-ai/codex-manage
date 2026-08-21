@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { ModelCatalogResponse, ModelOption, SessionModelState, UpdateModelSelectionInput } from "../shared/models";
 import { defaultEffortForModel, filterAndSortModels } from "./modelSelection";
 
+type MobileModelMenu = "model" | "effort" | null;
+
 export function ModelSelector({
   open,
   catalog,
@@ -27,6 +29,7 @@ export function ModelSelector({
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [reasoningEffort, setReasoningEffort] = useState<string | null>(null);
   const [effortNotice, setEffortNotice] = useState<string | null>(null);
+  const [mobileMenu, setMobileMenu] = useState<MobileModelMenu>(null);
   const models = useMemo(() => filterAndSortModels(catalog?.models ?? [], search), [catalog, search]);
   const selected = catalog?.models.find((model) => model.model === selectedModel) ?? null;
 
@@ -43,6 +46,7 @@ export function ModelSelector({
     setEffortNotice(initial && previousEffort && !initial.supportedReasoningEfforts.includes(previousEffort)
       ? `原推理强度 ${previousEffort} 不受支持，已选择 ${initial.defaultReasoningEffort ?? "模型默认值"}。`
       : null);
+    setMobileMenu(null);
     setSearch("");
   }, [open, catalog, current.mode, current.preferredModel, current.preferredReasoningEffort, current.actualReasoningEffort]);
 
@@ -71,9 +75,25 @@ export function ModelSelector({
       : null);
   }
 
+  function applyMobileModel(model: ModelOption) {
+    const nextEffort = defaultEffortForModel(model, reasoningEffort ?? current.actualReasoningEffort);
+    setSelectedModel(model.model);
+    setReasoningEffort(nextEffort);
+    setMobileMenu(null);
+    void onApply({ mode: "override", model: model.model, reasoningEffort: nextEffort });
+  }
+
+  function applyMobileEffort(nextEffort: string | null) {
+    setReasoningEffort(nextEffort);
+    setEffortNotice(null);
+    setMobileMenu(null);
+    if (selectedModel) void onApply({ mode: "override", model: selectedModel, reasoningEffort: nextEffort });
+  }
+
   return (
     <div className="modelSelectorBackdrop" role="presentation" onClick={submitting ? undefined : onClose}>
-      <section className="modelSelectorDialog" role="dialog" aria-modal="true" aria-labelledby="model-selector-title" onClick={(event) => event.stopPropagation()}>
+      <section className="modelSelectorDialog" role="dialog" aria-modal="true" aria-label="切换会话模型" onClick={(event) => event.stopPropagation()}>
+        <div className="modelSelectorDesktop">
         <header className="modelSelectorHeader">
           <div>
             <h2 id="model-selector-title">切换会话模型</h2>
@@ -143,6 +163,88 @@ export function ModelSelector({
             </button>
           </div>
         </footer>
+        </div>
+
+        <div className="modelSelectorMobile">
+          <header className="modelSelectorMobileHeader">
+            <h2 id="model-selector-title-mobile">会话模型</h2>
+            <button className="iconButton" type="button" aria-label="关闭模型选择器" onClick={onClose} disabled={submitting}>×</button>
+          </header>
+
+          {error ? <div className="modelSelectorMobileMessage errorBanner">{error}</div> : null}
+          {effortNotice ? <div className="modelSelectorMobileMessage modelEffortNotice" role="status">{effortNotice}</div> : null}
+
+          <div className="mobileModelMenuRows">
+            <button
+              className={`mobileModelMenuRow${mobileMenu === "model" ? " active" : ""}`}
+              type="button"
+              onClick={() => setMobileMenu((currentMenu) => currentMenu === "model" ? null : "model")}
+              disabled={submitting}
+            >
+              <span>模型</span>
+              <strong>{selected?.displayName ?? selectedModel ?? "未选择"}</strong>
+              <span aria-hidden="true">›</span>
+            </button>
+            <button
+              className={`mobileModelMenuRow${mobileMenu === "effort" ? " active" : ""}`}
+              type="button"
+              onClick={() => setMobileMenu((currentMenu) => currentMenu === "effort" ? null : "effort")}
+              disabled={!selected || submitting}
+            >
+              <span>推理强度</span>
+              <strong>{reasoningEffort ?? "默认"}</strong>
+              <span aria-hidden="true">›</span>
+            </button>
+            <button
+              className="mobileModelResetRow"
+              type="button"
+              disabled={submitting}
+              onClick={() => void onApply({ mode: "follow_session" })}
+            >
+              <span>重置为默认设置</span>
+              <span aria-hidden="true">↻</span>
+            </button>
+          </div>
+
+          {mobileMenu === "model" ? (
+            <div className="mobileModelSubmenu" role="listbox" aria-label="支持模型">
+              {loading && !catalog ? <div className="emptyState">正在读取支持模型...</div> : null}
+              {!loading && models.length === 0 ? <div className="emptyState">没有可用模型</div> : null}
+              {models.map((model) => (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={selectedModel === model.model}
+                  className={`mobileModelOption${selectedModel === model.model ? " selected" : ""}`}
+                  key={model.model}
+                  onClick={() => applyMobileModel(model)}
+                  disabled={submitting}
+                >
+                  <span>
+                    <strong>{model.displayName}</strong>
+                    <small>{model.model}</small>
+                  </span>
+                  {model.model === current.actualModel ? <b>当前</b> : model.isDefault ? <b>默认</b> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {mobileMenu === "effort" ? (
+            <div className="mobileModelSubmenu" role="listbox" aria-label="推理强度选项">
+              <button className="mobileModelOption" role="option" aria-selected={!reasoningEffort} type="button" onClick={() => applyMobileEffort(null)} disabled={submitting}>
+                <strong>默认</strong>
+                {!reasoningEffort ? <b>✓</b> : null}
+              </button>
+              {selected?.supportedReasoningEfforts.map((effort) => (
+                <button className="mobileModelOption" role="option" aria-selected={reasoningEffort === effort} type="button" key={effort} onClick={() => applyMobileEffort(effort)} disabled={submitting}>
+                  <strong>{effort}</strong>
+                  {reasoningEffort === effort ? <b>✓</b> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </section>
     </div>
   );

@@ -2660,6 +2660,10 @@ textarea {
   box-shadow: 0 20px 54px rgb(10 20 30 / 28%);
 }
 
+.modelSelectorMobile {
+  display: none;
+}
+
 .modelSelectorHeader,
 .modelSelectorFooter {
   flex: 0 0 auto;
@@ -6516,6 +6520,171 @@ textarea::placeholder {
 
   .modelSelectorDialog {
     max-height: min(74dvh, 560px);
+  }
+
+  .modelSelectorDesktop {
+    display: none;
+  }
+
+  .modelSelectorMobile {
+    min-width: 0;
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .modelSelectorMobileHeader {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 2px 4px;
+  }
+
+  .modelSelectorMobileHeader h2 {
+    margin: 0;
+    color: #f5f5f7;
+    font-size: 0.98rem;
+  }
+
+  .modelSelectorMobileHeader .iconButton {
+    width: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border: 0;
+    border-radius: 9px;
+    padding: 0;
+    background: #363638;
+  }
+
+  .modelSelectorMobileMessage {
+    margin: 0;
+    padding: 8px 10px;
+    font-size: 0.72rem;
+  }
+
+  .mobileModelMenuRows {
+    display: grid;
+    gap: 2px;
+    overflow: hidden;
+    border: 1px solid #49494d;
+    border-radius: 12px;
+    background: #2a2a2c;
+  }
+
+  .mobileModelMenuRow,
+  .mobileModelResetRow {
+    min-width: 0;
+    min-height: 38px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    border-bottom: 1px solid #3a3a3c;
+    border-radius: 0;
+    padding: 0 10px;
+    color: #aeaeb2;
+    background: transparent;
+    text-align: left;
+    font-size: 0.72rem;
+  }
+
+  .mobileModelMenuRow:last-child,
+  .mobileModelResetRow:last-child {
+    border-bottom: 0;
+  }
+
+  .mobileModelMenuRow strong {
+    min-width: 0;
+    overflow: hidden;
+    color: #f5f5f7;
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .mobileModelMenuRow > span:last-child,
+  .mobileModelResetRow > span:last-child {
+    color: #8e8e93;
+    font-size: 1rem;
+  }
+
+  .mobileModelMenuRow.active,
+  .mobileModelMenuRow:hover,
+  .mobileModelResetRow:hover {
+    background: #363638;
+  }
+
+  .mobileModelResetRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    color: #8e8e93;
+  }
+
+  .mobileModelSubmenu {
+    max-height: min(42dvh, 320px);
+    display: grid;
+    gap: 2px;
+    overflow: auto;
+    border: 1px solid #49494d;
+    border-radius: 12px;
+    padding: 4px;
+    background: #242426;
+  }
+
+  .mobileModelOption {
+    min-width: 0;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 0;
+    border-radius: 8px;
+    padding: 5px 8px;
+    color: #f5f5f7;
+    background: transparent;
+    text-align: left;
+  }
+
+  .mobileModelOption > span {
+    min-width: 0;
+    display: grid;
+    gap: 1px;
+  }
+
+  .mobileModelOption strong,
+  .mobileModelOption small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileModelOption strong {
+    font-size: 0.76rem;
+  }
+
+  .mobileModelOption small {
+    color: #8e8e93;
+    font-size: 0.62rem;
+  }
+
+  .mobileModelOption b {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    padding: 2px 5px;
+    color: #d9eeff;
+    background: #303f52;
+    font-size: 0.6rem;
+  }
+
+  .mobileModelOption:hover,
+  .mobileModelOption:focus-visible,
+  .mobileModelOption.selected {
+    background: #363638;
   }
 
   .modelSelectorHeader {
