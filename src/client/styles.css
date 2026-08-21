@@ -5970,11 +5970,11 @@ textarea::placeholder {
   justify-self: end;
   max-width: 100%;
   overflow: hidden;
-  border: 1px solid #3f3f43;
-  border-radius: 7px;
-  padding: 5px 8px;
-  color: #d1d1d6;
-  background: #1f1f21;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: #f5f5f7;
+  background: transparent;
   font-size: 0.74rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6003,7 +6003,47 @@ textarea::placeholder {
   }
 
   .settingsPage .detailToolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
     padding-bottom: 0;
+  }
+
+  .settingsPage .detailToolbar .detailTitleBar {
+    width: 100%;
+  }
+
+  .settingsPage .detailToolbar .toolbarActions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
+    gap: 8px;
+  }
+
+  .settingsPage .detailToolbar .toolbarActions > button,
+  .settingsPage .detailToolbar .toolbarActions > .ghostButton {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    overflow: visible;
+    border: 1px solid #49494d;
+    border-radius: 10px;
+    padding: 0 10px;
+    color: #f5f5f7;
+    background: #2a2a2c;
+    font-size: 0.76rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .settingsPage .detailToolbar .toolbarActions > .ghostButton::after {
+    content: none;
+  }
+
+  .settingsPage .detailToolbar .toolbarActions > .primaryButton {
+    border-color: #30d158;
+    color: #101112;
+    background: #30d158;
   }
 
   .settingsPage .healthOverview {
