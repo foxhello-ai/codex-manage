@@ -6248,8 +6248,12 @@ textarea::placeholder {
 }
 
 @media (max-width: 767px) {
+  .historyViewport {
+    overflow: visible;
+  }
+
   .timelineScrollControls {
-    right: 2px;
+    right: -8px;
     bottom: 12px;
   }
 
