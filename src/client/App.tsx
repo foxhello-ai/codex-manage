@@ -1099,12 +1099,12 @@ function Dashboard({
           />
 
           <div className="mobileDashboardHome">
-            <section className="toolbar">
+            <section className="toolbar mobileDashboardToolbar">
               <div>
                 <h2>会话管理</h2>
                 <p className="muted">查看 ~/.codex/sessions 中的历史会话，恢复会话并继续任务。</p>
               </div>
-              <div className="toolbarActions">
+              <div className="toolbarActions mobileDashboardToolbarActions">
                 <button
                   className="iconButton mobileOnly"
                   type="button"
@@ -1123,14 +1123,14 @@ function Dashboard({
               </div>
             </section>
 
-            <section className="infoGrid compact" aria-label="当前配置">
+            <section className="mobileSessionBrowser" aria-label="会话列表">
+              {renderSessionBrowser()}
+            </section>
+
+            <section className="infoGrid compact mobileDashboardInfo" aria-label="当前配置">
               <InfoItem label="监听地址" value={listenAddress} />
               <InfoItem label="Codex 版本" value={currentConfig?.codexCliVersion ?? currentConfig?.codexVersionError ?? "读取中"} />
               <InfoItem label="App Server" value={appServerStatus} />
-            </section>
-
-            <section className="sessionSection desktopSessionPanel" aria-label="会话列表">
-              {renderSessionBrowser()}
             </section>
           </div>
         </>
@@ -1296,6 +1296,7 @@ function Dashboard({
               onSearchChange={setSearch}
               onSearchSubmit={handleSearchSubmit}
               onSelect={handleSelectSession}
+              onMetadataSaved={handleMetadataSaved}
             />
           </aside>
         </div>
@@ -3027,7 +3028,8 @@ function MobileSessionDrawer({
   onOpenSettings,
   onSearchChange,
   onSearchSubmit,
-  onSelect
+  onSelect,
+  onMetadataSaved
 }: {
   sessions: SessionSummary[];
   selectedSessionId: string | null;
@@ -3041,16 +3043,8 @@ function MobileSessionDrawer({
   onSearchChange: (value: string) => void;
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSelect: (session: SessionSummary) => void;
+  onMetadataSaved: (session: SessionSummary) => void;
 }) {
-  const normalizedSearch = search.trim().toLocaleLowerCase();
-  const visibleSessions = normalizedSearch
-    ? sessions.filter((session) => [session.title, session.defaultTitle, session.summary, session.workspace, session.id]
-      .some((value) => value.toLocaleLowerCase().includes(normalizedSearch)))
-    : sessions;
-  const pinned = visibleSessions.filter((session) => isSameSession(session, selectedSessionId));
-  const recent = visibleSessions.filter((session) => !isSameSession(session, selectedSessionId));
-  const project = pinned[0]?.workspace ?? visibleSessions[0]?.workspace ?? "Codex Manage";
-
   return (
     <div className="mobileSessionDrawerContent">
       <header className="drawerHeader mobileDrawerHeader">
@@ -3071,33 +3065,20 @@ function MobileSessionDrawer({
         </div>
       </header>
 
-      <section className="drawerProjectSummary" aria-label="当前项目">
-        <div><i aria-hidden="true" /> <strong>{workspaceDisplayName(project).toUpperCase()}</strong></div>
-        <p>{workspaceDisplayName(project)} · {sessions.length} active sessions <span>Connected</span></p>
-      </section>
-
-      <form className="mobileDrawerSearch" onSubmit={onSearchSubmit}>
-        <label className="srOnly" htmlFor="drawer-session-search">搜索会话</label>
-        <span aria-hidden="true">⌕</span>
-        <input
-          id="drawer-session-search"
-          aria-label="搜索会话"
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search chats"
+      <div className="mobileDrawerSessionBrowser">
+        <SessionBrowser
+          sessions={sessions}
+          search={search}
+          loadingSessions={loading}
+          sessionError={error}
+          selectedSessionId={selectedSessionId}
+          showHeading={false}
+          onSearchChange={onSearchChange}
+          onSearchSubmit={onSearchSubmit}
+          onSelect={onSelect}
+          onMetadataSaved={onMetadataSaved}
         />
-        <button className="drawerSearchSubmit" type="submit" aria-label="搜索">搜索</button>
-      </form>
-
-      {error ? <div className="errorBanner">{error}</div> : null}
-      {loading ? <div className="drawerEmptyState">Loading chats…</div> : null}
-      {!loading && visibleSessions.length === 0 ? <div className="drawerEmptyState">No matching chats</div> : null}
-      {!loading && pinned.length > 0 ? (
-        <DrawerSessionGroup title="PINNED" sessions={pinned} onSelect={onSelect} />
-      ) : null}
-      {!loading && recent.length > 0 ? (
-        <DrawerSessionGroup title="RECENT" sessions={recent} onSelect={onSelect} />
-      ) : null}
+      </div>
 
       <footer className="drawerUtility">
         <button type="button" aria-label="打开设置和诊断" onClick={onOpenSettings}>
@@ -3108,41 +3089,6 @@ function MobileSessionDrawer({
       </footer>
     </div>
   );
-}
-
-function DrawerSessionGroup({
-  title,
-  sessions,
-  onSelect
-}: {
-  title: string;
-  sessions: SessionSummary[];
-  onSelect: (session: SessionSummary) => void;
-}) {
-  return (
-    <section className="drawerSessionGroup" aria-label={title}>
-      <h3>{title}</h3>
-      <div>
-        {sessions.map((session) => (
-          <button className={`drawerSessionRow ${session.status}`} key={session.id} type="button" onClick={() => onSelect(session)}>
-            <i aria-hidden="true" />
-            <span>
-              <strong>{session.title}</strong>
-              <small>{drawerSessionMeta(session)}</small>
-            </span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function drawerSessionMeta(session: SessionSummary): string {
-  if (session.status === "waiting_approval") return "Approval required";
-  if (session.status === "waiting_input") return "Waiting for input · " + formatDateTime(session.updatedAt);
-  if (session.status === "running" || session.status === "starting") return `Running · ${workspaceDisplayName(session.workspace)}`;
-  if (session.status === "failed") return "Needs attention";
-  return `Completed · ${formatDateTime(session.updatedAt)}`;
 }
 
 function workspaceDisplayName(workspace: string): string {

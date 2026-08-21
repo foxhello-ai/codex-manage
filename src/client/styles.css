@@ -4221,7 +4221,77 @@ textarea::placeholder {
 
   .mobileDashboardHome {
     display: grid;
-    gap: 18px;
+    gap: 16px;
+  }
+
+  .mobileDashboardToolbar {
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .mobileDashboardToolbar > div:first-child {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mobileDashboardToolbarActions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .mobileDashboardToolbarActions > button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+  }
+
+  .mobileDashboardToolbarActions > .iconButton {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+  }
+
+  .mobileSessionBrowser {
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobileSessionBrowser .sectionHeader,
+  .mobileSessionBrowser .sectionHeader.noHeading {
+    display: grid;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .mobileSessionBrowser .searchForm {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mobileSessionBrowser .sessionItem {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .mobileSessionBrowser .sessionActions {
+    grid-template-columns: minmax(56px, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobileSessionBrowser .sessionActions .ghostButton {
+    min-width: 56px;
+    min-height: 40px;
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+
+  .mobileSessionBrowser .workspaceGroupList {
+    padding-left: 0;
   }
 
   .appShell.reserveFloatingStatus .content {
@@ -4233,6 +4303,10 @@ textarea::placeholder {
     min-width: 0;
     min-height: 0;
     display: grid;
+  }
+
+  .workspaceLayout.desktopWorkspaceHome {
+    display: none;
   }
 
   .workspaceLayout {
@@ -4644,9 +4718,8 @@ textarea::placeholder {
   .mobileSessionDrawerContent {
     min-height: 100%;
     display: grid;
-    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-    align-content: start;
-    gap: 16px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 14px;
     padding: calc(18px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
   }
 
@@ -4684,6 +4757,64 @@ textarea::placeholder {
     border: 0;
     border-radius: 12px;
     background: #303034;
+  }
+
+  .mobileDrawerSessionBrowser {
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+  }
+
+  .mobileDrawerSessionBrowser .sectionHeader,
+  .mobileDrawerSessionBrowser .sectionHeader.noHeading {
+    display: grid;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .mobileDrawerSessionBrowser .searchForm {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mobileDrawerSessionBrowser .sessionList {
+    gap: 12px;
+  }
+
+  .mobileDrawerSessionBrowser .sessionItem {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    border-color: #49494d;
+    border-radius: 12px;
+    padding: 12px;
+    background: #303034;
+  }
+
+  .mobileDrawerSessionBrowser .sessionActions {
+    grid-template-columns: minmax(56px, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobileDrawerSessionBrowser .sessionActions .ghostButton {
+    min-width: 56px;
+    min-height: 40px;
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+
+  .mobileDrawerSessionBrowser .workspaceGroupList {
+    padding-left: 0;
+  }
+
+  .mobileDrawerSessionBrowser .workspaceGroupSummary .muted {
+    display: block;
+    color: #8e8e93;
   }
 
   .drawerProjectSummary {
