@@ -17,6 +17,11 @@ body {
   margin: 0;
 }
 
+body.workspaceSidebarResizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
 button,
 input {
   font: inherit;
@@ -326,41 +331,176 @@ h2 {
   gap: 14px;
 }
 
+.composerDock {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+}
+
+.composerDock > .approvalPanel {
+  min-height: 0;
+  max-height: min(42vh, 440px);
+  margin: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.composerDock > .approvalPanel .approvalList {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.composerWarning {
+  margin: 0;
+}
+
+.composerRuntimeBar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  border: 1px solid #d9e0e7;
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #384650;
+  background: #f8fafb;
+}
+
+.composerRuntimeState,
+.composerRuntimeModel,
+.composerRuntimeBadges {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.composerRuntimeState {
+  flex: 0 0 auto;
+}
+
+.composerRuntimeState strong {
+  color: #172026;
+  font-size: 0.82rem;
+}
+
+.composerRuntimeState > span:not(.composerRuntimeDot),
+.composerRuntimeModel > span {
+  color: #5f6f7a;
+  font-size: 0.76rem;
+}
+
+.composerRuntimeDot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #8a96a0;
+}
+
+.composerRuntimeBar.running .composerRuntimeDot,
+.composerRuntimeBar.starting .composerRuntimeDot {
+  background: #1769aa;
+  box-shadow: 0 0 0 4px rgb(23 105 170 / 14%);
+}
+
+.composerRuntimeBar.waiting_approval .composerRuntimeDot,
+.composerRuntimeBar.waiting_input .composerRuntimeDot {
+  background: #d97706;
+  box-shadow: 0 0 0 4px rgb(217 119 6 / 14%);
+}
+
+.composerRuntimeBar.failed .composerRuntimeDot {
+  background: #b42318;
+}
+
+.composerRuntimeModel {
+  min-width: 180px;
+  flex: 1 1 240px;
+}
+
+.composerRuntimeModel strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #172026;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composerRuntimeModel small {
+  flex: 0 0 auto;
+  color: #5f6f7a;
+  font-size: 0.74rem;
+}
+
+.composerRuntimeBadges {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+.composerRuntimeBadges span {
+  border: 1px solid #d9e0e7;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #5f6f7a;
+  background: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.composerRuntimeBadges .fullAccessBadge {
+  border-color: #e08787;
+  color: #8f1d1d;
+  background: #fff1f1;
+}
+
+.composerRuntimeBadges .approvalCount {
+  border-color: #f0b429;
+  color: #6f3d00;
+  background: #fff1c2;
+}
+
+.composerModelButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+}
+
+.composerPermissionButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border-color: #f0b429;
+  color: #6f3d00;
+  background: #fff1c2;
+  padding: 0 12px;
+  font-size: 0.78rem;
+}
+
+.liveEmptyState {
+  border: 1px dashed #8ec5ff;
+  border-radius: 8px;
+  padding: 12px;
+  color: #074b80;
+  background: #f7fbff;
+  font-size: 0.86rem;
+}
+
 .detailScrollContent {
   min-width: 0;
   display: grid;
   gap: 14px;
 }
 
-
-.commandsPanel {
-  border-top: 1px solid #d9e0e7;
-  padding-top: 14px;
+.detailScrollContent > .livePanel {
+  margin-top: auto;
 }
 
-.commandsSummary {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  cursor: pointer;
-}
-
-.commandsSummary h3 {
-  margin: 0 0 4px;
-  font-size: 1rem;
-}
-
-.commandsPanelBody {
-  display: grid;
-  gap: 12px;
-  padding-top: 12px;
-}
-
-.commandList {
-  display: grid;
-  gap: 10px;
-}
 
 .commandCard {
   min-width: 0;
@@ -507,6 +647,18 @@ h2 {
 
 .messageItem.agent {
   border-color: #d9e0e7;
+}
+
+.turnItems .messageItem.user,
+.liveOutputBody .messageItem.user {
+  justify-self: end;
+  width: min(82%, 760px);
+}
+
+.turnItems .messageItem.agent,
+.liveOutputBody .messageItem.agent {
+  justify-self: start;
+  width: min(88%, 860px);
 }
 
 .messageHeader {
@@ -707,8 +859,38 @@ h2 {
 .searchForm {
   width: min(620px, 100%);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #49494d;
+  border-radius: 10px;
+  background: #2a2a2c;
+}
+
+.searchForm input {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.searchForm .iconButton {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-left: 1px solid #49494d;
+  border-radius: 0;
+  padding: 0;
+  color: #151515;
+  background: #30d158;
+  font-size: 1.25rem;
+}
+
+.searchForm .iconButton:hover {
+  border-color: #49494d;
+  color: #151515;
+  background: #4ade6b;
 }
 
 .errorBanner,
@@ -862,6 +1044,97 @@ h2 {
   gap: 16px;
 }
 
+.sessionViewTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  border: 1px solid #49494d;
+  border-radius: 10px;
+  padding: 4px;
+  background: #242426;
+}
+
+.sessionViewTabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 8px;
+  color: #8e8e93;
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.sessionViewTabs button:hover,
+.sessionViewTabs button.active {
+  color: #f5f5f7;
+  background: #3a3a3c;
+}
+
+.workspaceSidebarResizeHandle {
+  width: 8px;
+  min-width: 8px;
+  min-height: 100%;
+  align-self: stretch;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: transparent;
+  background: #242426;
+  cursor: col-resize;
+}
+
+.workspaceSidebarResizeHandle:hover,
+.workspaceLayout.resizing .workspaceSidebarResizeHandle {
+  background: #0a84ff;
+}
+
+.recentSessionGroup {
+  min-height: 0;
+}
+
+.recentSessionList {
+  min-height: 0;
+}
+
+.workspaceFilterRow {
+  display: grid;
+  gap: 6px;
+}
+
+.workspaceFilterRow label {
+  color: #5f6f7a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.workspaceSelectControl {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspaceSelectControl select {
+  min-width: 0;
+  min-height: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspaceSelectControl .copyPathButton {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.workspaceGroupSummary .muted {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
 .sessionWorkspaceGroup {
   min-width: 0;
   display: grid;
@@ -886,6 +1159,46 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.workspacePathRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspacePathRow h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.workspacePathText {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.workspaceGroupHeader .muted {
+  margin-top: 4px;
+}
+
+.copyPathButton {
+  flex: 0 0 auto;
+  width: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #57575d;
+  border-radius: 6px;
+  padding: 0;
+  color: #aeaeb2;
+  background: #303034;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .workspaceGroupList {
   display: grid;
   gap: 10px;
@@ -906,6 +1219,27 @@ h2 {
   border-radius: 8px;
   padding: 14px;
   background: #ffffff;
+}
+
+.sessionDragHandle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: #636366;
+  cursor: grab;
+  font-size: 1rem;
+  letter-spacing: -0.18em;
+  line-height: 1;
+  user-select: none;
+}
+
+.sessionItem.dragging {
+  opacity: 0.45;
+}
+
+.sessionItem.dragOver {
+  border-color: #0a84ff;
+  box-shadow: 0 0 0 1px rgb(10 132 255 / 48%);
 }
 
 .sessionItem.selected {
@@ -1263,36 +1597,6 @@ h2 {
 .detailStack {
   display: grid;
   gap: 14px;
-}
-
-
-.commandsPanel {
-  border-top: 1px solid #d9e0e7;
-  padding-top: 14px;
-}
-
-.commandsSummary {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  cursor: pointer;
-}
-
-.commandsSummary h3 {
-  margin: 0 0 4px;
-  font-size: 1rem;
-}
-
-.commandsPanelBody {
-  display: grid;
-  gap: 12px;
-  padding-top: 12px;
-}
-
-.commandList {
-  display: grid;
-  gap: 10px;
 }
 
 .commandCard {
@@ -1712,6 +2016,26 @@ textarea {
   box-shadow: 0 12px 30px rgb(20 35 50 / 20%);
 }
 
+.floatingRuntimeModel {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.floatingRuntimeModel strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.floatingRuntimeModel small {
+  flex: 0 0 auto;
+  color: #5f6f7a;
+  font-size: 0.74rem;
+}
+
 .floatingRuntimeDragHandle {
   display: flex;
   align-items: center;
@@ -2052,6 +2376,14 @@ textarea {
   padding: 0 12px;
 }
 
+.panelHeaderActions .iconButton {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-size: 1rem;
+}
+
 .livePanel .messageItem,
 .livePanel .commandCard {
   background: #ffffff;
@@ -2142,53 +2474,12 @@ textarea {
   gap: 10px;
   overflow: auto;
   padding-right: 4px;
-  scroll-behavior: smooth;
-}
-
-.liveHiddenNotice {
-  border: 1px dashed #8ec5ff;
-  border-radius: 8px;
-  padding: 8px 10px;
-  color: #074b80;
-  background: #f7fbff;
-  font-size: 0.86rem;
-  font-weight: 700;
-}
-
-.historyHiddenNotice {
-  border: 1px solid #8ec5ff;
-  border-radius: 8px;
-  padding: 12px;
-  color: #074b80;
-  background: #f7fbff;
-  font-weight: 700;
 }
 
 .historyContent {
   display: grid;
   gap: 14px;
-}
-
-.historyHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid #8ec5ff;
-  border-radius: 8px;
-  padding: 12px;
-  background: #f7fbff;
-}
-
-.historyHeader h3 {
-  margin: 0 0 4px;
-  color: #074b80;
-  font-size: 1rem;
-}
-
-.historyHeader button {
-  flex: 0 0 auto;
-  padding: 0 12px;
+  overflow-anchor: none;
 }
 
 .panelHeaderCompact {
@@ -2207,7 +2498,7 @@ textarea {
 .approvalCard {
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   display: grid;
   gap: 10px;
   border: 1px solid #f0c36a;
@@ -2252,8 +2543,9 @@ textarea {
 }
 
 .approvalActions {
+  min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   gap: 10px;
   border-top: 1px solid #edcf91;
@@ -2262,6 +2554,7 @@ textarea {
 
 .approvalAllowActions,
 .approvalDismissActions {
+  min-width: 0;
   display: grid;
   gap: 8px;
 }
@@ -2271,15 +2564,34 @@ textarea {
 }
 
 .approvalDismissActions {
-  grid-template-columns: repeat(2, minmax(88px, auto));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .approvalActions button {
   min-width: 0;
   min-height: 44px;
   padding: 0 14px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   line-height: 1.2;
   white-space: normal;
+}
+
+.approvalScopeField > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #edcf91;
+  padding-bottom: 10px;
+}
+
+.approvalScopeField code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: inherit;
+  background: transparent;
 }
 
 .approvalSessionButton {
@@ -2971,5 +3283,2750 @@ textarea {
     text-align: left;
     overflow-wrap: anywhere;
     white-space: normal;
+  }
+}
+
+/* V4 conversation workspace: shared dark visual language and overlays. */
+:root {
+  color: #f5f5f7;
+  background: #1c1c1e;
+}
+
+body,
+#root,
+.appShell,
+.loginPage {
+  color: #f5f5f7;
+  background: #1c1c1e;
+}
+
+button {
+  color: #101112;
+  background: #30d158;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid rgb(10 132 255 / 85%);
+  outline-offset: 2px;
+}
+
+input,
+textarea,
+select {
+  border-color: #49494d;
+  color: #f5f5f7;
+  background: #2a2a2c;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8e8e93;
+}
+
+.topbar,
+.loginPanel,
+.sessionDetail,
+.infoItem,
+.runtimePanel,
+.livePanel,
+.commandCard,
+.messageItem,
+.modelSelectorDialog,
+.modelSelectorHeader,
+.modelSelectorFooter,
+.sessionDrawer,
+.messageDialog,
+.taskInput,
+.settingsSection,
+.healthOverview,
+.floatingRuntimeStatus,
+.composerRuntimeBar {
+  border-color: #3a3a3c;
+  color: #f5f5f7;
+  background: #28282a;
+}
+
+.topbar,
+.dialogHeader,
+.modelSelectorHeader,
+.modelSelectorFooter,
+.modelSelectorToolbar,
+.sessionHero,
+.permissionControl,
+.turnBlock {
+  border-color: #3a3a3c;
+}
+
+.topbar,
+.modelSelectorToolbar,
+.modelSelectorHeader,
+.modelSelectorFooter,
+.dialogHeader,
+.floatingRuntimeBody,
+.composerRuntimeBar {
+  background: #262628;
+}
+
+.topbar h1,
+.detailTitleBar h2,
+.sessionHero h3,
+.messageHeader strong,
+.turnHeader h3,
+.runtimePanel h3,
+.panelHeaderCompact h3,
+.settingsSectionHeader h3,
+.modelSelectorHeader h2,
+.sessionTitleRow,
+.commandHeader strong,
+.composerRuntimeState strong,
+.composerRuntimeModel strong {
+  color: #f5f5f7;
+}
+
+.muted,
+.eyebrow,
+.detailEyebrow,
+.sessionHeroMeta,
+.messageHeader,
+.turnHeader,
+.infoItem span,
+.settingsRow span,
+.modelSelectorHeader p,
+.modelOption p,
+.modelSelectorFooter label,
+.retryModelSummary span,
+.retryMessagePreview > span,
+.permissionControlLabel,
+.mobileRuntimePrimary small {
+  color: #aeaeb2;
+}
+
+.workspaceFilterRow label,
+.workspaceGroupSummary .muted {
+  color: #aeaeb2;
+}
+
+.workspaceSelectControl select {
+  border-color: #49494d;
+  color: #f5f5f7;
+  background: #2a2a2c;
+}
+
+.ghostButton,
+.iconButton,
+.titleEditButton,
+.mobileRuntimeSummary {
+  border-color: #49494d;
+  color: #f5f5f7;
+  background: #2a2a2c;
+}
+
+.ghostButton:hover,
+.iconButton:hover,
+.titleEditButton:hover,
+.messagePreview:hover {
+  border-color: #636366;
+  background: #363638;
+}
+
+.sessionHero,
+.messageItem.user,
+.modelOption.selected,
+.retryModelSummary,
+.modelEffortNotice {
+  border-color: #3a3a3c;
+  color: #f5f5f7;
+  background: #2a2a2c;
+}
+
+.messageItem.agent,
+.modelOption,
+.fileChangeList details,
+.markdownCode,
+.retryMessagePreview > div,
+.mobileRuntimeStatus,
+.mobileRuntimeDetails {
+  border-color: #3a3a3c;
+  color: #f5f5f7;
+  background: #2a2a2c;
+}
+
+.modelOption > code,
+.modelOption .modelEfforts,
+.markdownContent code,
+.commandText,
+.commandOutput,
+.monospaceValue {
+  color: #d1d1d6;
+  background: #1f1f21;
+}
+
+.statusBadge,
+.runtimeBadges span,
+.panelHeaderCompact span,
+.approvalHeader > span,
+.floatingRuntimeBadges span,
+.mobileRuntimeIndicators small,
+.composerRuntimeBadges span {
+  border-color: #49494d;
+  color: #d1d1d6;
+  background: #363638;
+}
+
+.statusBadge.running,
+.statusBadge.starting,
+.floatingRuntimeStatus.running,
+.livePanel {
+  border-color: #30d158;
+}
+
+.statusBadge.running,
+.statusBadge.starting,
+.livePanel {
+  color: #d9ffe1;
+  background: #173d27;
+}
+
+.statusBadge.waiting_approval,
+.statusBadge.waiting_input,
+.approvalPanel,
+.approvalCard {
+  border-color: #ff9f0a;
+  color: #fff3de;
+  background: #3d2b12;
+}
+
+.approvalActions {
+  border-color: #67471e;
+}
+
+.approvalSessionButton {
+  color: #111;
+  background: #ff9f0a;
+}
+
+.approvalDeclineButton,
+.dangerButton {
+  border-color: #ff453a;
+  color: #ffe9e7;
+  background: #512022;
+}
+
+.statusBadge.failed,
+.liveErrorCard.terminal,
+.errorBanner,
+.errorText {
+  border-color: #ff453a;
+  color: #ffe9e7;
+  background: #512022;
+}
+
+.successBanner {
+  border-color: #30d158;
+  color: #d9ffe1;
+  background: #173d27;
+}
+
+.modalBackdrop,
+.drawerBackdrop,
+.modelSelectorBackdrop {
+  background: rgb(0 0 0 / 62%);
+}
+
+.mobileRuntimeHeader {
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.mobileRuntimeSummary {
+  flex: 1 1 auto;
+}
+
+.mobileRuntimeIndicators {
+  padding-right: 8px;
+}
+
+.mobileApprovalTrigger {
+  min-height: 36px;
+  border: 1px solid #ff9f0a;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #fff3de;
+  background: #684100;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.approvalScopeBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(0 0 0 / 68%);
+}
+
+.approvalScopeDialog {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 16px;
+  border: 1px solid #ff9f0a;
+  border-radius: 14px;
+  padding: 20px;
+  color: #f5f5f7;
+  background: #28282a;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 45%);
+}
+
+.approvalScopeDialog h2,
+.approvalScopeDialog p {
+  margin: 0;
+}
+
+.approvalScopeDialog p {
+  color: #d1d1d6;
+  line-height: 1.5;
+}
+
+.mobileApprovalSheetBackdrop,
+.mobileApprovalSheet {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .detailScrollContent > .approvalPanel {
+    display: none;
+  }
+
+  .mobileApprovalSheetBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: grid;
+    align-items: end;
+    background: rgb(0 0 0 / 62%);
+  }
+
+  .mobileApprovalSheet {
+    width: 100%;
+    max-height: min(82dvh, 720px);
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    overflow: hidden;
+    border: 1px solid #49494d;
+    border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+    color: #f5f5f7;
+    background: #28282a;
+    box-shadow: 0 -18px 48px rgb(0 0 0 / 45%);
+  }
+
+  .mobileSheetHandle {
+    width: 36px;
+    height: 4px;
+    justify-self: center;
+    margin-top: 10px;
+    border-radius: 999px;
+    background: #636366;
+  }
+
+  .mobileApprovalSheetHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid #3a3a3c;
+    padding: 12px 16px;
+  }
+
+  .mobileApprovalSheetHeader h2 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+  }
+
+  .mobileApprovalSheetHeader p {
+    margin: 0;
+    color: #aeaeb2;
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+
+  .mobileApprovalSheetBody {
+    min-height: 0;
+    overflow: auto;
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .mobileApprovalSheet .approvalPanel {
+    display: grid;
+    padding: 12px;
+  }
+
+  .mobileApprovalSheet .approvalCard {
+    padding: 12px;
+  }
+
+  .approvalScopeBackdrop {
+    z-index: 90;
+    place-items: end center;
+    padding: 12px;
+  }
+
+  .approvalScopeDialog {
+    width: 100%;
+    border-radius: 16px;
+    padding: 16px;
+  }
+}
+
+/* V4 desktop workspace: the session list stays present while the timeline is read. */
+.desktopWorkspaceHome,
+.mobileDashboardHome {
+  display: none;
+}
+
+.sessionItem,
+.workspaceGroupHeader,
+.emptyState,
+.systemItem,
+.fileChangeList details,
+.fileChangeList pre,
+.commandMeta span,
+.settingsSectionHeader,
+.settingsRow,
+.diagnosticBadge {
+  border-color: #3a3a3c;
+  color: #f5f5f7;
+  background: #28282a;
+}
+
+.workspaceGroupHeader h3,
+.titleEditButton,
+.sessionSummary,
+.sessionMeta,
+.remarkHint,
+.sessionId,
+.fileChangeList summary small,
+.settingsSectionHeader > span,
+.commandMeta span,
+.diagnosticBadge {
+  color: #aeaeb2;
+}
+
+.sessionItem.selected {
+  border-color: #0a84ff;
+  background: #363638;
+  box-shadow: 0 0 0 1px rgb(10 132 255 / 48%);
+}
+
+.titleEditIcon {
+  border-color: #49494d;
+  color: #aeaeb2;
+  background: #363638;
+}
+
+.approvalAcceptButton {
+  color: #17110a;
+  background: #ff9f0a;
+}
+
+@media (min-width: 768px) {
+  .appShell.desktopWorkspaceShell .content {
+    width: 100%;
+    max-width: none;
+    min-height: calc(100dvh - 64px);
+    margin: 0;
+    padding: 0;
+    gap: 0;
+  }
+
+  .desktopWorkspaceHome {
+    display: grid;
+  }
+
+  .appShell.reserveFloatingStatus .content {
+    width: 100%;
+    max-width: none;
+    min-height: calc(100dvh - 64px);
+    margin: 0;
+    padding: 0;
+  }
+
+  .workspaceLayout {
+    height: calc(100dvh - 64px);
+    min-height: calc(100dvh - 64px);
+    display: grid;
+    grid-template-columns: var(--workspace-sidebar-width, 280px) 8px minmax(0, 1fr);
+    overflow: hidden;
+    background: #1c1c1e;
+  }
+
+  .workspaceSidebar {
+    min-width: 0;
+    height: calc(100dvh - 64px);
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    border-right: 1px solid #3a3a3c;
+    padding: 16px 12px 24px;
+    background: #262628;
+  }
+
+  .workspaceSidebarHeading {
+    display: grid;
+    gap: 5px;
+    padding: 4px 8px 2px;
+  }
+
+  .workspaceSidebarHeading strong {
+    color: #f5f5f7;
+    font-size: 1rem;
+  }
+
+  .workspaceSidebarHeading span,
+  .workspaceSidebar .sectionHeader .muted {
+    color: #8e8e93;
+    font-size: 0.75rem;
+  }
+
+  .workspaceSidebar .searchForm {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .workspaceSidebar .sessionViewTabs button {
+    min-height: 34px;
+    font-size: 0.68rem;
+  }
+
+  .workspaceSidebar .searchForm .iconButton {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 1.25rem;
+  }
+
+  .workspaceSidebar .searchForm input {
+    min-height: 40px;
+    padding: 0 9px;
+    font-size: 0.68rem;
+  }
+
+  .workspaceSidebar .workspaceSelectControl select {
+    min-height: 40px;
+    padding: 0 9px;
+    font-size: 0.68rem;
+  }
+
+  .workspaceSidebar .sessionList {
+    gap: 14px;
+  }
+
+  .workspaceSidebar .sessionWorkspaceGroup {
+    gap: 4px;
+  }
+
+  .workspaceSidebar .workspaceGroupHeader {
+    border: 0;
+    padding: 6px 8px;
+    background: transparent;
+  }
+
+  .workspaceSidebar .workspaceGroupHeader h3 {
+    margin: 0;
+    color: #8e8e93;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    direction: rtl;
+    text-align: left;
+  }
+
+  .workspaceSidebar .copyPathButton {
+    width: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0;
+    border-color: #57575d;
+    color: #aeaeb2;
+    background: #303034;
+    font-size: 0.75rem;
+  }
+
+  .workspaceSidebar .workspaceGroupHeader .muted,
+  .workspaceSidebar .sessionSummary,
+  .workspaceSidebar .remarkHint,
+  .workspaceSidebar .sessionId,
+  .workspaceSidebar .titleEditIcon {
+    display: none;
+  }
+
+  .workspaceSidebar .workspaceGroupList {
+    gap: 2px;
+    padding-left: 0;
+  }
+
+  .workspaceSidebar .sessionItem {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 9px 8px;
+    background: transparent;
+  }
+
+  .workspaceSidebar .sessionDragHandle {
+    display: none;
+  }
+
+  .workspaceSidebar .sessionDragHandle:active {
+    cursor: grabbing;
+  }
+
+  .workspaceSidebar .sessionItem.dragOver {
+    background: #303034;
+  }
+
+  .workspaceSidebar .sessionMain {
+    gap: 4px;
+  }
+
+  .workspaceSidebar .sessionTitleRow {
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .workspaceSidebar .titleEditButton span {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.86rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .workspaceSidebar .sessionMeta {
+    gap: 4px;
+    color: #8e8e93;
+    font-size: 0.68rem;
+  }
+
+  .workspaceSidebar .sessionMeta span:first-child {
+    display: none;
+  }
+
+  .workspaceSidebar .recentSessionList .sessionMeta span:first-child {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspaceSidebar .recentSessionList .sessionMeta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    font-size: 0.68rem;
+  }
+
+  .workspaceSidebar .statusBadge {
+    padding: 2px 5px;
+    font-size: 0.64rem;
+  }
+
+  .workspaceSidebar .sessionActions {
+    display: grid;
+    align-content: center;
+  }
+
+  .workspaceSidebar .sessionActions .ghostButton {
+    min-width: 44px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+  }
+
+  .workspaceSidebar .workspaceToggleButton {
+    min-height: 38px;
+    margin-left: 8px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+  }
+
+  .workspaceSidebar .workspaceGroupSummary .muted {
+    font-size: 0.68rem;
+  }
+
+  .workspaceConversation {
+    min-width: 0;
+    height: calc(100dvh - 64px);
+    min-height: calc(100dvh - 64px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    background: #1c1c1e;
+  }
+
+  .workspaceHomeMain {
+    grid-template-rows: minmax(0, 1fr);
+    place-items: center;
+    padding: 32px;
+  }
+
+  .workspaceWelcome {
+    width: min(680px, 100%);
+    display: grid;
+    gap: 14px;
+  }
+
+  .workspaceWelcomeEyebrow {
+    margin: 0;
+    color: #30d158;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+
+  .workspaceWelcome h2,
+  .workspaceWelcome h3,
+  .workspaceWelcome p {
+    margin: 0;
+  }
+
+  .workspaceWelcome h2 {
+    color: #f5f5f7;
+    font-size: clamp(1.65rem, 2.8vw, 2.35rem);
+    letter-spacing: -0.035em;
+    line-height: 1.15;
+  }
+
+  .workspaceWelcomeDescription {
+    max-width: 560px;
+    color: #aeaeb2;
+    font-size: 0.95rem;
+    line-height: 1.65;
+  }
+
+  .workspaceWelcomeHint,
+  .workspaceWelcomeLoading {
+    border: 1px solid #3a3a3c;
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: #aeaeb2;
+    background: #28282a;
+    line-height: 1.5;
+  }
+
+  .workspaceRecent {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .workspaceRecentHeading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .workspaceRecentHeading h3 {
+    color: #f5f5f7;
+    font-size: 0.84rem;
+  }
+
+  .workspaceRecentHeading span {
+    color: #8e8e93;
+    font-size: 0.75rem;
+  }
+
+  .workspaceRecentList {
+    display: grid;
+    border: 1px solid #3a3a3c;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #28282a;
+  }
+
+  .workspaceRecentList.expanded {
+    max-height: min(480px, 52dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .workspaceRecentToggle {
+    justify-self: start;
+    min-height: 32px;
+    border: 1px solid #49494d;
+    border-radius: 999px;
+    padding: 0 12px;
+    color: #aeaeb2;
+    background: #2a2a2c;
+    font-size: 0.72rem;
+  }
+
+  .workspaceRecentToggle:hover {
+    color: #f5f5f7;
+    background: #363638;
+  }
+
+  .workspaceRecentSession {
+    min-width: 0;
+    min-height: 66px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-bottom: 1px solid #3a3a3c;
+    border-radius: 0;
+    padding: 12px 14px;
+    color: #f5f5f7;
+    background: transparent;
+    text-align: left;
+  }
+
+  .workspaceRecentSession:last-child {
+    border-bottom: 0;
+  }
+
+  .workspaceRecentSession:hover {
+    background: #363638;
+  }
+
+  .workspaceRecentStatus {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #8e8e93;
+  }
+
+  .workspaceRecentStatus.running,
+  .workspaceRecentStatus.starting {
+    background: #30d158;
+    box-shadow: 0 0 0 4px rgb(48 209 88 / 15%);
+  }
+
+  .workspaceRecentStatus.waiting_approval,
+  .workspaceRecentStatus.waiting_input {
+    background: #ff9f0a;
+  }
+
+  .workspaceRecentStatus.failed {
+    background: #ff453a;
+  }
+
+  .workspaceRecentCopy {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .workspaceRecentCopy strong,
+  .workspaceRecentCopy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspaceRecentCopy strong {
+    color: #f5f5f7;
+    font-size: 0.9rem;
+  }
+
+  .workspaceRecentCopy small,
+  .workspaceRecentMeta {
+    color: #8e8e93;
+    font-size: 0.72rem;
+  }
+
+  .workspaceRecentMeta {
+    white-space: nowrap;
+  }
+
+  .workspaceConversation .detailToolbar {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 22px 32px 14px;
+  }
+
+  .workspaceConversation .backToListButton {
+    display: none;
+  }
+
+  .workspaceConversation .sessionDetail {
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    height: 100%;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    padding: 0 32px 20px;
+    background: transparent;
+  }
+
+  .workspaceConversation .detailStack {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+
+  .workspaceConversation .detailScrollContent {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 2px 2px 12px;
+  }
+
+  .workspaceConversation .sessionHero {
+    border: 0;
+    border-radius: 0;
+    padding: 8px 0 18px;
+    background: transparent;
+  }
+
+  .workspaceConversation .sessionHeroMeta {
+    color: #8e8e93;
+  }
+
+  .workspaceConversation .runtimePanel {
+    border-radius: 12px;
+  }
+
+  .workspaceConversation .taskInput {
+    border-radius: 16px;
+    box-shadow: 0 16px 44px rgb(0 0 0 / 30%);
+  }
+}
+
+@media (max-width: 767px) {
+  .desktopWorkspaceHome {
+    display: none;
+  }
+
+  .mobileDashboardHome {
+    display: grid;
+    gap: 18px;
+  }
+
+  .appShell.reserveFloatingStatus .content {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .workspaceLayout,
+  .workspaceConversation {
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+  }
+
+  .workspaceLayout {
+    height: 100%;
+  }
+
+  .workspaceSidebar,
+  .workspaceSidebarResizeHandle,
+  .backToListButton {
+    display: none;
+  }
+
+  .workspaceConversation {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .workspaceConversation .detailToolbar {
+    padding-top: 0;
+  }
+}
+
+/* V5 mobile: a focused conversation, navigation drawer, and access decision. */
+.mobileConversationProject,
+.mobileRuntimeStatus,
+.mobileTaskContext,
+.mobileSessionDrawerContent,
+.taskInputPlus {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .appShell.reserveFloatingStatus {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  .appShell.reserveFloatingStatus > .topbar {
+    display: none;
+  }
+
+  .appShell.reserveFloatingStatus .content {
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: 0;
+  }
+
+  .workspaceConversation {
+    background: #1c1c1e;
+  }
+
+  .workspaceConversation .detailToolbar {
+    min-height: 82px;
+    align-items: center;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 12px;
+    border-bottom: 1px solid #3a3a3c;
+    background: #28282a;
+  }
+
+  .detailTitleBar {
+    gap: 12px;
+  }
+
+  .detailTitleBar .iconButton {
+    border: 0;
+    border-radius: 12px;
+    background: #363638;
+  }
+
+  .detailTitleBar h2 {
+    max-width: 168px;
+    color: #f5f5f7;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .detailEyebrow {
+    margin: 0 0 3px;
+    color: #8e8e93;
+    font-size: 0.7rem;
+    letter-spacing: 0;
+  }
+
+  .desktopConversationLabel {
+    display: none;
+  }
+
+  .mobileConversationProject {
+    display: inline;
+  }
+
+  .detailToolbar .toolbarActions {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .detailToolbar .toolbarActions > .ghostButton {
+    width: 40px;
+    min-width: 40px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 12px;
+    padding: 0;
+    color: transparent;
+    background: #363638;
+  }
+
+  .detailToolbar .toolbarActions > .ghostButton::after {
+    content: "…";
+    color: #f5f5f7;
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .mobileRuntimeStatus {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mobileRuntimeLiveState,
+  .mobileApprovalTrigger {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0 10px;
+    color: #d9ffe1;
+    background: #173d27;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+
+  .mobileRuntimeLiveState i,
+  .drawerProjectSummary i,
+  .drawerSessionRow > i,
+  .approvalRiskBadge i {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .mobileRuntimeStatus.waiting_approval .mobileRuntimeLiveState,
+  .mobileRuntimeStatus.waiting_input .mobileRuntimeLiveState,
+  .mobileApprovalTrigger {
+    color: #ffb340;
+    background: #684100;
+  }
+
+  .mobileRuntimeStatus.failed .mobileRuntimeLiveState {
+    color: #ff8d87;
+    background: #512022;
+  }
+
+  .mobileApprovalTrigger {
+    min-width: 0;
+    color: #fff3de;
+  }
+
+  .workspaceConversation .sessionDetail {
+    width: 100%;
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .appShell.reserveFloatingStatus .sessionDetail {
+    overflow: hidden;
+  }
+
+  .appShell.reserveFloatingStatus .detailStack {
+    gap: 0;
+  }
+
+  .appShell.reserveFloatingStatus .detailScrollContent {
+    gap: 18px;
+    padding: 24px 24px 16px;
+  }
+
+  .detailScrollContent > .approvalPanel,
+  .sessionHero,
+  .runtimePanel {
+    display: none;
+  }
+
+  .livePanel {
+    gap: 16px;
+    border: 0;
+    padding: 0;
+    color: #f5f5f7;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .livePanel .panelHeaderCompact {
+    display: none;
+  }
+
+  .liveOutputBody {
+    display: grid;
+    gap: 18px;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .livePanel .messageItem,
+  .livePanel .commandCard {
+    border: 0;
+    border-radius: 0;
+    padding: 0 0 0 16px;
+    color: #d1d1d6;
+    background: transparent;
+    box-shadow: inset 2px 0 0 #48484d;
+  }
+
+  .livePanel .messageItem.user {
+    color: #f5f5f7;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .livePanel .messageItem.user::before,
+  .livePanel .messageItem.agent::before {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    margin-left: -21px;
+    border-radius: 50%;
+    content: "";
+  }
+
+  .livePanel .messageItem.user::before { background: #8e8e93; }
+  .livePanel .messageItem.agent::before { background: #0a84ff; }
+
+  .livePanel .messageHeader {
+    color: #aeaeb2;
+    font-size: 0.67rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+
+  .livePanel .messageHeader strong {
+    color: inherit;
+  }
+
+  .livePanel .messageBody {
+    color: inherit;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .livePanel .commandCard {
+    gap: 0;
+    box-shadow: none;
+  }
+
+  .livePanel .commandHeader,
+  .livePanel .commandOutputDetails,
+  .livePanel .commandOutput {
+    display: none;
+  }
+
+  .livePanel .commandText {
+    border: 0;
+    border-radius: 10px;
+    padding: 11px 12px;
+    color: #d1d1d6;
+    background: #28282a;
+    font-size: 0.76rem;
+  }
+
+  .mobileTaskContext {
+    display: grid;
+    gap: 8px;
+    border: 1px solid #49494d;
+    border-radius: 16px;
+    padding: 16px;
+    color: #f5f5f7;
+    background: #303034;
+  }
+
+  .mobileTaskContextHeader,
+  .mobileTaskChanges,
+  .mobileTaskCommand {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 7px;
+  }
+
+  .mobileTaskContextHeader {
+    justify-content: space-between;
+    color: #30d158;
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+
+  .mobileTaskContextHeader small { color: #aeaeb2; }
+
+  .mobileTaskContext h3 {
+    margin: 0;
+    font-size: 0.96rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .mobileTaskContext > p {
+    margin: -3px 0 2px;
+    color: #aeaeb2;
+    font-size: 0.74rem;
+  }
+
+  .mobileTaskCommand {
+    min-height: 42px;
+    border-radius: 9px;
+    padding: 0 10px;
+    color: #aeaeb2;
+    background: #242426;
+  }
+
+  .mobileTaskCommand code {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    color: #d1d1d6;
+    background: transparent;
+    font-size: 0.74rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileTaskCommand strong {
+    color: #30d158;
+    font-size: 0.66rem;
+  }
+
+  .mobileTaskCommand strong.running { color: #ffb340; }
+
+  .mobileTaskChanges {
+    border-top: 1px solid #4b4b50;
+    padding-top: 10px;
+    color: #aeaeb2;
+    font-size: 0.72rem;
+  }
+
+  .mobileTaskChanges span:last-child { margin-left: auto; }
+
+  .taskInput {
+    grid-template-columns: 20px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 9px;
+    margin: 0 16px calc(12px + env(safe-area-inset-bottom));
+    border-radius: 21px;
+    padding: 8px 10px;
+    background: #2a2a2c;
+    box-shadow: 0 12px 36px rgb(0 0 0 / 28%);
+  }
+
+  .taskInputPlus {
+    display: grid;
+    place-items: center;
+    color: #aeaeb2;
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .taskInput textarea {
+    min-height: 44px;
+    max-height: 100px;
+    border: 0;
+    padding: 11px 0;
+    color: #f5f5f7;
+    background: transparent;
+    resize: none;
+  }
+
+  .taskInput button {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    color: #fff;
+    background: #0a84ff;
+    font-size: 1.2rem;
+  }
+
+  .taskInput button:disabled {
+    color: #8e8e93;
+    background: #3a3a3c;
+    opacity: 1;
+  }
+
+  .sessionDrawer {
+    width: 100%;
+    max-width: 390px;
+    grid-template-rows: minmax(0, 1fr);
+    padding: 0;
+    color: #f5f5f7;
+    background: #28282a;
+  }
+
+  .mobileSessionDrawerContent {
+    min-height: 100%;
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    align-content: start;
+    gap: 16px;
+    padding: calc(18px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .mobileDrawerHeader {
+    align-items: center;
+  }
+
+  .mobileDrawerHeader h2 {
+    margin: 0;
+    color: #f5f5f7;
+    font-size: 1.36rem;
+  }
+
+  .mobileDrawerHeader > div {
+    display: flex;
+    gap: 8px;
+  }
+
+  .drawerNewButton {
+    min-height: 40px;
+    border-radius: 999px;
+    padding: 0 15px;
+    color: #151515;
+    background: #30d158;
+    font-size: 0.8rem;
+    font-weight: 800;
+  }
+
+  .drawerNewButton span { font-size: 1.05rem; }
+
+  .mobileDrawerHeader .iconButton {
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border: 0;
+    border-radius: 12px;
+    background: #303034;
+  }
+
+  .drawerProjectSummary {
+    display: grid;
+    gap: 8px;
+    border: 1px solid #57575d;
+    border-radius: 14px;
+    padding: 14px;
+    background: #303034;
+  }
+
+  .drawerProjectSummary > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+  }
+
+  .drawerProjectSummary i { color: #30d158; }
+
+  .drawerProjectSummary p {
+    display: flex;
+    gap: 6px;
+    margin: 0;
+    color: #aeaeb2;
+    font-size: 0.73rem;
+  }
+
+  .drawerProjectSummary p span {
+    margin-left: auto;
+    color: #30d158;
+    font-weight: 700;
+  }
+
+  .mobileDrawerSearch {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) 1px;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #57575d;
+    border-radius: 12px;
+    padding: 0 12px;
+    color: #8e8e93;
+    background: #28282a;
+  }
+
+  .mobileDrawerSearch input {
+    min-height: 42px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    font-size: 0.85rem;
+  }
+
+  .drawerSearchSubmit {
+    width: 1px;
+    min-width: 1px;
+    min-height: 1px;
+    overflow: hidden;
+    padding: 0;
+    opacity: 0;
+  }
+
+  .drawerSessionGroup {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+  }
+
+  .drawerSessionGroup h3 {
+    margin: 0 4px;
+    color: #8e8e93;
+    font-size: 0.63rem;
+    letter-spacing: 0.05em;
+  }
+
+  .drawerSessionGroup > div,
+  .mobileApprovalList {
+    display: grid;
+    gap: 8px;
+  }
+
+  .drawerSessionRow {
+    width: 100%;
+    min-height: 60px;
+    display: grid;
+    grid-template-columns: 9px minmax(0, 1fr);
+    align-items: start;
+    gap: 9px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 11px 12px;
+    color: #f5f5f7;
+    background: #303034;
+    text-align: left;
+  }
+
+  .drawerSessionRow.running,
+  .drawerSessionRow.starting { border-color: #0a84ff; }
+  .drawerSessionRow.running > i,
+  .drawerSessionRow.starting > i { color: #30d158; }
+  .drawerSessionRow.waiting_approval > i { color: #ff9f0a; }
+  .drawerSessionRow.waiting_input > i { color: #0a84ff; }
+  .drawerSessionRow.failed > i { color: #ff453a; }
+  .drawerSessionRow.history > i,
+  .drawerSessionRow.exited > i { color: #8e8e93; }
+
+  .drawerSessionRow > span {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .drawerSessionRow strong,
+  .drawerSessionRow small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .drawerSessionRow strong { font-size: 0.83rem; }
+  .drawerSessionRow small { color: #aeaeb2; font-size: 0.69rem; }
+  .drawerSessionRow.waiting_approval small { color: #ffb340; font-weight: 700; }
+  .drawerSessionRow.running small,
+  .drawerSessionRow.starting small { color: #30d158; }
+
+  .drawerEmptyState {
+    padding: 18px 4px;
+    color: #8e8e93;
+    font-size: 0.84rem;
+  }
+
+  .drawerUtility {
+    align-self: end;
+    border-top: 1px solid #57575d;
+    padding-top: 16px;
+  }
+
+  .drawerUtility button {
+    width: 100%;
+    min-height: 48px;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    border-radius: 12px;
+    padding: 0 12px;
+    color: #f5f5f7;
+    background: #303034;
+    text-align: left;
+  }
+
+  .drawerUtility strong { color: #30d158; font-size: 0.7rem; }
+
+  .mobileApprovalSheet {
+    max-height: min(70dvh, 620px);
+    border-color: #5b5b60;
+    border-radius: 24px 24px 0 0;
+    background: #3a3a3f;
+  }
+
+  .mobileApprovalSheetHeader {
+    padding: 16px 20px 12px;
+  }
+
+  .mobileApprovalSheetHeader h2 { font-size: 1.15rem; }
+  .mobileApprovalSheetHeader p { max-width: 260px; font-size: 0.78rem; }
+  .mobileApprovalSheetHeader .iconButton { width: 36px; min-width: 36px; min-height: 36px; border: 0; background: #303034; }
+
+  .mobileApprovalSheetBody {
+    padding: 14px 20px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .mobileApprovalSheet .approvalCard {
+    gap: 14px;
+    border: 0;
+    padding: 0;
+    color: #f5f5f7;
+    background: transparent;
+  }
+
+  .approvalHeader strong { font-size: 1.1rem; }
+  .approvalDescription { margin: 4px 0 0; color: #aeaeb2; font-size: 0.8rem; line-height: 1.4; }
+
+  .approvalRiskRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #aeaeb2;
+    font-size: 0.72rem;
+  }
+
+  .approvalRiskBadge {
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 0 10px;
+    color: #ffb340;
+    background: #4b3821;
+    font-size: 0.65rem;
+    font-weight: 800;
+  }
+
+  .approvalRiskBadge.high { color: #ff8d87; background: #512022; }
+  .approvalRiskBadge.elevated { color: #ffb340; background: #4b3821; }
+  .approvalRiskBadge.readOnly { color: #ffb340; background: #4b3821; }
+
+  .approvalDetailField {
+    display: grid;
+    gap: 7px;
+  }
+
+  .approvalDetailField > span {
+    color: #8e8e93;
+    font-size: 0.63rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+
+  .approvalDetailField .commandText {
+    max-height: 84px;
+    border-color: #5b5b60;
+    border-radius: 10px;
+    padding: 14px;
+    color: #f5f5f7;
+    background: #2a2a2e;
+    font-size: 0.78rem;
+  }
+
+  .approvalScopeField > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid #57575d;
+    padding-bottom: 10px;
+  }
+
+  .approvalScopeField code {
+    min-width: 0;
+    overflow: hidden;
+    color: #f5f5f7;
+    background: transparent;
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .approvalScopeField strong { flex: 0 0 auto; color: #ffb340; font-size: 0.7rem; }
+
+  .mobileApprovalSheet .approvalActions {
+    gap: 12px;
+    border: 0;
+    padding: 0;
+  }
+
+  .mobileApprovalSheet .approvalAllowActions,
+  .mobileApprovalSheet .approvalDismissActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mobileApprovalSheet .approvalAllowActions {
+    grid-template-columns: 1fr;
+  }
+
+  .mobileApprovalSheet .approvalActions button {
+    min-height: 44px;
+    padding: 8px 10px;
+    border-radius: 11px;
+    font-size: 0.8rem;
+    font-weight: 800;
+  }
+
+  .mobileApprovalSheet .approvalAcceptButton { color: #18120b; background: #ff9f0a; }
+  .mobileApprovalSheet .approvalSessionButton { border: 1px solid #69696f; color: #f5f5f7; background: #29292d; }
+  .mobileApprovalSheet .approvalDeclineButton { border-color: #69696f; color: #f5f5f7; background: #29292d; }
+  .mobileApprovalSheet .approvalDismissActions .ghostButton { border: 1px solid #69696f; color: #aeaeb2; background: #29292d; }
+
+  .approvalSessionHint,
+  .approvalPausedHint {
+    margin: -7px 0 0;
+    color: #8e8e93;
+    font-size: 0.64rem;
+    text-align: center;
+  }
+
+  .approvalPausedHint { margin-top: -5px; }
+}
+
+/* Conversation flow: Codex stays left, user messages stay right, and live output sits above the composer. */
+.liveDetailScrollContent {
+  display: flex;
+  flex-direction: column;
+}
+
+.liveDetailScrollContent > .livePanel {
+  margin-top: auto;
+}
+
+.turnItems .messageItem.user,
+.liveOutputBody .messageItem.user {
+  justify-self: end;
+  width: min(82%, 760px);
+}
+
+.turnItems .messageItem.agent,
+.liveOutputBody .messageItem.agent {
+  justify-self: start;
+  width: min(88%, 860px);
+}
+
+.liveOutputBody .messageItem.user {
+  margin-left: auto;
+}
+
+.liveOutputBody .messageItem.agent {
+  margin-right: auto;
+}
+
+@media (max-width: 767px) {
+  .turnItems .messageItem.user,
+  .liveOutputBody .messageItem.user,
+  .turnItems .messageItem.agent,
+  .liveOutputBody .messageItem.agent {
+    width: min(94%, 100%);
+  }
+}
+
+/* Composer order: approval decision, message input, then model and permission controls. */
+.composerRuntimeState > span:not(.composerRuntimeDot),
+.composerRuntimeModel > span,
+.composerRuntimeModel small {
+  color: #aeaeb2;
+}
+
+.liveEmptyState {
+  color: #d9eeff;
+  background: #0e3d67;
+}
+
+.composerRuntimeBar.running,
+.composerRuntimeBar.starting {
+  border-color: #30d158;
+}
+
+.composerRuntimeBar.waiting_approval,
+.composerRuntimeBar.waiting_input {
+  border-color: #ff9f0a;
+}
+
+.composerRuntimeBar.failed {
+  border-color: #ff453a;
+}
+
+.composerRuntimeBar.running .composerRuntimeDot,
+.composerRuntimeBar.starting .composerRuntimeDot {
+  background: #30d158;
+}
+
+.composerRuntimeBar.waiting_approval .composerRuntimeDot,
+.composerRuntimeBar.waiting_input .composerRuntimeDot {
+  background: #ff9f0a;
+}
+
+.composerRuntimeBar.failed .composerRuntimeDot {
+  background: #ff453a;
+}
+
+/* Keep the live user bubble readable in the dark conversation workspace. */
+.livePanel .messageItem.user {
+  border-color: #49494d;
+  color: #f5f5f7;
+  background: #2a2a2c;
+}
+
+.livePanel .messageItem.user .messageHeader {
+  color: #aeaeb2;
+}
+
+.livePanel .messageItem.user .messageHeader strong,
+.livePanel .messageItem.user .messageBody {
+  color: #f5f5f7;
+}
+
+/* Live command cards must use the conversation dark surface as well. The base
+   command card styles are shared with the light history view. */
+.livePanel .commandCard,
+.livePanel .commandCard.running,
+.livePanel .commandCard.completed {
+  border-color: #3a3a3c;
+  color: #f5f5f7;
+  background: #28282a;
+  box-shadow: none;
+}
+
+.livePanel .commandCard.running {
+  border-color: #30d158;
+  background: #242426;
+}
+
+.livePanel .commandHeader strong {
+  color: #f5f5f7;
+}
+
+.livePanel .commandHeader .muted {
+  color: #aeaeb2;
+}
+
+.livePanel .commandHeader button {
+  border-color: #49494d;
+  color: #f5f5f7;
+  background: #363638;
+}
+
+.livePanel .commandText,
+.livePanel .commandOutput {
+  border-color: #49494d;
+  color: #d1d1d6;
+  background: #1f1f21;
+}
+
+.livePanel .commandText {
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.livePanel .commandOutput.running {
+  color: #d9eeff;
+  background: #202b32;
+}
+
+/* Model cards use one surface; identifiers and effort hints must not create stripes. */
+.modelOption > code,
+.modelOption .modelEfforts {
+  background: transparent;
+}
+
+.composerPermissionButton {
+  border-color: #ff9f0a;
+  color: #fff3de;
+  background: #4b3821;
+}
+
+/* Approval cards remain readable and actionable inside the constrained composer dock. */
+.composerDock > .approvalPanel .approvalActions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: 2px;
+  border-top-color: #67471e;
+  padding-bottom: 10px;
+  background: #3d2b12;
+}
+
+.mobileApprovalSheet .approvalActions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: #3a3a3f;
+}
+
+.approvalDescription {
+  margin: 4px 0 0;
+  color: #d1d1d6;
+  line-height: 1.45;
+}
+
+.approvalRiskRow {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  color: #d1d1d6;
+  line-height: 1.4;
+}
+
+.approvalRiskRow > span:last-child {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.approvalRiskBadge {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  border: 1px solid #ff9f0a;
+  border-radius: 999px;
+  padding: 0 9px;
+  color: #ffb340;
+  background: #4b3821;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.approvalRiskBadge i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.approvalRiskBadge.high {
+  border-color: #ff453a;
+  color: #ff8d87;
+  background: #512022;
+}
+
+.approvalRiskBadge.readOnly {
+  border-color: #30d158;
+  color: #d9ffe1;
+  background: #173d27;
+}
+
+.composerDock > .approvalPanel .approvalCard .commandText {
+  max-height: min(18vh, 144px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.mobileApprovalSheet .approvalCommandText {
+  max-height: min(18dvh, 144px);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.approvalScopeField strong {
+  flex: 0 0 auto;
+  color: #ffb340;
+  font-size: 0.72rem;
+}
+
+.composerApprovalButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border-color: #ff9f0a;
+  color: #fff3de;
+  background: #4b3821;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 767px) {
+  .composerDock {
+    gap: 8px;
+    border-top: 1px solid #3a3a3c;
+    padding: 8px 0 calc(env(safe-area-inset-bottom));
+    background: #1c1c1e;
+  }
+
+  .composerRuntimeBar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 10px;
+    border-radius: 14px;
+    padding: 9px 12px;
+  }
+
+  .composerRuntimeState {
+    min-width: 0;
+  }
+
+  .composerRuntimeState strong {
+    font-size: 0.78rem;
+  }
+
+  .composerRuntimeState > span:not(.composerRuntimeDot) {
+    overflow: hidden;
+    font-size: 0.68rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .composerRuntimeModel {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    flex: none;
+  }
+
+  .composerRuntimeModel strong {
+    font-size: 0.76rem;
+  }
+
+  .composerRuntimeModel small {
+    font-size: 0.68rem;
+  }
+
+  .composerRuntimeBadges {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .composerRuntimeBadges span {
+    padding: 2px 7px;
+    font-size: 0.66rem;
+  }
+
+  .composerModelButton {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.7rem;
+  }
+
+  .composerPermissionButton {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.7rem;
+  }
+
+  .composerApprovalButton {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.7rem;
+  }
+
+  .composerDock > .approvalPanel {
+    max-height: min(44dvh, 320px);
+    border-radius: 14px;
+    padding: 10px;
+  }
+
+  .composerDock > .approvalPanel .approvalList {
+    max-height: min(34dvh, 230px);
+    overflow: auto;
+  }
+
+  .composerDock > .composerWarning {
+    border-radius: 12px;
+    padding: 9px 10px;
+    font-size: 0.74rem;
+  }
+}
+
+/* The conversation history and live responses share one timeline and one scroll surface. */
+@media (min-width: 768px) {
+  .workspaceConversation .detailScrollContent {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .workspaceConversation .historyContent {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+}
+
+.timeline > .liveMessage.user {
+  justify-self: end;
+  width: min(82%, 760px);
+  margin-left: auto;
+}
+
+.timeline > .liveMessage.agent {
+  justify-self: start;
+  width: min(88%, 860px);
+  margin-right: auto;
+}
+
+@media (max-width: 767px) {
+  .timeline > .liveMessage.user,
+  .timeline > .liveMessage.agent {
+    width: min(94%, 100%);
+  }
+}
+
+/* Final approval/composer pass: keep decisions visible, scoped, and easy to scan. */
+.fullAccessDialog {
+  width: min(560px, 100%);
+  overflow: hidden;
+  border: 1px solid #4b4b50;
+  border-radius: 16px;
+  background: #242426;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 52%);
+}
+
+.fullAccessDialog .dialogHeader {
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid #3a3a3c;
+  background: #28282a;
+}
+
+.fullAccessDialog .dialogHeader h2 {
+  margin: 0;
+  color: #f5f5f7;
+  font-size: 1.12rem;
+}
+
+.fullAccessDialog .dialogHeader .muted {
+  margin: 5px 0 0;
+  color: #aeaeb2;
+}
+
+.fullAccessDialogBody {
+  gap: 16px;
+  padding: 18px 22px 22px;
+  background: #242426;
+}
+
+.fullAccessWarning {
+  border: 1px solid #8f3935;
+  border-left: 4px solid #ff453a;
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #ffe9e7;
+  background: #3b1e20;
+}
+
+.fullAccessWarningHeading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.approvalAlertIcon {
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #ff8d87;
+  border-radius: 50%;
+  color: #ffb3ae;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.fullAccessWarning p {
+  margin: 8px 0 0 29px;
+  color: #f2b8b5;
+  line-height: 1.5;
+}
+
+.fullAccessDialog .dialogActions {
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.fullAccessDialog .dialogActions button {
+  min-height: 42px;
+  border-radius: 10px;
+  font-weight: 750;
+}
+
+.composerDock > .approvalPanel {
+  border: 1px solid #5b461e;
+  border-left: 4px solid #ff9f0a;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #252527;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 18%);
+}
+
+.composerDock > .approvalPanel > .panelHeaderCompact {
+  min-height: 30px;
+  border-bottom: 1px solid #413a2b;
+  padding: 0 2px 10px;
+}
+
+.composerDock > .approvalPanel > .panelHeaderCompact h3 {
+  color: #fff3de;
+  font-size: 0.9rem;
+}
+
+.composerDock > .approvalPanel > .panelHeaderCompact span {
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #9a681f;
+  border-radius: 999px;
+  color: #ffd27d;
+  background: #4b3821;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.composerDock > .approvalPanel .approvalCard {
+  gap: 12px;
+  border: 1px solid #47474d;
+  border-radius: 12px;
+  padding: 14px;
+  color: #f5f5f7;
+  background: #2d2d30;
+  box-shadow: none;
+}
+
+.composerDock > .approvalPanel .approvalHeader strong {
+  color: #f5f5f7;
+  font-size: 0.96rem;
+}
+
+.composerDock > .approvalPanel .approvalHeader > span {
+  border-color: #5b5b60;
+  color: #d1d1d6;
+  background: #363638;
+}
+
+.composerDock > .approvalPanel .approvalDescription,
+.composerDock > .approvalPanel .approvalRiskRow {
+  color: #aeaeb2;
+}
+
+.composerDock > .approvalPanel .approvalDetailField > span {
+  color: #8e8e93;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.composerDock > .approvalPanel .approvalCommandText {
+  border: 1px solid #45454a;
+  border-radius: 9px;
+  padding: 10px 12px;
+  color: #f5f5f7;
+  background: #1f1f21;
+}
+
+.composerDock > .approvalPanel .approvalScopeField > div {
+  border-bottom-color: #45454a;
+}
+
+.composerDock > .approvalPanel .approvalActions {
+  position: static;
+  display: grid;
+  gap: 8px;
+  border-top-color: #45454a;
+  padding: 12px 0 0;
+  background: transparent;
+}
+
+.composerDock > .approvalPanel .approvalActions button {
+  min-height: 40px;
+  border-radius: 9px;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.composerDock > .approvalPanel .approvalAcceptButton {
+  border: 1px solid #ffb340;
+  color: #18120b;
+  background: #ff9f0a;
+}
+
+.composerDock > .approvalPanel .approvalSessionButton {
+  border: 1px solid #9a681f;
+  color: #ffd27d;
+  background: #4b3821;
+}
+
+.composerDock > .approvalPanel .approvalDeclineButton {
+  border-color: #8f3935;
+  color: #ffb3ae;
+  background: #3b1e20;
+}
+
+.composerDock > .approvalPanel .approvalActions .ghostButton {
+  border-color: #4f4f54;
+  color: #d1d1d6;
+  background: #363638;
+}
+
+.composerDock > .approvalPanel .approvalSessionHint,
+.composerDock > .approvalPanel .approvalPausedHint {
+  color: #8e8e93;
+  font-size: 0.68rem;
+}
+
+.sendButton {
+  align-self: center;
+  width: 46px;
+  min-width: 46px;
+  min-height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #2494ff;
+  border-radius: 11px;
+  padding: 0;
+  color: #ffffff;
+  background: #0a84ff;
+  box-shadow: 0 5px 14px rgb(10 132 255 / 24%);
+}
+
+.sendButton:hover:not(:disabled) {
+  border-color: #58adff;
+  background: #168dff;
+}
+
+.sendButton:disabled,
+.sendButton:disabled:hover {
+  border-color: #49494d;
+  color: #8e8e93;
+  background: #3a3a3c;
+  box-shadow: none;
+  opacity: 1;
+}
+
+.sendIcon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+@media (max-width: 767px) {
+  .fullAccessDialog .dialogHeader {
+    padding: 18px 18px 13px;
+  }
+
+  .fullAccessDialogBody {
+    padding: 16px 18px 18px;
+  }
+
+  .fullAccessWarning p {
+    margin-left: 0;
+  }
+
+  .sendButton {
+    width: 44px;
+    min-width: 44px;
+    border-radius: 50%;
+  }
+}
+
+/* Conversation navigation and settings presentation refinements. */
+.historyViewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.historyViewport > .historyContent {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.timelineScrollControls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 5;
+  display: grid;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid #49494d;
+  border-radius: 12px;
+  background: rgb(42 42 44 / 92%);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 28%);
+  backdrop-filter: blur(8px);
+}
+
+.timelineScrollButton {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #57575d;
+  border-radius: 8px;
+  padding: 0;
+  color: #f5f5f7;
+  background: #363638;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.timelineScrollButton:hover:not(:disabled) {
+  border-color: #0a84ff;
+  background: #303f52;
+}
+
+.timelineScrollButton:disabled {
+  color: #636366;
+  background: #2a2a2c;
+  opacity: 0.72;
+}
+
+.settingsPage {
+  width: min(100%, 1080px);
+  display: grid;
+  gap: 16px;
+  margin: 0 auto;
+}
+
+.settingsPage > .detailToolbar {
+  margin-bottom: 2px;
+  padding-bottom: 2px;
+}
+
+.settingsPage .detailTitleBar h2 {
+  font-size: 1.3rem;
+}
+
+.settingsPage .healthOverview {
+  position: relative;
+  min-height: 104px;
+  border: 1px solid #295d43;
+  border-left: 4px solid #30d158;
+  border-radius: 14px;
+  padding: 18px 20px;
+  color: #d9ffe1;
+  background: linear-gradient(135deg, #173d27 0%, #1d2d25 100%);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 16%);
+}
+
+.settingsPage .healthOverview::before {
+  width: 9px;
+  height: 9px;
+  content: "";
+  position: absolute;
+  top: 21px;
+  left: 20px;
+  border-radius: 50%;
+  background: #30d158;
+  box-shadow: 0 0 0 5px rgb(48 209 88 / 16%);
+}
+
+.settingsPage .healthOverview > div {
+  padding-left: 23px;
+}
+
+.settingsPage .healthOverview p {
+  margin: 0 0 6px;
+  color: #9ce7b2;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+.settingsPage .healthOverview strong {
+  color: #f5fff7;
+  font-size: 1.08rem;
+}
+
+.settingsPage .healthOverview > span {
+  color: #b9d9c2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+}
+
+.settingsPage .healthOverview.unhealthy,
+.settingsPage .healthOverview.unknown {
+  border-color: #7b3835;
+  border-left-color: #ff453a;
+  color: #ffe9e7;
+  background: linear-gradient(135deg, #512022 0%, #302326 100%);
+}
+
+.settingsPage .healthOverview.unhealthy::before,
+.settingsPage .healthOverview.unknown::before {
+  background: #ff453a;
+  box-shadow: 0 0 0 5px rgb(255 69 58 / 16%);
+}
+
+.settingsPage .healthOverview.unhealthy p,
+.settingsPage .healthOverview.unknown p,
+.settingsPage .healthOverview.unhealthy > span,
+.settingsPage .healthOverview.unknown > span {
+  color: #f2b8b5;
+}
+
+.settingsPage .settingsSection {
+  border: 1px solid #3f3f43;
+  border-radius: 14px;
+  background: #28282a;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 14%);
+}
+
+.settingsPage .settingsSectionHeader {
+  position: relative;
+  min-height: 58px;
+  border-bottom: 1px solid #3f3f43;
+  padding: 0 18px 0 22px;
+  background: #303034;
+}
+
+.settingsPage .settingsSectionHeader::before {
+  width: 4px;
+  height: 22px;
+  content: "";
+  position: absolute;
+  left: 0;
+  border-radius: 0 4px 4px 0;
+  background: #0a84ff;
+}
+
+.settingsPage .settingsSectionHeader h3 {
+  color: #f5f5f7;
+  font-size: 0.92rem;
+  letter-spacing: 0.01em;
+}
+
+.settingsPage .settingsSectionHeader > span {
+  color: #aeaeb2;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.settingsPage .settingsRows {
+  background: #28282a;
+}
+
+.settingsPage .settingsRow {
+  min-height: 56px;
+  grid-template-columns: minmax(150px, 0.34fr) minmax(0, 1fr);
+  gap: 20px;
+  border-bottom-color: #3a3a3c;
+  padding: 10px 18px;
+}
+
+.settingsPage .settingsRow span {
+  color: #aeaeb2;
+  font-size: 0.8rem;
+}
+
+.settingsPage .settingsRow strong {
+  min-width: 0;
+  color: #f5f5f7;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.settingsPage .settingsRow .monospaceValue {
+  justify-self: end;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid #3f3f43;
+  border-radius: 7px;
+  padding: 5px 8px;
+  color: #d1d1d6;
+  background: #1f1f21;
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingsPage .diagnosticBadge.ready {
+  border-color: #2d8650;
+  color: #9ce7b2;
+  background: #173d27;
+}
+
+.settingsPage .diagnosticBadge.failed {
+  border-color: #8f3935;
+  color: #ffb3ae;
+  background: #512022;
+}
+
+@media (max-width: 767px) {
+  .timelineScrollControls {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .settingsPage {
+    gap: 12px;
+  }
+
+  .settingsPage .detailToolbar {
+    padding-bottom: 0;
+  }
+
+  .settingsPage .healthOverview {
+    min-height: 96px;
+    padding: 16px;
+  }
+
+  .settingsPage .healthOverview > span {
+    align-self: flex-end;
+  }
+
+  .settingsPage .settingsSectionHeader {
+    min-height: 52px;
+    padding: 0 14px 0 18px;
+  }
+
+  .settingsPage .settingsRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 11px 14px;
+  }
+
+  .settingsPage .settingsRow strong,
+  .settingsPage .settingsRow .monospaceValue {
+    justify-self: stretch;
+    text-align: left;
+  }
+}
+
+/* Keep the conversation title single-source and make its metadata scannable. */
+.detailTitleContent {
+  min-width: 0;
+  width: min(52vw, 680px);
+}
+
+.detailTitleContent h2 {
+  width: 100%;
+  max-width: 100%;
+}
+
+.sessionMetaStrip {
+  min-width: 0;
+  align-items: center;
+  gap: 18px;
+  border: 1px solid #3a3a3c;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #262628;
+}
+
+.sessionHeroContext {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sessionMetaLabel,
+.sessionMetaValue > span {
+  flex: 0 0 auto;
+  color: #8e8e93;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.sessionHeroContext strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #d1d1d6;
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionMetaStrip .sessionHeroMeta {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: #d1d1d6;
+  font-family: inherit;
+  font-size: 0.76rem;
+}
+
+.sessionMetaValue {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sessionMetaValue time,
+.sessionMetaValue code {
+  color: #d1d1d6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+}
+
+.sessionIdValue code {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copySessionIdButton {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #49494d;
+  border-radius: 7px;
+  padding: 0;
+  color: #d1d1d6;
+  background: #363638;
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.copySessionIdButton:hover {
+  border-color: #0a84ff;
+  color: #ffffff;
+  background: #303f52;
+}
+
+@media (max-width: 767px) {
+  .detailTitleContent {
+    width: auto;
+    max-width: 168px;
+  }
+
+  .sessionMetaStrip {
+    align-items: flex-start;
+    gap: 10px;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  .sessionHeroContext {
+    max-width: 100%;
+  }
+
+  .sessionMetaStrip .sessionHeroMeta {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px 12px;
+  }
+
+  .sessionIdValue code {
+    max-width: 132px;
   }
 }
