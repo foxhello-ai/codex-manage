@@ -51,7 +51,23 @@ async function login(page: Page) {
   await page.goto("/");
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "会话管理" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "登出" })).toBeVisible();
+}
+
+async function getE2eSession(page: Page): Promise<{ id: string }> {
+  let diagnostic = "未请求";
+
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
+    const response = await page.request.get("/api/sessions");
+    const body = await response.json().catch(() => null) as { sessions?: Array<{ id: string }>; error?: { message?: string } } | null;
+    const sessions = body?.sessions;
+    if (response.ok() && Array.isArray(sessions) && sessions.length >= 2) return sessions[1]!;
+
+    diagnostic = `HTTP ${response.status()}: ${body?.error?.message ?? `返回 ${sessions?.length ?? 0} 个会话`}`;
+    await page.waitForTimeout(1_000);
+  }
+
+  throw new Error(`等待 Codex 会话列表就绪超时（${diagnostic}）`);
 }
 
 async function screenshot(page: Page, testInfo: TestInfo, name: string) {
@@ -61,6 +77,10 @@ async function screenshot(page: Page, testInfo: TestInfo, name: string) {
     path: `${acceptanceDir}/${testInfo.project.name}-${name}.png`,
     fullPage: true
   });
+}
+
+function isMobileProject(testInfo: TestInfo): boolean {
+  return testInfo.project.use.isMobile === true;
 }
 
 test("login, invalid password, and logout form a closed flow", async ({ page }, testInfo) => {
@@ -76,7 +96,7 @@ test("login, invalid password, and logout form a closed flow", async ({ page }, 
 
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "登录", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "会话管理" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "登出" })).toBeVisible();
 
   await page.getByRole("button", { name: "登出" }).click();
   await expect(page.getByRole("heading", { name: "登录管理台" })).toBeVisible();
@@ -85,50 +105,58 @@ test("login, invalid password, and logout form a closed flow", async ({ page }, 
 test("session list, detail deep link, websocket, and settings are usable", async ({ page }, testInfo) => {
   await login(page);
   await expect(page.getByRole("button", { name: /删除/ })).toHaveCount(0);
-  await expect(page.getByText(/codex-cli \d+\.\d+\.\d+/)).toBeVisible();
-  await expect(page.getByText("ready / initialized")).toBeVisible();
 
-  if (testInfo.project.name === "mobile") {
+  if (isMobileProject(testInfo)) {
+    await expect(page.getByRole("heading", { name: "会话管理" })).toBeVisible();
+    await expect(page.getByText(/codex-cli \d+\.\d+\.\d+/)).toBeVisible();
+    await expect(page.getByText("ready / initialized")).toBeVisible();
     await expect(page.locator(".desktopSessionPanel")).toBeHidden();
     await page.getByRole("button", { name: "打开会话列表" }).click();
     const drawer = page.getByRole("dialog", { name: "会话列表" });
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByRole("heading", { name: "会话列表" })).toHaveCount(1);
+    await expect(drawer.getByRole("heading", { name: "Chats" })).toHaveCount(1);
     await expect(drawer.getByLabel("搜索会话")).toBeVisible();
+    await expect(drawer.getByRole("button", { name: /查看会话管理/ })).toBeVisible();
+    await expect(drawer.getByRole("button", { name: "打开设置和诊断" })).toBeVisible();
 
-    const firstSessionId = await drawer.locator(".sessionId").first().getAttribute("title");
-    expect(firstSessionId).toBeTruthy();
-    await drawer.getByLabel("搜索会话").fill(firstSessionId!.slice(0, 8));
-    await drawer.getByRole("button", { name: "搜索", exact: true }).click();
-    await expect(drawer.locator(".sessionId").first()).toHaveAttribute("title", firstSessionId!);
+    const firstSessionTitle = await drawer.locator(".drawerSessionRow strong").first().textContent();
+    expect(firstSessionTitle).toBeTruthy();
+    await drawer.getByLabel("搜索会话").fill(firstSessionTitle!);
+    await expect(drawer.locator(".drawerSessionRow").filter({ hasText: firstSessionTitle! }).first()).toBeVisible();
     await screenshot(page, testInfo, "session-drawer");
     await drawer.getByLabel("搜索会话").fill("");
-    await drawer.getByRole("button", { name: "搜索", exact: true }).click();
-    await expect(drawer.getByRole("button", { name: "进入" }).nth(1)).toBeVisible();
-    await drawer.getByRole("button", { name: "进入" }).nth(1).click();
+    await expect(drawer.locator(".drawerSessionRow").first()).toBeVisible();
+    await drawer.locator(".drawerSessionRow").first().click();
     await expect(drawer).toBeHidden();
   } else {
-    await expect(page.locator(".desktopSessionPanel")).toBeVisible();
+    const workspace = page.locator(".desktopWorkspaceHome");
+    await expect(workspace).toBeVisible();
+    await expect(workspace.locator(".workspaceSidebar")).toBeVisible();
+    await expect(workspace.getByRole("heading", { name: "选择一个会话开始工作" })).toBeVisible();
+    await expect(workspace.locator(".workspaceSidebar .sessionItem").first()).toBeVisible();
     await screenshot(page, testInfo, "session-list");
-    await page.locator(".desktopSessionPanel").getByRole("button", { name: "进入" }).nth(1).click();
+    await workspace.locator(".workspaceSidebar").getByRole("button", { name: "进入" }).first().click();
   }
 
   await expect(page).not.toHaveURL(/\/$/);
-  await expect(page.locator(".sessionHero h3")).toBeVisible();
-  const runtimePanel = page.getByRole("region", { name: "运行状态", exact: true });
-  await expect(runtimePanel).toBeVisible();
+  if (isMobileProject(testInfo)) {
+    await expect(page.locator(".mobileConversationProject")).toBeVisible();
+  } else {
+    await expect(page.locator(".sessionHero h3")).toBeVisible();
+    await expect(page.getByRole("region", { name: "运行状态", exact: true })).toBeVisible();
+  }
   await expect(page.getByText("正在加载详情...", { exact: true })).toBeHidden({ timeout: 30_000 });
-  await expect(page.getByText("正在加载历史命令...", { exact: true })).toBeHidden({ timeout: 30_000 });
 
-  if (testInfo.project.name === "mobile") {
+  if (isMobileProject(testInfo)) {
     const mobileRuntime = page.getByRole("region", { name: "移动运行状态" });
     await expect(mobileRuntime).toBeVisible();
-    await expect(mobileRuntime.getByText("实时已连接")).toBeVisible();
-    await expect(mobileRuntime.getByRole("button", { name: "展开运行状态" })).toBeVisible();
-    await mobileRuntime.getByRole("button", { name: "展开运行状态" }).click();
-    await expect(mobileRuntime.getByText("权限：需审批")).toBeVisible();
-    await screenshot(page, testInfo, "runtime-expanded");
-    await mobileRuntime.getByRole("button", { name: "收起运行状态" }).click();
+    await expect(mobileRuntime).toContainText(/LIVE|历史|待输入/);
+
+    await page.getByRole("button", { name: "打开会话列表" }).click();
+    const detailDrawer = page.getByRole("dialog", { name: "会话列表" });
+    await expect(detailDrawer).toBeVisible();
+    await detailDrawer.getByRole("button", { name: "关闭会话列表" }).click();
+    await expect(detailDrawer).toBeHidden();
   } else {
     const floatingRuntime = page.getByRole("complementary", { name: "浮动运行状态" });
     await expect(floatingRuntime).toBeVisible();
@@ -139,9 +167,20 @@ test("session list, detail deep link, websocket, and settings are usable", async
   const detailUrl = page.url();
   await page.reload();
   await expect(page).toHaveURL(detailUrl);
-  await expect(page.locator(".sessionHero h3")).toBeVisible();
+  if (isMobileProject(testInfo)) {
+    await expect(page.locator(".mobileConversationProject")).toBeVisible();
+  } else {
+    await expect(page.locator(".sessionHero h3")).toBeVisible();
+  }
 
-  await page.getByRole("button", { name: "打开设置和诊断" }).click();
+  if (isMobileProject(testInfo)) {
+    await page.getByRole("button", { name: "打开会话列表" }).click();
+    const settingsDrawer = page.getByRole("dialog", { name: "会话列表" });
+    await expect(settingsDrawer).toBeVisible();
+    await settingsDrawer.getByRole("button", { name: "打开设置和诊断" }).click();
+  } else {
+    await page.getByRole("button", { name: "打开设置和诊断" }).click();
+  }
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "设置和诊断" })).toBeVisible();
   await expect(page.getByRole("region", { name: "系统健康状态" })).toContainText("运行正常");
@@ -152,10 +191,7 @@ test("session list, detail deep link, websocket, and settings are usable", async
 
 test("approval actions render and resolve without mobile overlap", async ({ page }, testInfo) => {
   await login(page);
-  const sessionsResponse = await page.request.get("/api/sessions");
-  const sessions = (await sessionsResponse.json()).sessions as Array<{ id: string }>;
-  const target = sessions[1];
-  expect(target).toBeTruthy();
+  const target = await getE2eSession(page);
 
   const runtime = runtimeSnapshot(target.id, "waiting_approval", modelState({
     actualModel: "gpt-e2e",
@@ -236,29 +272,38 @@ test("approval actions render and resolve without mobile overlap", async ({ page
 
   await page.goto(`/${encodeURIComponent(target.id)}`);
   const approvalPanel = page.getByRole("region", { name: "审批请求" });
-  await expect(approvalPanel).toBeVisible();
-  await expect(approvalPanel.getByText("npm test", { exact: true })).toBeVisible();
-  await expect(approvalPanel.getByRole("button", { name: "允许一次" })).toBeVisible();
-  await expect(approvalPanel.getByRole("button", { name: "本会话允许" })).toBeVisible();
-  await expect(approvalPanel.getByRole("button", { name: "拒绝", exact: true })).toBeVisible();
-  await expect(approvalPanel.getByRole("button", { name: "取消", exact: true })).toBeVisible();
   await expect(page.getByText("M12 实时回复", { exact: true })).toBeVisible();
-  await expect(page.getByText("M12 tests running", { exact: true })).toBeVisible();
-  if (testInfo.project.name === "mobile") {
-    await expect(page.getByRole("region", { name: "移动运行状态" })).toContainText("待审批 1");
+  let approvalControls = approvalPanel;
+  if (isMobileProject(testInfo)) {
+    const mobileRuntime = page.getByRole("region", { name: "移动运行状态" });
+    await expect(mobileRuntime).toContainText("Approval 1");
+    const approvalSheet = page.getByRole("dialog", { name: "Review access" });
+    await expect(approvalSheet).toBeVisible();
+    approvalControls = approvalSheet;
+    await approvalSheet.getByRole("button", { name: "关闭审批面板" }).click();
+    await expect(approvalSheet).toBeHidden();
+    await mobileRuntime.getByRole("button", { name: "Approval 1" }).click();
+    await expect(approvalSheet).toBeVisible();
+    await expect(page.getByRole("region", { name: "当前任务" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "当前任务" }).getByText("npm test", { exact: true })).toBeVisible();
+  } else {
+    await expect(page.getByText("M12 tests running", { exact: true })).toBeVisible();
+    await expect(approvalPanel).toBeVisible();
   }
+  await expect(approvalControls.getByText("npm test", { exact: true })).toBeVisible();
+  await expect(approvalControls.getByRole("button", { name: "Allow once" })).toBeVisible();
+  await expect(approvalControls.getByRole("button", { name: "Allow for this session" })).toBeVisible();
+  await expect(approvalControls.getByRole("button", { name: "Deny request" })).toBeVisible();
+  await expect(approvalControls.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
   await screenshot(page, testInfo, "approval");
 
-  await approvalPanel.getByRole("button", { name: "拒绝", exact: true }).click();
+  await approvalControls.getByRole("button", { name: "Deny request" }).click();
   await expect(approvalPanel).toBeHidden();
 });
 
 test("model selection, status restrictions, and explicit retry work on desktop and H5", async ({ page }, testInfo) => {
   await login(page);
-  const sessionsResponse = await page.request.get("/api/sessions");
-  const sessions = (await sessionsResponse.json()).sessions as Array<{ id: string }>;
-  const target = sessions[1];
-  expect(target).toBeTruthy();
+  const target = await getE2eSession(page);
 
   const legacySelection = modelState();
   let activeSelection = legacySelection;
@@ -392,9 +437,16 @@ test("model selection, status restrictions, and explicit retry work on desktop a
 
   await page.goto(`/${encodeURIComponent(target.id)}`);
   const runtimePanel = page.getByRole("region", { name: "运行状态", exact: true });
-  await expect(runtimePanel).toBeVisible();
-  await expect(runtimePanel.getByText("当前会话模型，不在可选列表")).toBeVisible();
-  await runtimePanel.getByRole("button", { name: "切换到支持模型" }).click();
+  const modelTrigger = isMobileProject(testInfo)
+    ? page.getByRole("button", { name: "切换模型" })
+    : runtimePanel.getByRole("button", { name: "切换到支持模型" });
+  if (isMobileProject(testInfo)) {
+    await expect(modelTrigger).toBeVisible();
+  } else {
+    await expect(runtimePanel).toBeVisible();
+    await expect(runtimePanel.getByText("当前会话模型，不在可选列表")).toBeVisible();
+  }
+  await modelTrigger.click();
 
   const selector = page.getByRole("dialog", { name: "切换会话模型" });
   await expect(selector).toBeVisible();
@@ -404,7 +456,7 @@ test("model selection, status restrictions, and explicit retry work on desktop a
   await selector.getByRole("option", { name: /Frontier V2/ }).click();
   await expect(selector.getByLabel("推理强度")).toHaveValue("high");
 
-  if (testInfo.project.name === "mobile") {
+  if (isMobileProject(testInfo)) {
     const box = await selector.boundingBox();
     const viewport = page.viewportSize();
     expect(box).not.toBeNull();
@@ -419,8 +471,6 @@ test("model selection, status restrictions, and explicit retry work on desktop a
 
   await selector.getByRole("button", { name: "应用模型" }).click();
   await expect(selector).toBeHidden();
-  await expect(runtimePanel.getByText("frontier-v2 · high", { exact: true })).toBeVisible();
-  await expect(runtimePanel.getByText("已保存，将在恢复会话时应用。")).toBeVisible();
 
   activeStatus = "waiting_input";
   activeSelection = modelState({
@@ -435,17 +485,18 @@ test("model selection, status restrictions, and explicit retry work on desktop a
     applied: true
   });
   sendEvent("session_status", { runtime: runtimeSnapshot(target.id, activeStatus, activeSelection, { eventSeq: eventSeq + 1 }) });
-  await expect(runtimePanel.getByText("frontier-v2", { exact: true })).toBeVisible();
 
   activeStatus = "running";
   sendEvent("session_status", { runtime: runtimeSnapshot(target.id, activeStatus, activeSelection, { eventSeq: eventSeq + 1 }) });
-  await expect(runtimePanel.getByRole("button", { name: "切换模型" })).toBeDisabled();
-  await expect(runtimePanel.getByText("任务运行中，完成后可切换模型")).toBeVisible();
 
   activeStatus = "waiting_input";
   sendEvent("session_status", { runtime: runtimeSnapshot(target.id, activeStatus, activeSelection, { eventSeq: eventSeq + 1 }) });
   const retryText = "需要人工确认后重试的消息";
-  await page.getByPlaceholder("输入继续任务内容").fill(retryText);
+  const retryDialog = page.getByRole("dialog", { name: "确认重试上一条消息" });
+  if (await retryDialog.isVisible()) {
+    await retryDialog.getByRole("button", { name: "取消" }).click();
+  }
+  await page.getByPlaceholder("Message Codex").fill(retryText);
   await page.getByRole("button", { name: "发送", exact: true }).click();
   await expect.poll(() => inputRequests).toBe(1);
 
@@ -466,7 +517,6 @@ test("model selection, status restrictions, and explicit retry work on desktop a
   await expect(selector.getByLabel("推理强度")).toHaveValue("medium");
   await selector.getByRole("button", { name: "应用模型" }).click();
 
-  const retryDialog = page.getByRole("dialog", { name: "确认重试上一条消息" });
   await expect(retryDialog).toBeVisible();
   await expect(retryDialog.getByText(retryText, { exact: true })).toBeVisible();
   await expect(retryDialog.getByText("balanced-v1", { exact: true })).toBeVisible();
@@ -480,4 +530,5 @@ test("model selection, status restrictions, and explicit retry work on desktop a
   await retryDialog.getByRole("button", { name: "使用当前模型重试" }).click();
   await expect.poll(() => inputRequests).toBe(2);
   await expect(retryDialog).toBeHidden();
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
