@@ -2,6 +2,88 @@
 
 `main` 分支提供单体 Web 版本：一个 Fastify 服务托管 React 页面，并在同一台 Linux 主机上启动宿主机的 `codex app-server`。它不包含桌面客户端、Cloudflare Tunnel、运营后台、支付或云端控制面。
 
+## 产品全局架构与分支边界
+
+下图描述的是产品全貌，不表示所有组件已经合入当前 `main`。`main` 是 Linux Runtime 与 Web/H5 的稳定线；Desktop、Cloud Platform 及其支付、域名配置能力仍以各自的候选分支为实现来源，合并与发布必须经版本门禁确认。
+
+```mermaid
+flowchart TB
+  Browser["用户 Web / H5 浏览器<br/>会话、审批、模型、设置"]
+
+  subgraph Local["用户侧会话执行面：会话内容保留在本机"]
+    direction LR
+
+    subgraph LinuxRuntime["Linux Runtime：独立部署与发布线"]
+      direction TB
+      LinuxApp["React Web + Fastify 服务<br/>本地认证、会话、审批、模型"]
+      LinuxCodex["Codex CLI / app-server<br/>~/.codex/sessions"]
+
+      LinuxApp --> LinuxCodex
+    end
+
+    subgraph DesktopRuntime["Desktop Runtime：macOS / Windows"]
+      direction TB
+      DesktopUI["Electron Renderer<br/>会话、审批、模型、套餐/订阅"]
+      ElectronMain["Electron Main<br/>进程、托盘、更新、诊断"]
+      LocalAPI["Fastify 本地服务<br/>配对、本地认证、会话、审批"]
+      DesktopCodex["Codex CLI / app-server<br/>~/.codex/sessions"]
+      TunnelClient["cloudflared Client<br/>Tunnel 本机代理"]
+
+      DesktopUI --> ElectronMain --> LocalAPI --> DesktopCodex
+      ElectronMain --> TunnelClient
+    end
+  end
+
+  subgraph CloudSide["云端控制与外部服务：不保存会话内容"]
+    direction LR
+
+    subgraph TunnelModule["远程访问与 Tunnel"]
+      direction TB
+      CF["Cloudflare Tunnel / API / DNS"]
+      Worker["Tunnel Worker<br/>创建、更新、撤销、补偿"]
+
+      Worker --> CF
+    end
+
+    subgraph ControlPlane["Cloud Platform 控制面"]
+      direction TB
+      Admin["Admin Web<br/>运营与系统配置"]
+      API["Control API<br/>账号、设备、配置、权益、问题上报"]
+      DB[("PostgreSQL<br/>账号、设备、权益、Tunnel、审计")]
+
+      Admin --> API --> DB
+    end
+
+    subgraph Billing["支付与订阅：Cloud Platform 子模块"]
+      direction TB
+      BillingCore["套餐、订单、支付、回调、权益"]
+      Pay["微信支付 / 支付宝"]
+
+      BillingCore --> Pay
+    end
+  end
+
+  Browser -->|"访问 Linux 服务"| LinuxApp
+  Browser -. "远程访问 Desktop" .-> CF
+
+  TunnelClient <--> CF
+  ElectronMain -->|"登录、设备、配置、权益"| API
+  Worker --> DB
+
+  API --> BillingCore
+  BillingCore --> DB
+```
+
+Linux Runtime 与 Desktop Runtime 是并列的用户侧运行形态和独立发布线；Tunnel 是由桌面端 `cloudflared`、云端 Worker 与 Cloudflare 组成的跨端远程访问模块；Cloud Platform 只管理控制数据，不保存会话内容。支付与订阅是 Cloud Platform 的子模块，首版渠道为微信支付和支付宝。
+
+| 实现来源 | 1.0.7 候选内容 | 进入联合发布前的条件 |
+| --- | --- | --- |
+| `origin/feature/f-20260728-pay` | 支付模块、Control API 支付链路、Desktop 套餐购买、运营后台支付管理 | 商户参数和回调联调、真实小额订单、幂等与权限验收；未完成前保持购买关闭 |
+| `origin/feature/f-20260730-domain` | Desktop 运行时域名配置、Control API/Worker 动态系统配置、后台配置页、SMTP 验证码 | 新旧域名灰度、桌面配置刷新、迁移/回滚、SMTP 发送与安全验收 |
+| `origin/feature/f-20260804-ui` | Web/H5 会话工作台视觉与交互重构 | UI/UX 审计、关键任务流与移动端可用性回归、无障碍和视觉验收 |
+
+Desktop 与 Cloud Platform 的 `v1.0.6` 已由项目负责人确认同期发布；两条发布线仍分别保存版本、构建物、环境验收与回滚证据。详见 [`docs/releases/README.md`](docs/releases/README.md) 和 [`docs/governance/`](docs/governance/)。
+
 推荐部署方式是：GitHub Actions 构建无源码运行包，Linux 服务器用同一个系统用户通过 systemd 启动。不要用 Docker 做主部署。
 
 ## 构建运行包

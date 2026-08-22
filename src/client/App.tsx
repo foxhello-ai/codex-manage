@@ -1,14 +1,15 @@
-import { FormEvent, KeyboardEvent, PointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionCommands, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
-import type { ApprovalDecision, ApprovalSummary, HealthStatus, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionCommand, SessionCommandDiagnostics, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserSession, WebSessionEvent } from "../shared/models";
+import { CSSProperties, FormEvent, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createCollaborator, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel } from "../shared/api";
+import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
 import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
-import { isTaskSendShortcut, shouldAutoFollowLiveOutput } from "./sessionInteractions";
+import { findRetryContextForTurn, findRetryContextFromFailedTurns, isTaskSendShortcut, type RetryContext } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
-type DashboardView = "list" | "settings" | "detail" | "invalid";
+type DashboardView = "list" | "settings" | "members" | "detail" | "invalid";
+type SessionListMode = "workspace" | "recent";
 
 type LiveCommand = {
   id: string;
@@ -33,10 +34,17 @@ type LiveMessage = {
 
 type LiveErrorNotice = {
   id: string;
+  turnId: string | null;
   message: string;
   code: string | null;
   willRetry: boolean;
   createdAt: string;
+  retryContext: RetryContext | null;
+};
+
+type LiveTimelineEntry = {
+  kind: "message" | "command" | "error";
+  id: string;
 };
 
 
@@ -55,7 +63,7 @@ export function App() {
         if (cancelled) return;
         setSession(me);
 
-        if (me.authenticated) {
+        if (me.authenticated && me.user?.role !== "child") {
           const publicConfig = await getPublicConfig();
           if (cancelled) return;
           setConfig(publicConfig);
@@ -77,7 +85,7 @@ export function App() {
 
   async function handleLoggedIn(nextSession: UserSession) {
     setSession(nextSession);
-    setConfig(await getPublicConfig());
+    setConfig(nextSession.user?.role === "child" ? null : await getPublicConfig());
   }
 
   async function handleLogout() {
@@ -98,7 +106,7 @@ export function App() {
     return <LoginView defaultPassword={session?.defaultPassword ?? true} onLoggedIn={handleLoggedIn} />;
   }
 
-  return <Dashboard config={config} defaultPassword={session.defaultPassword} onLogout={handleLogout} />;
+  return <Dashboard user={session.user ?? ownerFallbackIdentity()} config={config} defaultPassword={session.defaultPassword} onLogout={handleLogout} />;
 }
 
 function LoginView({
@@ -109,8 +117,14 @@ function LoginView({
   onLoggedIn: (session: UserSession) => Promise<void>;
 }) {
   const [password, setPassword] = useState("");
+  const [accounts, setAccounts] = useState<LoginAccount[]>([]);
+  const [accountId, setAccountId] = useState("owner");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getLoginAccounts().then((response) => setAccounts(response.accounts)).catch(() => setAccounts([]));
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -118,7 +132,7 @@ function LoginView({
     setError(null);
 
     try {
-      const session = await login(password);
+      const session = await login(password, accountId);
       await onLoggedIn(session);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "登录失败");
@@ -143,6 +157,26 @@ function LoginView({
         ) : null}
 
         <form className="loginForm" onSubmit={handleSubmit}>
+          {accounts.length > 0 ? (
+            <div className="loginAccounts" aria-label="选择登录账号">
+              <span className="loginFieldLabel">账号</span>
+              {accounts.map((account) => (
+                <button
+                  className={`loginAccountOption${account.id === accountId ? " selected" : ""}`}
+                  type="button"
+                  key={account.id}
+                  onClick={() => setAccountId(account.id)}
+                >
+                  <span className="accountAvatar">{account.displayName.slice(0, 2).toUpperCase()}</span>
+                  <span>
+                    <strong>{account.displayName}</strong>
+                    <small>{account.localEmail ?? (account.role === "owner" ? "Owner account" : "Child user")}</small>
+                  </span>
+                  {account.id === accountId ? <span aria-hidden="true">✓</span> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <label htmlFor="password">密码</label>
           <input
             id="password"
@@ -163,19 +197,36 @@ function LoginView({
   );
 }
 
+function ownerFallbackIdentity(): UserIdentity {
+  return {
+    id: "owner",
+    role: "owner",
+    displayName: "Owner",
+    localEmail: null,
+    active: true,
+    ownerUserId: null
+  };
+}
+
 function Dashboard({
+  user,
   config,
   defaultPassword,
   onLogout
 }: {
+  user: UserIdentity;
   config: PublicConfig | null;
   defaultPassword: boolean;
   onLogout: () => Promise<void>;
 }) {
   const [initialRoute] = useState(() => parseSessionRoute(window.location.pathname));
+  const safeInitialRoute = user.role === "child" && (initialRoute.kind === "settings" || initialRoute.kind === "members")
+    ? ({ kind: "list" } as const)
+    : initialRoute;
   const [currentConfig, setCurrentConfig] = useState(config);
   const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [loadingDiagnostics, setLoadingDiagnostics] = useState(initialRoute.kind === "settings");
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(safeInitialRoute.kind === "settings" && user.role === "owner");
+  const [reloadingRuntime, setReloadingRuntime] = useState(false);
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
   const [runtimeReloadNotice, setRuntimeReloadNotice] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -184,27 +235,23 @@ function Dashboard({
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
-    initialRoute.kind === "detail" ? initialRoute.sessionId : null
+    safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null
   );
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(initialRoute.kind === "detail");
+  const [loadingDetail, setLoadingDetail] = useState(safeInitialRoute.kind === "detail");
   const [detailError, setDetailError] = useState<string | null>(null);
   const [historyLoadedSessionId, setHistoryLoadedSessionId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [commands, setCommands] = useState<SessionCommand[]>([]);
-  const [commandDiagnostics, setCommandDiagnostics] = useState<SessionCommandDiagnostics | null>(null);
-  const [loadingCommands, setLoadingCommands] = useState(false);
-  const [commandsError, setCommandsError] = useState<string | null>(null);
-  const [commandsLoadedSessionId, setCommandsLoadedSessionId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<DashboardView>(initialRoute.kind === "list" ? "list" : initialRoute.kind);
-  const [routeError, setRouteError] = useState<string | null>(initialRoute.kind === "invalid" ? initialRoute.message : null);
+  const [viewMode, setViewMode] = useState<DashboardView>(safeInitialRoute.kind === "list" ? "list" : safeInitialRoute.kind);
+  const [routeError, setRouteError] = useState<string | null>(safeInitialRoute.kind === "invalid" ? safeInitialRoute.message : null);
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
   const [permissionMode, setPermissionMode] = useState<SessionPermissionMode>("default");
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalSummary[]>([]);
   const [liveCommands, setLiveCommands] = useState<LiveCommand[]>([]);
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
   const [liveErrors, setLiveErrors] = useState<LiveErrorNotice[]>([]);
+  const [liveTimeline, setLiveTimeline] = useState<LiveTimelineEntry[]>([]);
   const [wsStatus, setWsStatus] = useState<WebSocketStatus>("idle");
   const [wsReconnectKey, setWsReconnectKey] = useState(0);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -214,23 +261,24 @@ function Dashboard({
   const [modelActionError, setModelActionError] = useState<string | null>(null);
   const [updatingModel, setUpdatingModel] = useState(false);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
-  const [retryMessage, setRetryMessage] = useState<string | null>(null);
+  const [retryContext, setRetryContext] = useState<RetryContext | null>(null);
   const [retryDialogOpen, setRetryDialogOpen] = useState(false);
   const lastEventSeqRef = useRef(0);
-  const selectedSessionIdRef = useRef<string | null>(initialRoute.kind === "detail" ? initialRoute.sessionId : null);
+  const runtimeEventSeqRef = useRef(0);
+  const selectedSessionIdRef = useRef<string | null>(safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null);
   const historyLoadedSessionIdRef = useRef<string | null>(null);
   const historyLoadingSessionIdRef = useRef<string | null>(null);
+  const sessionDetailRef = useRef<SessionDetail | null>(null);
   const liveMessagesRef = useRef<LiveMessage[]>([]);
-  const retryMessageRef = useRef<string | null>(null);
+  const liveTimelineRef = useRef<LiveTimelineEntry[]>([]);
+  const retryContextRef = useRef<RetryContext | null>(null);
   const runtimeReloadGenerationRef = useRef<number | null>(null);
+  const resolvedApprovalIdsRef = useRef(new Set<string>());
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const drawerCloseRef = useRef<HTMLButtonElement | null>(null);
+  const drawerTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const compactViewport = useCompactViewport();
 
-  const listenAddress = useMemo(() => {
-    if (!currentConfig) return "读取中";
-    return `${currentConfig.host}:${currentConfig.port}`;
-  }, [currentConfig]);
-  const appServerStatus = currentConfig?.appServer
-    ? `${currentConfig.appServer.status}${currentConfig.appServer.initialized ? " / initialized" : ""}`
-    : "未连接";
   const selectedSession = sessions.find((session) => isSameSession(session, selectedSessionId))
     ?? (isSameSession(sessionDetail, selectedSessionId) ? sessionDetail : null);
   const currentModelState = runtime && runtime.status !== "history"
@@ -266,6 +314,20 @@ function Dashboard({
     }
   }
 
+  async function handleReloadRuntime() {
+    setReloadingRuntime(true);
+    setDiagnosticsError(null);
+
+    try {
+      await reloadRuntime();
+      await loadDiagnostics();
+    } catch (caught) {
+      setDiagnosticsError(caught instanceof Error ? caught.message : "Codex 运行时刷新失败");
+    } finally {
+      setReloadingRuntime(false);
+    }
+  }
+
   useEffect(() => {
     if (config) setCurrentConfig(config);
   }, [config]);
@@ -293,6 +355,7 @@ function Dashboard({
   }, [currentConfig?.runtimeReload?.generation]);
 
   useEffect(() => {
+    if (user.role !== "owner") return;
     let active = true;
     async function pollRuntimeConfig() {
       try {
@@ -311,10 +374,10 @@ function Dashboard({
 
   useEffect(() => {
     void loadSessions("");
-    if (initialRoute.kind === "detail") {
-      void refreshCurrentSession(initialRoute.sessionId);
+    if (safeInitialRoute.kind === "detail") {
+      void refreshCurrentSession(safeInitialRoute.sessionId);
     }
-    if (initialRoute.kind === "settings") {
+    if (safeInitialRoute.kind === "settings" && user.role === "owner") {
       void loadDiagnostics();
     }
   }, []);
@@ -337,22 +400,42 @@ function Dashboard({
   }, [liveMessages]);
 
   useEffect(() => {
-    retryMessageRef.current = retryMessage;
-  }, [retryMessage]);
+    sessionDetailRef.current = sessionDetail;
+  }, [sessionDetail]);
+
+  useEffect(() => {
+    retryContextRef.current = retryContext;
+  }, [retryContext]);
+
+  useEffect(() => {
+    if (runtime?.status !== "failed" || !sessionDetail || historyLoadedSessionId !== sessionDetail.id || retryContextRef.current) return;
+    const restored = findRetryContextFromFailedTurns(sessionDetail.turns);
+    if (!restored) return;
+    retryContextRef.current = restored;
+    setRetryContext(restored);
+  }, [historyLoadedSessionId, runtime?.status, sessionDetail]);
 
   useEffect(() => {
     if (!drawerOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => drawerCloseRef.current?.focus(), 0);
 
     function handleKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") setDrawerOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDrawerOpen(false);
+        return;
+      }
+      if (event.key === "Tab") keepFocusInside(event, drawerRef.current);
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
+      window.clearTimeout(focusTimer);
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      drawerTriggerRef.current?.focus();
     };
   }, [drawerOpen]);
 
@@ -402,27 +485,24 @@ function Dashboard({
     }
   }
 
-  async function loadSessionCommands(sessionId: string, options: { silent?: boolean } = {}) {
-    if (!options.silent) setLoadingCommands(true);
-    setCommandsError(null);
-    if (!options.silent) setCommandDiagnostics(null);
+  function registerLiveTimelineEntry(kind: LiveTimelineEntry["kind"], id: string) {
+    if (liveTimelineRef.current.some((entry) => entry.kind === kind && entry.id === id)) return;
+    const next = [...liveTimelineRef.current, { kind, id }];
+    liveTimelineRef.current = next;
+    setLiveTimeline(next);
+  }
 
-    try {
-      const response = await getSessionCommands(sessionId);
-      if (selectedSessionIdRef.current !== sessionId) return;
-      setCommands(response.commands);
-      setCommandDiagnostics(response.diagnostics);
-      setCommandsLoadedSessionId(sessionId);
-    } catch (caught) {
-      if (selectedSessionIdRef.current !== sessionId) return;
-      if (!options.silent) setCommands([]);
-      setCommandsError(caught instanceof Error ? caught.message : "历史命令加载失败");
-    } finally {
-      if (!options.silent && selectedSessionIdRef.current === sessionId) setLoadingCommands(false);
-    }
+  function replaceLiveTimelineEntry(kind: LiveTimelineEntry["kind"], previousId: string, nextId: string) {
+    const next = liveTimelineRef.current
+      .filter((entry) => !(entry.kind === kind && entry.id === previousId))
+      .concat(liveTimelineRef.current.some((entry) => entry.kind === kind && entry.id === nextId) ? [] : [{ kind, id: nextId }]);
+    liveTimelineRef.current = next;
+    setLiveTimeline(next);
   }
 
   function syncRuntimeSnapshot(nextRuntime: RuntimeSnapshot) {
+    if (nextRuntime.eventSeq < runtimeEventSeqRef.current) return false;
+    runtimeEventSeqRef.current = nextRuntime.eventSeq;
     setRuntime(nextRuntime);
     setSessionDetail((current) => current && isSameSession(current, nextRuntime.threadId)
       ? {
@@ -434,6 +514,7 @@ function Dashboard({
     if (nextRuntime.status !== "history") {
       setPermissionMode(nextRuntime.permissionMode);
     }
+    return true;
   }
 
   async function loadRuntime(sessionId: string, options: { silent?: boolean } = {}): Promise<RuntimeSnapshot | null> {
@@ -515,17 +596,19 @@ function Dashboard({
         ? { ...current, modelState: response.selection }
         : current);
       setModelPickerOpen(false);
-      if (retryMessageRef.current) setRetryDialogOpen(true);
+      if (retryContextRef.current) setRetryDialogOpen(true);
     } catch (caught) {
       if (selectedSessionIdRef.current !== sessionId) return;
       const message = caught instanceof Error ? caught.message : "模型切换失败";
       setModelActionError(message);
       setLiveErrors((current) => upsertById(current, {
         id: `model-action-${sessionId}`,
+        turnId: null,
         message,
         code: "MODEL_SWITCH_FAILED",
         willRetry: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        retryContext: null
       }));
       await loadRuntime(sessionId, { silent: true });
     } finally {
@@ -534,15 +617,16 @@ function Dashboard({
   }
 
   async function handleRetryLastMessage() {
-    if (!retryMessage) return;
-    await handleSendInput(retryMessage, { isRetry: true });
+    if (!retryContext) return;
+    await handleSendInput(retryContext.text, { isRetry: true });
     setRetryDialogOpen(false);
-    setRetryMessage(null);
-    retryMessageRef.current = null;
+    setRetryContext(null);
+    retryContextRef.current = null;
   }
 
   function applyRealtimeEvent(event: WebSessionEvent) {
     if (selectedSessionIdRef.current !== event.threadId) return;
+    if (event.seq <= lastEventSeqRef.current) return;
     lastEventSeqRef.current = Math.max(lastEventSeqRef.current, event.seq);
     const payload = event.payload as Record<string, unknown>;
 
@@ -601,7 +685,7 @@ function Dashboard({
         }
       } : current);
       void refreshCurrentSession(event.threadId, { silent: true });
-      if (retryMessageRef.current) setRetryDialogOpen(true);
+      if (retryContextRef.current) setRetryDialogOpen(true);
       return;
     }
 
@@ -615,12 +699,16 @@ function Dashboard({
         modelChangeError: message,
         modelSelection: { ...current.modelSelection, applied: false, confirmationPending: false, lastError: message }
       } : current);
+      const errorId = `model-change-${event.threadId}`;
+      registerLiveTimelineEntry("error", errorId);
       setLiveErrors((current) => upsertById(current, {
-        id: `model-change-${event.threadId}`,
+        id: errorId,
+        turnId: null,
         message,
         code,
         willRetry: false,
-        createdAt: event.createdAt
+        createdAt: event.createdAt,
+        retryContext: null
       }));
       return;
     }
@@ -628,36 +716,57 @@ function Dashboard({
     if (event.type === "error") {
       const message = readRealtimeErrorMessage(payload) ?? "Codex 执行失败";
       const willRetry = payload.willRetry === true;
-      const turnId = readPayloadString(payload.turnId) ?? "current";
+      const turnId = readPayloadString(payload.turnId);
       const retryingId = `retrying-${event.threadId}-${turnId}`;
+      const retryContext = willRetry
+        ? null
+        : findRetryContextForTurn(turnId, liveMessagesRef.current, sessionDetailRef.current?.turns ?? []);
+      if (willRetry) {
+        registerLiveTimelineEntry("error", retryingId);
+      } else {
+        replaceLiveTimelineEntry("error", retryingId, `terminal-${event.seq}`);
+      }
       setLiveErrors((current) => willRetry
-        ? upsertById(current, { id: retryingId, message, code: readPayloadString(payload.errorCode), willRetry, createdAt: event.createdAt })
+        ? upsertById(current, {
+            id: retryingId,
+            turnId,
+            message,
+            code: readPayloadString(payload.errorCode),
+            willRetry,
+            createdAt: event.createdAt,
+            retryContext: null
+          })
         : [
             ...current.filter((item) => item.id !== retryingId),
             {
               id: `terminal-${event.seq}`,
+              turnId,
               message,
               code: readPayloadString(payload.errorCode),
               willRetry: false,
-              createdAt: event.createdAt
+              createdAt: event.createdAt,
+              retryContext
             }
           ]);
       if (!willRetry) {
-        const failedMessage = [...liveMessagesRef.current].reverse().find((messageItem) => messageItem.role === "user")?.text ?? null;
-        retryMessageRef.current = failedMessage;
-        setRetryMessage(failedMessage);
+        if (retryContext) {
+          retryContextRef.current = retryContext;
+          setRetryContext(retryContext);
+        }
       }
       return;
     }
 
     if (event.type === "approval_requested" && isApprovalSummary(payload.approval)) {
       const approval = payload.approval;
+      if (resolvedApprovalIdsRef.current.has(approval.id)) return;
       setPendingApprovals((current) => upsertById(current, approval));
       return;
     }
 
     if (event.type === "approval_resolved" && isApprovalSummary(payload.approval)) {
       const approval = payload.approval;
+      resolvedApprovalIdsRef.current.add(approval.id);
       setPendingApprovals((current) => current.filter((item) => item.id !== approval.id));
       return;
     }
@@ -666,19 +775,25 @@ function Dashboard({
       const itemId = readPayloadString(payload.itemId) ?? `${event.seq}`;
       const turnId = readPayloadString(payload.turnId);
       const delta = readPayloadString(payload.delta) ?? "";
-      setLiveMessages((current) => appendLiveMessage(current, {
-        id: itemId,
-        role: "agent",
-        itemId,
-        turnId,
-        text: delta,
-        deliveryStatus: null
-      }));
+      registerLiveTimelineEntry("message", itemId);
+      setLiveMessages((current) => {
+        const next = appendLiveMessage(current, {
+          id: itemId,
+          role: "agent",
+          itemId,
+          turnId,
+          text: delta,
+          deliveryStatus: null
+        });
+        liveMessagesRef.current = next;
+        return next;
+      });
       return;
     }
 
     if (event.type === "command_started") {
       const itemId = readPayloadString(payload.itemId) ?? `${event.seq}`;
+      registerLiveTimelineEntry("command", itemId);
       const command: LiveCommand = {
         id: itemId,
         itemId,
@@ -698,12 +813,14 @@ function Dashboard({
       const itemId = readPayloadString(payload.itemId);
       const delta = readPayloadString(payload.delta) ?? "";
       if (!itemId) return;
+      registerLiveTimelineEntry("command", itemId);
       setLiveCommands((current) => appendCommandOutput(current, itemId, delta));
       return;
     }
 
     if (event.type === "command_completed") {
       const itemId = readPayloadString(payload.itemId) ?? `${event.seq}`;
+      registerLiveTimelineEntry("command", itemId);
       setLiveCommands((current) =>
         upsertById(current, {
           id: itemId,
@@ -729,11 +846,6 @@ function Dashboard({
     setHistoryLoadedSessionId(null);
     setLoadingHistory(false);
     setHistoryError(null);
-    setCommands([]);
-    setCommandDiagnostics(null);
-    setLoadingCommands(false);
-    setCommandsError(null);
-    setCommandsLoadedSessionId(null);
     setRuntime(null);
     setPermissionMode("default");
     setPendingApprovals([]);
@@ -741,13 +853,17 @@ function Dashboard({
     setLiveMessages([]);
     liveMessagesRef.current = [];
     setLiveErrors([]);
+    setLiveTimeline([]);
+    liveTimelineRef.current = [];
     setRuntimeError(null);
     setModelActionError(null);
     setModelPickerOpen(false);
-    setRetryMessage(null);
-    retryMessageRef.current = null;
+    setRetryContext(null);
+    retryContextRef.current = null;
     setRetryDialogOpen(false);
     lastEventSeqRef.current = 0;
+    runtimeEventSeqRef.current = 0;
+    resolvedApprovalIdsRef.current.clear();
   }
 
   function applySessionRoute(route: SessionRoute) {
@@ -758,10 +874,25 @@ function Dashboard({
     }
 
     if (route.kind === "settings") {
+      if (user.role !== "owner") {
+        setViewMode("list");
+        return;
+      }
       setDrawerOpen(false);
       setRouteError(null);
       setViewMode("settings");
       void loadDiagnostics();
+      return;
+    }
+
+    if (route.kind === "members") {
+      if (user.role !== "owner") {
+        setViewMode("list");
+        return;
+      }
+      setDrawerOpen(false);
+      setRouteError(null);
+      setViewMode("members");
       return;
     }
 
@@ -806,10 +937,18 @@ function Dashboard({
     socket.addEventListener("message", (message) => {
       const event = JSON.parse(String(message.data)) as WebSessionEvent;
       if (event.type === "snapshot") {
+        if (event.seq < lastEventSeqRef.current) return;
         const payload = event.payload as Record<string, unknown>;
         if (isRuntimeSnapshot(payload.runtime)) syncRuntimeSnapshot(payload.runtime);
-        if (Array.isArray(payload.approvals)) setPendingApprovals(payload.approvals.filter(isApprovalSummary));
-        if (Array.isArray(payload.events)) payload.events.forEach((item) => applyRealtimeEvent(item as WebSessionEvent));
+        if (Array.isArray(payload.approvals)) {
+          setPendingApprovals(payload.approvals.filter(isApprovalSummary).filter((approval) => !resolvedApprovalIdsRef.current.has(approval.id)));
+        }
+        if (Array.isArray(payload.events)) {
+          payload.events
+            .filter((item): item is WebSessionEvent => Boolean(item && typeof item === "object"))
+            .sort((left, right) => left.seq - right.seq)
+            .forEach((item) => applyRealtimeEvent(item));
+        }
         lastEventSeqRef.current = Math.max(lastEventSeqRef.current, event.seq);
         return;
       }
@@ -829,23 +968,12 @@ function Dashboard({
     };
   }, [selectedSessionId, wsReconnectKey]);
 
-  async function handleResume() {
-    if (!selectedSessionId) return;
-    setRuntimeError(null);
-    try {
-      const response = await resumeSession(selectedSessionId, permissionMode);
-      syncRuntimeSnapshot(response.runtime);
-    } catch (caught) {
-      setRuntimeError(caught instanceof Error ? caught.message : "恢复会话失败");
-    }
-  }
-
   async function handleSendInput(text: string, options: { isRetry?: boolean } = {}) {
     if (!selectedSessionId) return;
     if (!options.isRetry) {
       setRetryDialogOpen(false);
-      setRetryMessage(null);
-      retryMessageRef.current = null;
+      setRetryContext(null);
+      retryContextRef.current = null;
     }
     const sessionId = selectedSessionId;
     const messageId = createLocalMessageId();
@@ -857,29 +985,42 @@ function Dashboard({
       text,
       deliveryStatus: "sending"
     };
+    registerLiveTimelineEntry("message", messageId);
     setRuntimeError(null);
     liveMessagesRef.current = [...liveMessagesRef.current, localMessage];
     setLiveMessages((current) => [...current, localMessage]);
     try {
       const response = await sendSessionInput(sessionId, text, permissionMode);
       if (selectedSessionIdRef.current !== sessionId) return;
-      setLiveMessages((current) => updateLiveMessageDeliveryStatus(current, messageId, "sent"));
+      const acknowledgedMessages = bindLiveMessageToTurn(
+        updateLiveMessageDeliveryStatus(liveMessagesRef.current, messageId, "sent"),
+        messageId,
+        response.runtime.activeTurnId
+      );
+      liveMessagesRef.current = acknowledgedMessages;
+      setLiveMessages(acknowledgedMessages);
       syncRuntimeSnapshot(response.runtime);
       void pollCurrentSessionAfterInput(sessionId);
     } catch (caught) {
       if (selectedSessionIdRef.current !== sessionId) throw caught;
-      setLiveMessages((current) => updateLiveMessageDeliveryStatus(current, messageId, "failed"));
+      const failedMessages = updateLiveMessageDeliveryStatus(liveMessagesRef.current, messageId, "failed");
+      liveMessagesRef.current = failedMessages;
+      setLiveMessages(failedMessages);
       const message = caught instanceof Error ? caught.message : "任务发送失败";
       setRuntimeError(message);
+      registerLiveTimelineEntry("error", `input-${messageId}`);
       setLiveErrors((current) => upsertById(current, {
         id: `input-${messageId}`,
+        turnId: null,
         message,
         code: null,
         willRetry: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        retryContext: { messageId, turnId: null, text }
       }));
-      retryMessageRef.current = text;
-      setRetryMessage(text);
+      const retryContext = { messageId, turnId: null, text };
+      retryContextRef.current = retryContext;
+      setRetryContext(retryContext);
       throw caught;
     }
   }
@@ -908,10 +1049,19 @@ function Dashboard({
     setRuntimeError(null);
     try {
       const response = await submitApproval(approval.threadId, approval.id, decision, answers);
+      resolvedApprovalIdsRef.current.add(approval.id);
       setPendingApprovals((current) => current.filter((item) => item.id !== approval.id));
       if (response.runtime) syncRuntimeSnapshot(response.runtime);
     } catch (caught) {
-      setRuntimeError(caught instanceof Error ? caught.message : "审批处理失败");
+      const message = caught instanceof Error ? caught.message : "审批处理失败";
+      setRuntimeError(message);
+      if (selectedSessionIdRef.current === approval.threadId) {
+        void Promise.all([
+          loadRuntime(approval.threadId, { silent: true }),
+          loadSessionDetail(approval.threadId, { silent: true, includeTurns: historyLoadedSessionIdRef.current === approval.threadId })
+        ]);
+      }
+      throw caught;
     }
   }
 
@@ -919,10 +1069,7 @@ function Dashboard({
     await loadSessions(search);
     if (selectedSessionIdRef.current) {
       const sessionId = selectedSessionIdRef.current;
-      await Promise.all([
-        refreshCurrentSession(sessionId),
-        commandsLoadedSessionId === sessionId ? loadSessionCommands(sessionId) : Promise.resolve()
-      ]);
+      await refreshCurrentSession(sessionId);
     }
   }
 
@@ -940,8 +1087,15 @@ function Dashboard({
   }
 
   function handleOpenSettings() {
+    if (user.role !== "owner") return;
     if (window.location.pathname !== "/settings") window.history.pushState(null, "", "/settings");
     applySessionRoute({ kind: "settings" });
+  }
+
+  function handleOpenMembers() {
+    if (user.role !== "owner") return;
+    if (window.location.pathname !== "/settings/members") window.history.pushState(null, "", "/settings/members");
+    applySessionRoute({ kind: "members" });
   }
 
   function renderSessionBrowser(showHeading = true) {
@@ -955,7 +1109,6 @@ function Dashboard({
         showHeading={showHeading}
         onSearchChange={setSearch}
         onSearchSubmit={handleSearchSubmit}
-        onRefresh={() => loadSessions(search)}
         onSelect={handleSelectSession}
         onMetadataSaved={handleMetadataSaved}
       />
@@ -965,19 +1118,36 @@ function Dashboard({
   return (
     <Shell
       title="Codex Manage"
-      reserveFloatingStatus={viewMode === "detail" && Boolean(selectedSession)}
+      leadingAction={viewMode === "list" ? (
+        <button
+          className="iconButton mobileOnly"
+          type="button"
+          aria-label="打开会话列表"
+          title="会话列表"
+          onClick={(event) => {
+            drawerTriggerRef.current = event.currentTarget;
+            setDrawerOpen(true);
+          }}
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
+      ) : undefined}
+      reserveFloatingStatus={viewMode === "detail" && Boolean(selectedSession) && compactViewport}
+      desktopWorkspace={viewMode === "list" || (viewMode === "detail" && !compactViewport)}
       action={(
         <div className="topbarActions">
-          <button
-            className="iconButton"
-            type="button"
-            aria-label="打开设置和诊断"
-            title="设置和诊断"
-            onClick={handleOpenSettings}
-            disabled={viewMode === "settings"}
-          >
-            <span aria-hidden="true">⚙</span>
-          </button>
+          {user.role === "owner" ? (
+            <button
+              className="iconButton"
+              type="button"
+              aria-label="打开设置和诊断"
+              title="设置和诊断"
+              onClick={handleOpenSettings}
+              disabled={viewMode === "settings" || viewMode === "members"}
+            >
+              <span aria-hidden="true">⚙</span>
+            </button>
+          ) : null}
           <button className="ghostButton" onClick={onLogout}>登出</button>
         </div>
       )}
@@ -988,128 +1158,169 @@ function Dashboard({
         </div>
       ) : null}
 
-      {viewMode === "list" ? (
+      {viewMode === "list" && user.role === "child" ? (
+        <ChildAccessPage sessions={sessions} loading={loadingSessions} error={sessionError} onSelect={handleSelectSession} />
+      ) : viewMode === "list" ? (
         <>
-          <section className="toolbar">
-            <div>
-              <h2>会话管理</h2>
-              <p className="muted">查看 ~/.codex/sessions 中的历史会话，恢复会话并继续任务。</p>
-            </div>
-            <div className="toolbarActions">
-              <button
-                className="iconButton mobileOnly"
-                type="button"
-                aria-label="打开会话列表"
-                title="会话列表"
-                onClick={() => setDrawerOpen(true)}
-              >
-                <span aria-hidden="true">☰</span>
-              </button>
-              <button className="ghostButton" onClick={() => loadSessions(search)} disabled={loadingSessions}>
-                {loadingSessions ? "刷新中" : "刷新"}
-              </button>
-            </div>
-          </section>
+          <DesktopWorkspaceHome
+            sessions={sessions}
+            search={search}
+            loadingSessions={loadingSessions}
+            sessionError={sessionError}
+            selectedSessionId={selectedSessionId}
+            onSearchChange={setSearch}
+            onSearchSubmit={handleSearchSubmit}
+            onSelect={handleSelectSession}
+            onMetadataSaved={handleMetadataSaved}
+          />
 
-          <section className="infoGrid compact" aria-label="当前配置">
-            <InfoItem label="监听地址" value={listenAddress} />
-            <InfoItem label="Codex 版本" value={currentConfig?.codexCliVersion ?? currentConfig?.codexVersionError ?? "读取中"} />
-            <InfoItem label="App Server" value={appServerStatus} />
-          </section>
+          <div className="mobileDashboardHome">
+            <section className="mobileDashboardWelcome workspaceWelcome" aria-labelledby="mobile-workspace-welcome-title">
+              <p className="workspaceWelcomeEyebrow">CODEX MANAGE</p>
+              <h2 id="mobile-workspace-welcome-title">选择一个会话开始工作</h2>
+              <p className="workspaceWelcomeDescription">从侧边栏浏览、搜索并继续本机 Codex 会话。打开后，任务进度与输入框会保留在此工作区。</p>
 
-          <section className="sessionSection desktopSessionPanel" aria-label="会话列表">
-            {renderSessionBrowser()}
-          </section>
+              {loadingSessions ? <div className="workspaceWelcomeLoading" role="status">正在准备你的工作台…</div> : null}
+              {!loadingSessions && sessionError ? <div className="workspaceWelcomeHint">会话暂时无法加载，请点击刷新重试。</div> : null}
+              {!loadingSessions && !sessionError && sessions.length === 0 ? (
+                <div className="workspaceWelcomeHint">还没有可显示的会话。请先在 Codex CLI 中创建会话，再返回这里刷新。</div>
+              ) : null}
+              {!loadingSessions && !sessionError ? (
+                <RecentSessions
+                  sessions={sessions}
+                  onSelect={handleSelectSession}
+                  onOpenDrawer={(trigger) => {
+                    drawerTriggerRef.current = trigger;
+                    setDrawerOpen(true);
+                  }}
+                  onRefresh={() => loadSessions(search)}
+                  refreshing={loadingSessions}
+                />
+              ) : null}
+            </section>
+          </div>
         </>
       ) : viewMode === "detail" ? (
-        <>
-          <section className="toolbar detailToolbar">
-            <div className="detailTitleBar">
-              <button className="iconButton" aria-label="返回会话列表" title="返回会话列表" onClick={handleBackToList}>
-                <span aria-hidden="true">←</span>
-              </button>
-              <div>
-                <p className="detailEyebrow">当前会话</p>
-                <h2 title={selectedSession?.title ?? selectedSessionId ?? "会话加载失败"}>
-                  {selectedSession?.title ?? (loadingDetail ? "正在加载会话..." : "会话加载失败")}
-                </h2>
-              </div>
+        <ResizableWorkspaceLayout
+          sidebar={(
+            <>
+            <div className="workspaceSidebarHeading">
+              <strong>Codex</strong>
+              <span>最近会话</span>
             </div>
-            <div className="toolbarActions">
-              <button className="ghostButton" onClick={handleRefresh} disabled={loadingSessions || loadingDetail || loadingHistory || loadingCommands}>
-                {loadingSessions || loadingDetail || loadingHistory || loadingCommands ? "刷新中" : "刷新"}
-              </button>
-            </div>
-          </section>
-
-          {selectedSession ? (
-            <MobileRuntimeStatus
-              sessionTitle={selectedSession.title}
-              runtime={runtime}
-              wsStatus={wsStatus}
-              pendingApprovalCount={pendingApprovals.length}
-            />
-          ) : null}
-
-          <section className="sessionDetail" aria-labelledby="session-detail-title">
-            <h2 id="session-detail-title" className="srOnly">当前会话详情</h2>
-            {selectedSession ? (
-              <SessionDetailPanel
-                fallbackSession={selectedSession}
-                detail={sessionDetail}
-                loading={loadingDetail}
-                error={detailError}
-                historyLoaded={historyLoadedSessionId === selectedSession.id}
-                loadingHistory={loadingHistory}
-                historyError={historyError}
-                commands={commands}
-                commandDiagnostics={commandDiagnostics}
-                loadingCommands={loadingCommands}
-                commandsError={commandsError}
-                commandsLoaded={commandsLoadedSessionId === selectedSession.id}
-                runtime={runtime}
-                permissionMode={permissionMode}
-                runtimeError={runtimeError}
-                pendingApprovals={pendingApprovals}
-                liveCommands={liveCommands}
-                liveMessages={liveMessages}
-                liveErrors={liveErrors}
-                wsStatus={wsStatus}
-                modelState={currentModelState}
-                updatingModel={updatingModel}
-                onResume={handleResume}
-                onPermissionModeChange={handlePermissionModeChange}
-                onOpenModelPicker={handleOpenModelPicker}
-                onSendInput={handleSendInput}
-                onOpenRetry={() => setRetryDialogOpen(true)}
-                onLoadHistory={handleLoadHistory}
-                onLoadCommands={() => {
-                  if (!loadingCommands && commandsLoadedSessionId !== selectedSession.id) {
-                    void loadSessionCommands(selectedSession.id);
-                  }
-                }}
-                onSubmitApproval={handleSubmitApproval}
-              />
-            ) : loadingDetail ? (
-              <div className="emptyState">正在加载会话详情...</div>
-            ) : (
-              <div className="routeErrorState">
-                <div className="errorBanner">{detailError ?? "会话不存在或无法读取"}</div>
-                <button className="ghostButton" type="button" onClick={handleBackToList}>返回会话列表</button>
+            {renderSessionBrowser(false)}
+            </>
+          )}
+          main={(
+          <div className="workspaceConversation">
+            <section className="toolbar detailToolbar">
+              <div className="detailTitleBar">
+                <button
+                  className="iconButton mobileOnly"
+                  type="button"
+                  aria-label="打开会话列表"
+                  title="会话列表"
+                  onClick={(event) => {
+                    drawerTriggerRef.current = event.currentTarget;
+                    setDrawerOpen(true);
+                  }}
+                >
+                  <span aria-hidden="true">☰</span>
+                </button>
+                <button className="iconButton backToListButton" aria-label="返回会话列表" title="返回会话列表" onClick={handleBackToList}>
+                  <span aria-hidden="true">←</span>
+                </button>
+                <div className="detailTitleContent">
+                  <p className="detailEyebrow">
+                    <span className="desktopConversationLabel">当前会话</span>
+                    <span className="mobileConversationProject">{selectedSession ? workspaceDisplayName(selectedSession.workspace) : "Codex Manage"}</span>
+                  </p>
+                  <h2 title={selectedSession?.title ?? selectedSessionId ?? "会话加载失败"}>
+                    {selectedSession?.title ?? (loadingDetail ? "正在加载会话..." : "会话加载失败")}
+                  </h2>
+                </div>
               </div>
-            )}
-          </section>
-        </>
+              <div className="toolbarActions">
+                <button
+                  className={compactViewport ? "iconButton detailMoreButton" : "ghostButton"}
+                  type="button"
+                  aria-label={compactViewport ? "切换模型" : undefined}
+                  onClick={compactViewport ? handleOpenModelPicker : handleRefresh}
+                  disabled={compactViewport
+                    ? Boolean(modelSwitchDisabledReason(runtime?.status ?? "history")) || updatingModel
+                    : loadingSessions || loadingDetail || loadingHistory}
+                >
+                  {compactViewport ? <span aria-hidden="true">⋯</span> : loadingSessions || loadingDetail || loadingHistory ? "刷新中" : "刷新"}
+                </button>
+              </div>
+            </section>
+
+            <section className="sessionDetail" aria-labelledby="session-detail-title">
+              <h2 id="session-detail-title" className="srOnly">当前会话详情</h2>
+              {selectedSession ? (
+                <SessionDetailPanel
+                  fallbackSession={selectedSession}
+                  detail={sessionDetail}
+                  loading={loadingDetail}
+                  error={detailError}
+                  historyLoaded={historyLoadedSessionId === selectedSession.id}
+                  loadingHistory={loadingHistory}
+                  historyError={historyError}
+                  runtime={runtime}
+                  permissionMode={permissionMode}
+                  runtimeError={runtimeError}
+                  pendingApprovals={pendingApprovals}
+                  liveCommands={liveCommands}
+                  liveMessages={liveMessages}
+                  liveErrors={liveErrors}
+                  liveTimeline={liveTimeline}
+                  modelState={currentModelState}
+                  updatingModel={updatingModel}
+                  isChild={user.role === "child"}
+                  onPermissionModeChange={handlePermissionModeChange}
+                  onOpenModelPicker={(context) => {
+                    if (context !== undefined) {
+                      retryContextRef.current = context;
+                      setRetryContext(context);
+                    }
+                    handleOpenModelPicker();
+                  }}
+                  onSendInput={handleSendInput}
+                  onOpenRetry={(context) => {
+                    retryContextRef.current = context;
+                    setRetryContext(context);
+                    setRetryDialogOpen(true);
+                  }}
+                  onLoadHistory={handleLoadHistory}
+                  onSubmitApproval={handleSubmitApproval}
+                />
+              ) : loadingDetail ? (
+                <div className="emptyState">正在加载会话详情...</div>
+              ) : (
+                <div className="routeErrorState">
+                  <div className="errorBanner">{detailError ?? "会话不存在或无法读取"}</div>
+                  <button className="ghostButton" type="button" onClick={handleBackToList}>返回会话列表</button>
+                </div>
+              )}
+            </section>
+          </div>
+          )}
+        />
       ) : viewMode === "settings" ? (
-        <SettingsPage
+      <SettingsPage
           config={currentConfig}
           health={health}
           loading={loadingDiagnostics}
+          reloadingRuntime={reloadingRuntime}
           error={diagnosticsError}
           reloadNotice={runtimeReloadNotice}
           onBack={handleBackToList}
           onRefresh={loadDiagnostics}
+          onReloadRuntime={handleReloadRuntime}
+          onOpenMembers={handleOpenMembers}
         />
+      ) : viewMode === "members" ? (
+        <MembersPage user={user} onBack={handleOpenSettings} />
       ) : (
         <>
           <section className="toolbar detailToolbar">
@@ -1132,36 +1343,34 @@ function Dashboard({
         </>
       )}
 
-      {viewMode === "list" && drawerOpen ? (
+      {drawerOpen ? (
         <div className="drawerBackdrop" role="presentation" onClick={() => setDrawerOpen(false)}>
           <aside
             className="sessionDrawer"
+            ref={drawerRef}
             role="dialog"
             aria-modal="true"
             aria-label="会话列表"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="drawerHeader">
-              <div>
-                <h2>会话列表</h2>
-                <p className="muted">共 {sessions.length} 个会话</p>
-              </div>
-              <button className="iconButton" type="button" aria-label="关闭会话列表" title="关闭" onClick={() => setDrawerOpen(false)}>
-                <span aria-hidden="true">×</span>
-              </button>
-            </div>
-            {renderSessionBrowser(false)}
+            <MobileSessionDrawer
+              isOwner={user.role === "owner"}
+              sessions={sessions}
+              selectedSessionId={selectedSessionId}
+              search={search}
+              loading={loadingSessions}
+              error={sessionError}
+              closeButtonRef={drawerCloseRef}
+              onClose={() => setDrawerOpen(false)}
+              onOpenList={handleBackToList}
+              onOpenSettings={handleOpenSettings}
+              onSearchChange={setSearch}
+              onSearchSubmit={handleSearchSubmit}
+              onSelect={handleSelectSession}
+              onMetadataSaved={handleMetadataSaved}
+            />
           </aside>
         </div>
-      ) : null}
-
-      {viewMode === "detail" && selectedSession ? (
-        <FloatingRuntimeStatus
-          sessionTitle={selectedSession.title}
-          runtime={runtime}
-          wsStatus={wsStatus}
-          pendingApprovalCount={pendingApprovals.length}
-        />
       ) : null}
 
       {viewMode === "detail" && selectedSession ? (
@@ -1173,14 +1382,13 @@ function Dashboard({
           submitting={updatingModel}
           error={modelActionError ?? modelCatalogError}
           onClose={() => setModelPickerOpen(false)}
-          onRefresh={() => loadModelCatalog(true)}
           onApply={handleApplyModel}
         />
       ) : null}
 
-      {viewMode === "detail" && retryDialogOpen && retryMessage ? (
+      {viewMode === "detail" && retryDialogOpen && retryContext ? (
         <RetryLastMessageDialog
-          message={retryMessage}
+          message={retryContext.text}
           model={currentModelState.mode === "override" ? currentModelState.preferredModel : currentModelState.actualModel}
           onCancel={() => setRetryDialogOpen(false)}
           onConfirm={handleRetryLastMessage}
@@ -1193,27 +1401,63 @@ function Dashboard({
 
 const DEFAULT_VISIBLE_TURNS = 5;
 const DEFAULT_VISIBLE_GROUP_SESSIONS = 5;
-const MAX_VISIBLE_LIVE_MESSAGES = 20;
-const MAX_VISIBLE_LIVE_COMMANDS = 20;
 const MAX_LIVE_COMMAND_OUTPUT_CHARS = 12000;
 const FLOATING_RUNTIME_POSITION_KEY = "codex-manage-floating-runtime-position";
+
+function useCompactViewport() {
+  const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setCompact(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return compact;
+}
+
+function keepFocusInside(event: globalThis.KeyboardEvent, container: HTMLElement | null) {
+  if (!container) return;
+  const focusable = [...container.querySelectorAll<HTMLElement>(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )].filter((element) => !element.hasAttribute("hidden"));
+  if (focusable.length === 0) return;
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
 
 function SettingsPage({
   config,
   health,
   loading,
+  reloadingRuntime,
   error,
   reloadNotice,
   onBack,
-  onRefresh
+  onRefresh,
+  onReloadRuntime,
+  onOpenMembers
 }: {
   config: PublicConfig | null;
   health: HealthStatus | null;
   loading: boolean;
+  reloadingRuntime: boolean;
   error: string | null;
   reloadNotice: string | null;
   onBack: () => void;
   onRefresh: () => Promise<void>;
+  onReloadRuntime: () => Promise<void>;
+  onOpenMembers: () => void;
 }) {
   const appServer = health?.appServer ?? config?.appServer ?? null;
   const cliAvailable = health?.codexCli.available ?? Boolean(config?.codexCliVersion);
@@ -1221,7 +1465,7 @@ function SettingsPage({
   const statusText = loading && !health ? "检查中" : health?.ok ? "运行正常" : health ? "需要检查" : "状态未知";
 
   return (
-    <>
+    <div className="settingsPage">
       <section className="toolbar detailToolbar">
         <div className="detailTitleBar">
           <button className="iconButton" aria-label="返回会话列表" title="返回会话列表" onClick={onBack}>
@@ -1233,8 +1477,11 @@ function SettingsPage({
           </div>
         </div>
         <div className="toolbarActions">
-          <button className="ghostButton" type="button" onClick={() => void onRefresh()} disabled={loading}>
+          <button className="ghostButton" type="button" onClick={() => void onRefresh()} disabled={loading || reloadingRuntime}>
             {loading ? "检查中" : "重新检查"}
+          </button>
+          <button className="primaryButton" type="button" onClick={() => void onReloadRuntime()} disabled={loading || reloadingRuntime}>
+            {reloadingRuntime ? "刷新中" : "刷新 Codex 运行时"}
           </button>
         </div>
       </section>
@@ -1280,7 +1527,294 @@ function SettingsPage({
           <SettingsRow label="进程 ID" value={appServer?.pid ? String(appServer.pid) : "无"} monospace />
         </div>
       </section>
-    </>
+
+      <section className="settingsSection" aria-labelledby="access-settings-title">
+        <div className="settingsSectionHeader">
+          <h3 id="access-settings-title">Access &amp; collaboration</h3>
+          <span>主用户管理</span>
+        </div>
+        <div className="settingsRows">
+          <div className="settingsRow settingsActionRow">
+            <div>
+              <span>Members &amp; access</span>
+              <small>创建子用户，并为既有会话授予或撤销访问权限。</small>
+            </div>
+            <button className="ghostButton" type="button" onClick={onOpenMembers}>Open</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ChildAccessPage({
+  sessions,
+  loading,
+  error,
+  onSelect
+}: {
+  sessions: SessionSummary[];
+  loading: boolean;
+  error: string | null;
+  onSelect: (session: SessionSummary) => void;
+}) {
+  return (
+    <main className="childAccessPage" aria-labelledby="child-access-title">
+      <section className="childAccessHero">
+        <div className="childAccessIcon" aria-hidden="true">✓</div>
+        <div>
+          <p className="eyebrow">受限工作区</p>
+          <h1 id="child-access-title">Authorized sessions</h1>
+          <p>你只能访问主用户授权的会话。会话操作始终使用默认受控模式，并固定在原始 workspace。</p>
+        </div>
+      </section>
+
+      {error ? <div className="errorBanner">{error}</div> : null}
+      <section className="childAccessSection" aria-labelledby="authorized-sessions-title">
+        <div className="childAccessSectionHeader">
+          <div>
+            <h2 id="authorized-sessions-title">Authorized sessions</h2>
+            <span>{loading ? "载入中" : `${sessions.length} 个会话`}</span>
+          </div>
+          <span className="permissionBadge controlled">默认受控</span>
+        </div>
+        {loading ? <div className="emptyState">正在加载已授权会话...</div> : null}
+        {!loading && sessions.length === 0 ? (
+          <div className="childAccessEmpty">
+            <strong>暂时没有已授权会话</strong>
+            <span>请联系主用户为你授权一个既有会话。</span>
+          </div>
+        ) : null}
+        {!loading && sessions.length > 0 ? (
+          <div className="childSessionList">
+            {sortSessionsByUpdatedAt(sessions).map((session) => (
+              <button className="childSessionCard" type="button" key={session.id} onClick={() => onSelect(session)}>
+                <span className={`workspaceRecentStatus ${session.status}`} aria-hidden="true" />
+                <span className="childSessionCopy">
+                  <strong>{session.title}</strong>
+                  <small>{workspaceDisplayName(session.workspace)} · {formatDateTime(session.updatedAt)}</small>
+                </span>
+                <span className="childSessionArrow" aria-hidden="true">›</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="childAccessNotice" aria-label="不可用功能">
+        <h2>Unavailable actions</h2>
+        <div>
+          <span>创建新会话</span><strong>由 Codex CLI 创建</strong>
+          <span>切换 workspace</span><strong>固定为授权会话 workspace</strong>
+          <span>Settings &amp; diagnostics</span><strong>仅主用户可用</strong>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void }) {
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedGrantIds, setSelectedGrantIds] = useState<string[]>([]);
+  const [savingGrants, setSavingGrants] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createdCredential, setCreatedCredential] = useState<{ displayName: string; password: string } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const selected = collaborators.find((item) => item.id === selectedId) ?? null;
+
+  async function loadMembers() {
+    setLoading(true);
+    setError(null);
+    try {
+      const [memberResponse, sessionResponse] = await Promise.all([getCollaborators(), getSessions()]);
+      setCollaborators(memberResponse.collaborators);
+      setSessions(sessionResponse.sessions);
+      setSelectedId((current) => current && memberResponse.collaborators.some((item) => item.id === current)
+        ? current
+        : memberResponse.collaborators[0]?.id ?? null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "成员信息加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadMembers();
+  }, []);
+
+  useEffect(() => {
+    setSelectedGrantIds(selected?.grants ?? []);
+  }, [selectedId, selected?.grants]);
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const displayName = String(form.get("displayName") ?? "").trim();
+    const localEmail = String(form.get("localEmail") ?? "").trim();
+    const password = String(form.get("password") ?? "").trim();
+    setCreating(true);
+    setFormError(null);
+    try {
+      const response = await createCollaborator({ displayName, localEmail, password: password || undefined });
+      setCollaborators((current) => [...current, response.collaborator]);
+      setSelectedId(response.collaborator.id);
+      setSelectedGrantIds([]);
+      setCreatedCredential({ displayName: response.collaborator.displayName, password: response.initialPassword });
+      setCreateOpen(false);
+      event.currentTarget.reset();
+    } catch (caught) {
+      setFormError(caught instanceof Error ? caught.message : "子用户创建失败");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleStatusChange(member: Collaborator) {
+    setUpdatingStatus(member.id);
+    setError(null);
+    try {
+      const response = await updateCollaboratorStatus(member.id, !member.active);
+      setCollaborators((current) => current.map((item) => item.id === member.id ? response.collaborator : item));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "成员状态更新失败");
+    } finally {
+      setUpdatingStatus(null);
+    }
+  }
+
+  async function handleSaveGrants() {
+    if (!selected) return;
+    setSavingGrants(true);
+    setError(null);
+    try {
+      const response = await updateCollaboratorGrants(selected.id, selectedGrantIds);
+      setCollaborators((current) => current.map((item) => item.id === selected.id ? response.collaborator : item));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "会话授权更新失败");
+    } finally {
+      setSavingGrants(false);
+    }
+  }
+
+  function toggleGrant(sessionId: string) {
+    setSelectedGrantIds((current) => current.includes(sessionId)
+      ? current.filter((id) => id !== sessionId)
+      : [...current, sessionId]);
+  }
+
+  return (
+    <div className="membersPage">
+      <section className="toolbar detailToolbar">
+        <div className="detailTitleBar">
+          <button className="iconButton" type="button" aria-label="返回设置" title="返回设置" onClick={onBack}>
+            <span aria-hidden="true">←</span>
+          </button>
+          <div>
+            <p className="detailEyebrow">Access &amp; collaboration</p>
+            <h2>Members &amp; access</h2>
+          </div>
+        </div>
+        <button className="primaryButton" type="button" onClick={() => { setFormError(null); setCreateOpen(true); }}>
+          Add child user
+        </button>
+      </section>
+
+      {error ? <div className="errorBanner">{error}</div> : null}
+      {createdCredential ? (
+        <section className="credentialNotice" role="status">
+          <div>
+            <strong>{createdCredential.displayName} 已创建</strong>
+            <span>请安全地把 initial password 交给该用户；关闭此提示后不会再次显示。</span>
+          </div>
+          <code>{createdCredential.password}</code>
+          <button className="ghostButton" type="button" onClick={() => void copyTextToClipboard(createdCredential.password)}>Copy</button>
+          <button className="iconButton" type="button" aria-label="关闭初始密码提示" onClick={() => setCreatedCredential(null)}>×</button>
+        </section>
+      ) : null}
+
+      <div className="membersLayout">
+        <section className="membersListPanel" aria-labelledby="members-list-title">
+          <div className="membersPanelHeader">
+            <div><h3 id="members-list-title">Members</h3><span>{loading ? "载入中" : `${collaborators.length + 1} 个账号`}</span></div>
+          </div>
+          <button className="memberRow ownerMemberRow" type="button">
+            <span className="memberAvatar">{user.displayName.slice(0, 2).toUpperCase()}</span>
+            <span className="memberRowCopy"><strong>{user.displayName}</strong><small>{user.localEmail ?? "未设置邮箱"} · Owner</small></span>
+            <span className="memberStatus active">Owner</span>
+          </button>
+          {collaborators.map((member) => (
+            <button
+              className={`memberRow${member.id === selectedId ? " selected" : ""}`}
+              type="button"
+              key={member.id}
+              onClick={() => setSelectedId(member.id)}
+            >
+              <span className="memberAvatar">{member.displayName.slice(0, 2).toUpperCase()}</span>
+              <span className="memberRowCopy"><strong>{member.displayName}</strong><small>{member.localEmail} · Child user</small></span>
+              <span className={`memberStatus ${member.active ? "active" : "inactive"}`}>{member.active ? "Active" : "Disabled"}</span>
+            </button>
+          ))}
+          {!loading && collaborators.length === 0 ? <div className="emptyState">还没有子用户。</div> : null}
+        </section>
+
+        <section className="memberDetailPanel" aria-labelledby="member-detail-title">
+          {selected ? (
+            <>
+              <div className="memberDetailHeader">
+                <div>
+                  <p className="detailEyebrow">Child user</p>
+                  <h3 id="member-detail-title">{selected.displayName}</h3>
+                  <span>{selected.localEmail}</span>
+                </div>
+                <button className="ghostButton" type="button" onClick={() => void handleStatusChange(selected)} disabled={updatingStatus === selected.id}>
+                  {updatingStatus === selected.id ? "Updating" : selected.active ? "Disable" : "Enable"}
+                </button>
+              </div>
+              <div className="memberPolicyNotice"><strong>受控访问</strong><span>该用户不能访问 Settings、切换 workspace 或使用 full access。</span></div>
+              <div className="grantHeader"><div><h4>Session access</h4><span>选择该用户可以打开的既有会话。</span></div><strong>{selectedGrantIds.length} selected</strong></div>
+              <div className="grantList">
+                {sessions.map((session) => (
+                  <label className="grantRow" key={session.id}>
+                    <input type="checkbox" checked={selectedGrantIds.includes(session.id)} onChange={() => toggleGrant(session.id)} />
+                    <span><strong>{session.title}</strong><small>{workspaceDisplayName(session.workspace)} · {formatDateTime(session.updatedAt)}</small></span>
+                  </label>
+                ))}
+                {sessions.length === 0 ? <div className="emptyState">当前没有可授权的既有 session。</div> : null}
+              </div>
+              <div className="memberDetailActions">
+                <span>授权变更会立即影响下一次访问。</span>
+                <button className="primaryButton" type="button" onClick={() => void handleSaveGrants()} disabled={savingGrants}>{savingGrants ? "Saving" : "Save access"}</button>
+              </div>
+            </>
+          ) : (
+            <div className="memberEmptyDetail"><strong>选择一个 child user</strong><span>管理其状态和 session access。</span></div>
+          )}
+        </section>
+      </div>
+
+      {createOpen ? (
+        <div className="modalBackdrop" role="presentation" onClick={creating ? undefined : () => setCreateOpen(false)}>
+          <section className="messageDialog collaboratorDialog" role="dialog" aria-modal="true" aria-labelledby="create-child-title" onClick={(event) => event.stopPropagation()}>
+            <div className="dialogHeader"><div><h2 id="create-child-title">Add child user</h2><p className="muted">创建后可为该用户授权既有 session。</p></div><button className="iconButton" type="button" aria-label="关闭" onClick={() => setCreateOpen(false)}>×</button></div>
+            <form className="dialogBody collaboratorForm" onSubmit={(event) => void handleCreate(event)}>
+              <label>Display name<input name="displayName" required maxLength={80} placeholder="例如 Alex" /></label>
+              <label>Local email<input name="localEmail" required type="email" maxLength={160} placeholder="alex@local" /></label>
+              <label>Password <span className="muted">（留空自动生成）</span><input name="password" minLength={8} maxLength={200} type="password" autoComplete="new-password" placeholder="至少 8 位" /></label>
+              {formError ? <div className="errorBanner">{formError}</div> : null}
+              <div className="dialogActions"><button className="ghostButton" type="button" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</button><button className="primaryButton" type="submit" disabled={creating}>{creating ? "Creating" : "Create user"}</button></div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1288,7 +1822,7 @@ function SettingsRow({ label, value, monospace = false }: { label: string; value
   return (
     <div className="settingsRow">
       <span>{label}</span>
-      <strong className={monospace ? "monospaceValue" : undefined}>{value}</strong>
+      <strong className={monospace ? "monospaceValue" : undefined} title={value}>{value}</strong>
     </div>
   );
 }
@@ -1298,65 +1832,22 @@ type FloatingPosition = {
   y: number;
 };
 
-function MobileRuntimeStatus({
-  sessionTitle,
-  runtime,
-  wsStatus,
-  pendingApprovalCount
-}: {
-  sessionTitle: string;
-  runtime: RuntimeSnapshot | null;
-  wsStatus: WebSocketStatus;
-  pendingApprovalCount: number;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const status = runtime?.status ?? "history";
-
-  return (
-    <section className={`mobileRuntimeStatus ${status}${expanded ? " expanded" : ""}`} aria-label="移动运行状态">
-      <button
-        className="mobileRuntimeSummary"
-        type="button"
-        aria-expanded={expanded}
-        aria-label={expanded ? "收起运行状态" : "展开运行状态"}
-        onClick={() => setExpanded((current) => !current)}
-      >
-        <span className="mobileRuntimePrimary">
-          <strong>{statusLabel(status)}</strong>
-          <small>{wsStatusLabel(wsStatus)}</small>
-        </span>
-        <span className="mobileRuntimeIndicators">
-          {runtime?.permissionMode === "full_access" ? <small className="fullAccessBadge">完全权限</small> : null}
-          {pendingApprovalCount > 0 ? <small className="approvalCount">待审批 {pendingApprovalCount}</small> : null}
-          <span aria-hidden="true">{expanded ? "⌃" : "⌄"}</span>
-        </span>
-      </button>
-      {expanded ? (
-        <div className="mobileRuntimeDetails">
-          <strong title={sessionTitle}>{sessionTitle}</strong>
-          <div>
-            <span>权限：{runtime?.permissionMode === "full_access" ? "完全权限" : "需审批"}</span>
-            <span>事件：{runtime?.eventSeq ?? 0}</span>
-          </div>
-          {runtime?.lastError ? <p className="errorText">{runtime.lastError}</p> : null}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
 function FloatingRuntimeStatus({
   sessionTitle,
   runtime,
+  modelState,
   wsStatus,
   pendingApprovalCount
 }: {
   sessionTitle: string;
   runtime: RuntimeSnapshot | null;
+  modelState: SessionModelState;
   wsStatus: WebSocketStatus;
   pendingApprovalCount: number;
 }) {
   const status = runtime?.status ?? "history";
+  const model = runtime?.model ?? modelState.actualModel ?? modelState.preferredModel;
+  const reasoningEffort = runtime?.reasoningEffort ?? modelState.actualReasoningEffort ?? modelState.preferredReasoningEffort;
   const [position, setPosition] = useState<FloatingPosition>(() => readFloatingRuntimePosition());
   const positionRef = useRef(position);
   const dragOffsetRef = useRef<FloatingPosition | null>(null);
@@ -1417,6 +1908,10 @@ function FloatingRuntimeStatus({
       </div>
       <div className="floatingRuntimeBody">
         <span title={sessionTitle}>{sessionTitle}</span>
+        <div className="floatingRuntimeModel" title={[model, reasoningEffort].filter(Boolean).join(" · ") || "模型未识别"}>
+          <strong>{model ?? "模型未识别"}</strong>
+          {reasoningEffort ? <small>{reasoningEffort}</small> : null}
+        </div>
         <div className="floatingRuntimeBadges">
           <span>{wsStatusLabel(wsStatus)}</span>
           {runtime?.permissionMode === "full_access" ? <span className="fullAccessBadge">完全权限</span> : null}
@@ -1469,11 +1964,6 @@ function SessionDetailPanel({
   historyLoaded,
   loadingHistory,
   historyError,
-  commands,
-  commandDiagnostics,
-  loadingCommands,
-  commandsError,
-  commandsLoaded,
   runtime,
   permissionMode,
   runtimeError,
@@ -1481,16 +1971,15 @@ function SessionDetailPanel({
   liveCommands,
   liveMessages,
   liveErrors,
-  wsStatus,
+  liveTimeline,
   modelState,
   updatingModel,
-  onResume,
+  isChild,
   onPermissionModeChange,
   onOpenModelPicker,
   onSendInput,
   onOpenRetry,
   onLoadHistory,
-  onLoadCommands,
   onSubmitApproval
 }: {
   fallbackSession: SessionSummary;
@@ -1500,11 +1989,6 @@ function SessionDetailPanel({
   historyLoaded: boolean;
   loadingHistory: boolean;
   historyError: string | null;
-  commands: SessionCommand[];
-  commandDiagnostics: SessionCommandDiagnostics | null;
-  loadingCommands: boolean;
-  commandsError: string | null;
-  commandsLoaded: boolean;
   runtime: RuntimeSnapshot | null;
   permissionMode: SessionPermissionMode;
   runtimeError: string | null;
@@ -1512,130 +1996,402 @@ function SessionDetailPanel({
   liveCommands: LiveCommand[];
   liveMessages: LiveMessage[];
   liveErrors: LiveErrorNotice[];
-  wsStatus: WebSocketStatus;
+  liveTimeline: LiveTimelineEntry[];
   modelState: SessionModelState;
   updatingModel: boolean;
-  onResume: () => Promise<void>;
+  isChild: boolean;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
-  onOpenModelPicker: () => void;
+  onOpenModelPicker: (retryContext?: RetryContext | null) => void;
   onSendInput: (text: string) => Promise<void>;
-  onOpenRetry: () => void;
+  onOpenRetry: (context: RetryContext) => void;
   onLoadHistory: () => Promise<void>;
-  onLoadCommands: () => void;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
   const session = detail ?? fallbackSession;
   const [expandedMessage, setExpandedMessage] = useState<{ title: string; text: string; meta?: string } | null>(null);
+  const [copiedSessionId, setCopiedSessionId] = useState(false);
   const [visibleTurnCount, setVisibleTurnCount] = useState(DEFAULT_VISIBLE_TURNS);
-  const [showHistoryDuringLive, setShowHistoryDuringLive] = useState(false);
-  const hasLiveOutput = liveMessages.length > 0 || liveErrors.length > 0 || liveCommands.some((command) => !isLiveCommandCompleted(command));
-  const showHistory = !hasLiveOutput || showHistoryDuringLive;
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const timelineAtLatestRef = useRef(true);
+  const initialScrollSessionRef = useRef<string | null>(null);
+  const pendingHistoryLoadRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
+  const [timelineScrollState, setTimelineScrollState] = useState({ canScrollUp: false, canScrollDown: false });
+  const hasVisibleHistory = Boolean(detail?.turns.some((turn) => turn.items.some((item) => item.type !== "unknown")));
+  const pendingApprovalCount = Math.max(
+    runtime?.pendingApprovalCount ?? 0,
+    pendingApprovals.length,
+    runtime?.status === "waiting_approval" ? 1 : 0
+  );
 
   useEffect(() => {
     setVisibleTurnCount(DEFAULT_VISIBLE_TURNS);
-    setShowHistoryDuringLive(false);
+    pendingHistoryLoadRef.current = null;
   }, [session.id]);
 
+  useLayoutEffect(() => {
+    const timelineScroll = timelineScrollRef.current;
+    const previous = pendingHistoryLoadRef.current;
+    if (!timelineScroll || !previous) return;
+
+    timelineScroll.scrollTop = previous.scrollTop + (timelineScroll.scrollHeight - previous.scrollHeight);
+    pendingHistoryLoadRef.current = null;
+    updateTimelineScrollState();
+  }, [visibleTurnCount]);
+
+  useLayoutEffect(() => {
+    const timelineScroll = timelineScrollRef.current;
+    if (!timelineScroll || !historyLoaded || initialScrollSessionRef.current === session.id) return;
+
+    timelineScroll.scrollTop = timelineScroll.scrollHeight;
+    timelineAtLatestRef.current = true;
+    initialScrollSessionRef.current = session.id;
+    updateTimelineScrollState();
+  }, [detail, historyLoaded, session.id]);
+
+  async function copySessionId() {
+    if (!await copyTextToClipboard(session.id)) return;
+    setCopiedSessionId(true);
+    window.setTimeout(() => setCopiedSessionId(false), 1500);
+  }
+
+  useEffect(() => {
+    const timelineScroll = timelineScrollRef.current;
+    if (!timelineScroll || !timelineAtLatestRef.current) return;
+    timelineScroll.scrollTop = timelineScroll.scrollHeight;
+    updateTimelineScrollState();
+  }, [liveTimeline, liveMessages, liveCommands, liveErrors]);
+
+  function updateTimelineScrollState() {
+    const timelineScroll = timelineScrollRef.current;
+    if (!timelineScroll) return;
+    const maxScrollTop = Math.max(0, timelineScroll.scrollHeight - timelineScroll.clientHeight);
+    setTimelineScrollState({
+      canScrollUp: timelineScroll.scrollTop > 24,
+      canScrollDown: timelineScroll.scrollTop < maxScrollTop - 24
+    });
+  }
+
+  function handleTimelineScroll() {
+    const timelineScroll = timelineScrollRef.current;
+    if (!timelineScroll) return;
+    timelineAtLatestRef.current = timelineScroll.scrollTop + timelineScroll.clientHeight >= timelineScroll.scrollHeight - 32;
+    updateTimelineScrollState();
+  }
+
+  function scrollTimelineTo(position: "top" | "bottom") {
+    const timelineScroll = timelineScrollRef.current;
+    if (!timelineScroll) return;
+    timelineAtLatestRef.current = position === "bottom";
+    timelineScroll.scrollTo({
+      top: position === "top" ? 0 : timelineScroll.scrollHeight,
+      behavior: "smooth"
+    });
+  }
+
   async function handleSendInput(text: string) {
-    setShowHistoryDuringLive(false);
     await onSendInput(text);
   }
 
   return (
     <div className="detailStack">
       <div className="detailScrollContent">
-        {runtime?.permissionMode === "full_access" ? (
-          pendingApprovals.length > 0 ? <div className="errorBanner">完全权限模式收到未预期的审批请求，系统未自动处理。</div> : null
-        ) : (
-          <ApprovalPanel approvals={pendingApprovals} onSubmitApproval={onSubmitApproval} />
-        )}
-        {!showHistoryDuringLive ? (
-          <LiveOutputPanel
-            liveMessages={liveMessages}
-            liveCommands={liveCommands}
-            liveErrors={liveErrors}
-            runtimeStatus={runtime?.status ?? "history"}
-            canRetry={Boolean(liveErrors.some((notice) => !notice.willRetry) && liveMessages.some((message) => message.role === "user"))}
-            onChooseModel={onOpenModelPicker}
-            onRetry={onOpenRetry}
-            onShowHistory={() => setShowHistoryDuringLive(true)}
-          />
-        ) : null}
+        <MobileTaskContext
+          session={session}
+          detail={detail}
+          runtime={runtime}
+          liveCommands={liveCommands}
+        />
 
-        <div className="sessionHero">
-          <div>
-            <p className="eyebrow">{session.remarkTitle ? "会话备注" : "会话名称"}</p>
-            <h3>{session.title}</h3>
-            {session.remarkTitle ? <p className="muted">默认标题：{session.defaultTitle}</p> : null}
+        <div className="sessionHero sessionMetaStrip">
+          <div className="sessionHeroContext">
+            <span className="sessionMetaLabel">当前项目</span>
+            <strong title={session.workspace}>{workspaceDisplayName(session.workspace)}</strong>
           </div>
-          <div className="sessionHeroMeta">
-            <span>{formatDateTime(session.updatedAt)}</span>
-            <span title={session.id}>{shortId(session.id)}</span>
+          <div className="sessionHeroMeta" aria-label="会话元信息">
+            <span className="sessionMetaValue">
+              <span>更新时间</span>
+              <time dateTime={session.updatedAt}>{formatDateTime(session.updatedAt)}</time>
+            </span>
+            <span className="sessionMetaValue sessionIdValue">
+              <span>会话 ID</span>
+              <code title={session.id}>{shortId(session.id)}</code>
+              <button
+                className="copySessionIdButton"
+                type="button"
+                title={copiedSessionId ? "已复制完整会话 ID" : "复制完整会话 ID"}
+                aria-label={copiedSessionId ? "已复制完整会话 ID" : "复制完整会话 ID"}
+                onClick={() => void copySessionId()}
+              >
+                <span aria-hidden="true">{copiedSessionId ? "✓" : "⧉"}</span>
+              </button>
+            </span>
           </div>
         </div>
 
-        <RuntimePanel
-          runtime={runtime}
-          permissionMode={permissionMode}
-          wsStatus={wsStatus}
-          error={runtimeError}
-          modelState={modelState}
-          updatingModel={updatingModel}
-          onResume={onResume}
-          onPermissionModeChange={onPermissionModeChange}
-          onOpenModelPicker={onOpenModelPicker}
-        />
-
-        {hasLiveOutput && !showHistory ? <div className="historyHiddenNotice">实时输出进行中，历史会话内容已隐藏。</div> : null}
-        {showHistory ? (
-          <div className="historyContent">
-            {hasLiveOutput ? (
-              <div className="historyHeader">
-                <div>
-                  <h3>历史会话内容</h3>
-                  <p className="muted">实时输出已隐藏。</p>
-                </div>
-                <button className="ghostButton" type="button" onClick={() => setShowHistoryDuringLive(false)}>
-                  返回实时输出
+        <div className="historyViewport">
+          <div className="historyContent" ref={timelineScrollRef} onScroll={handleTimelineScroll}>
+          {loading ? <div className="emptyState">正在加载详情...</div> : null}
+          {error ? <div className="errorBanner">{error}</div> : null}
+          {historyError ? <div className="errorBanner">{historyError}</div> : null}
+          {detail && !historyLoaded ? (
+            <div className="emptyState">
+              <p>{loadingHistory ? "正在加载最新历史消息..." : "历史消息暂未加载。"}</p>
+              {!loadingHistory ? (
+                <button className="ghostButton" type="button" onClick={() => void onLoadHistory()}>
+                  重新加载历史消息
                 </button>
-              </div>
-            ) : null}
-            {loading ? <div className="emptyState">正在加载详情...</div> : null}
-            {error ? <div className="errorBanner">{error}</div> : null}
-            {historyError ? <div className="errorBanner">{historyError}</div> : null}
-            {detail && !historyLoaded ? (
-              <div className="emptyState">
-                <p>{loadingHistory ? "正在加载最新历史消息..." : "历史消息暂未加载。"}</p>
-                {!loadingHistory ? (
-                  <button className="ghostButton" type="button" onClick={() => void onLoadHistory()}>
-                    重新加载历史消息
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-            {historyLoaded && detail && detail.turns.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
-            {historyLoaded && detail && detail.turns.length > 0 ? (
-              <SessionTimeline
-                detail={detail}
-                visibleTurnCount={visibleTurnCount}
-                onLoadMore={() => setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS)}
-                onOpenMessage={setExpandedMessage}
-              />
-            ) : null}
-            <SessionCommandsPanel
-              commands={commands}
-              diagnostics={commandDiagnostics}
-              loading={loadingCommands}
-              error={commandsError}
-              loaded={commandsLoaded}
-              onOpen={onLoadCommands}
+              ) : null}
+            </div>
+          ) : null}
+          {historyLoaded && detail && !hasVisibleHistory && liveTimeline.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
+          {historyLoaded && detail && hasVisibleHistory ? (
+            <SessionTimeline
+              detail={detail}
+              visibleTurnCount={visibleTurnCount}
+              onLoadMore={() => {
+                const timelineScroll = timelineScrollRef.current;
+                if (timelineScroll) {
+                  pendingHistoryLoadRef.current = {
+                    scrollTop: timelineScroll.scrollTop,
+                    scrollHeight: timelineScroll.scrollHeight
+                  };
+                }
+                setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS);
+              }}
+              onOpenMessage={setExpandedMessage}
+              liveMessages={liveMessages}
+              liveCommands={liveCommands}
+              liveErrors={liveErrors}
+              liveTimeline={liveTimeline}
+              onChooseModel={onOpenModelPicker}
+              onRetry={onOpenRetry}
             />
+          ) : liveTimeline.length > 0 ? (
+            <SessionTimeline
+              detail={{ turns: [] }}
+              visibleTurnCount={0}
+              onLoadMore={() => undefined}
+              onOpenMessage={setExpandedMessage}
+              liveMessages={liveMessages}
+              liveCommands={liveCommands}
+              liveErrors={liveErrors}
+              liveTimeline={liveTimeline}
+              onChooseModel={onOpenModelPicker}
+              onRetry={onOpenRetry}
+            />
+          ) : null}
           </div>
-        ) : null}
+          {timelineScrollState.canScrollUp || timelineScrollState.canScrollDown ? (
+            <div className="timelineScrollControls" aria-label="会话内容快速定位">
+              <button
+                className="timelineScrollButton"
+                type="button"
+                aria-label="跳到会话顶部"
+                title="跳到会话顶部"
+                onClick={() => scrollTimelineTo("top")}
+                disabled={!timelineScrollState.canScrollUp}
+              >
+                <span aria-hidden="true">↑</span>
+              </button>
+              <button
+                className="timelineScrollButton"
+                type="button"
+                aria-label="跳到会话底部"
+                title="跳到会话底部"
+                onClick={() => scrollTimelineTo("bottom")}
+                disabled={!timelineScrollState.canScrollDown}
+              >
+                <span aria-hidden="true">↓</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
-      <TaskInput runtime={runtime} onSend={handleSendInput} />
+      <div className="composerDock">
+        {runtimeError ? <div className="errorBanner composerWarning" role="alert">{runtimeError}</div> : null}
+        {runtime?.permissionMode === "full_access" && pendingApprovals.length > 0 ? (
+          <div className="errorBanner composerWarning" role="alert">完全权限模式收到未预期的审批请求，系统未自动处理；你仍可拒绝或取消该请求。</div>
+        ) : null}
+        <ApprovalPanel
+          approvals={pendingApprovals}
+          pendingCount={pendingApprovalCount}
+          onSubmitApproval={onSubmitApproval}
+        />
+        <TaskInput runtime={runtime} onSend={handleSendInput} />
+        <ComposerRuntimeBar
+          runtime={runtime}
+          modelState={modelState}
+          permissionMode={permissionMode}
+          pendingApprovalCount={pendingApprovalCount}
+          isChild={isChild}
+          updatingModel={updatingModel}
+          onPermissionModeChange={onPermissionModeChange}
+          onFocusApprovals={() => {
+            const approvalPanel = document.getElementById("session-approval-panel");
+            approvalPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
+            approvalPanel?.focus({ preventScroll: true });
+          }}
+          onOpenModelPicker={() => onOpenModelPicker()}
+        />
+      </div>
       {expandedMessage ? <MessageDetailDialog message={expandedMessage} onClose={() => setExpandedMessage(null)} /> : null}
     </div>
+  );
+}
+
+function ComposerRuntimeBar({
+  runtime,
+  modelState,
+  permissionMode,
+  pendingApprovalCount,
+  updatingModel,
+  onPermissionModeChange,
+  onFocusApprovals,
+  onOpenModelPicker,
+  isChild
+}: {
+  runtime: RuntimeSnapshot | null;
+  modelState: SessionModelState;
+  permissionMode: SessionPermissionMode;
+  pendingApprovalCount: number;
+  updatingModel: boolean;
+  onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
+  onFocusApprovals: () => void;
+  onOpenModelPicker: () => void;
+  isChild: boolean;
+}) {
+  const status = runtime?.status ?? "history";
+  const model = runtime?.model ?? modelState.actualModel ?? modelState.preferredModel;
+  const effort = runtime?.reasoningEffort ?? modelState.actualReasoningEffort ?? modelState.preferredReasoningEffort;
+  const modelDisabledReason = modelSwitchDisabledReason(status);
+  const canChangePermission = status === "history" || status === "waiting_input" || status === "exited" || status === "failed";
+  const [updatingPermission, setUpdatingPermission] = useState(false);
+  const [confirmFullAccess, setConfirmFullAccess] = useState(false);
+
+  async function applyPermissionMode(nextMode: SessionPermissionMode) {
+    setUpdatingPermission(true);
+    try {
+      await onPermissionModeChange(nextMode);
+    } finally {
+      setUpdatingPermission(false);
+    }
+  }
+
+  function handlePermissionToggle() {
+    if (!canChangePermission || updatingPermission) return;
+    if (permissionMode === "default") {
+      setConfirmFullAccess(true);
+      return;
+    }
+    void applyPermissionMode("default").catch(() => undefined);
+  }
+
+  async function confirmPermissionMode() {
+    setConfirmFullAccess(false);
+    await applyPermissionMode("full_access");
+  }
+
+  return (
+    <>
+      <section
+        className={`composerRuntimeBar ${status}${pendingApprovalCount > 0 ? " hasApproval" : ""}`}
+        aria-label="当前模型与权限"
+      >
+        <div className="composerRuntimeModel" title={[model, effort].filter(Boolean).join(" · ") || "模型未识别"}>
+          <span>模型</span>
+          <strong>{model ?? "未识别"}</strong>
+          {effort ? <small>{effort}</small> : null}
+        </div>
+        {pendingApprovalCount > 0 ? (
+          <div className="composerRuntimeBadges">
+            <span className="approvalCount">待审批 {pendingApprovalCount}</span>
+          </div>
+        ) : null}
+        {isChild ? (
+          <span className="permissionBadge controlled">受控模式 · 原始 workspace</span>
+        ) : (
+          <button
+            className="ghostButton composerPermissionButton"
+            type="button"
+            onClick={handlePermissionToggle}
+            disabled={!canChangePermission || updatingPermission}
+            title={!canChangePermission ? "当前状态不可切换权限模式" : "切换权限模式"}
+          >
+            {updatingPermission ? "切换中" : permissionMode === "full_access" ? "完全权限" : "需审批"}
+          </button>
+        )}
+        {pendingApprovalCount > 0 ? (
+          <button className="ghostButton composerApprovalButton" type="button" onClick={onFocusApprovals}>
+            查看审批（{pendingApprovalCount}）
+          </button>
+        ) : null}
+        <button
+          className="ghostButton composerModelButton"
+          type="button"
+          onClick={onOpenModelPicker}
+          disabled={Boolean(modelDisabledReason) || updatingModel}
+          title={modelDisabledReason ?? "切换模型"}
+        >
+          {updatingModel ? "切换中" : <><span className="composerModelButtonLabel">模型选择</span><span className="composerModelButtonChevron" aria-hidden="true">›</span></>}
+        </button>
+      </section>
+      {confirmFullAccess ? (
+        <FullAccessConfirmDialog
+          submitting={updatingPermission}
+          onCancel={() => setConfirmFullAccess(false)}
+          onConfirm={confirmPermissionMode}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function MobileTaskContext({
+  session,
+  detail,
+  runtime,
+  liveCommands
+}: {
+  session: SessionSummary;
+  detail: SessionDetail | null;
+  runtime: RuntimeSnapshot | null;
+  liveCommands: LiveCommand[];
+}) {
+  const active = runtime?.status === "starting" || runtime?.status === "running" || runtime?.status === "waiting_approval";
+  const latestCommand = liveCommands.at(-1) ?? null;
+  const latestTurn = detail?.turns.at(-1) ?? null;
+  const changedFiles = latestTurn?.items
+    .filter((item): item is Extract<SessionTurnItem, { type: "file_change" }> => item.type === "file_change")
+    .flatMap((item) => item.changes) ?? [];
+
+  if (!active || (!runtime && !latestCommand && changedFiles.length === 0)) return null;
+
+  const taskStatus = runtime?.status === "waiting_approval" ? "Waiting for approval" : "Running";
+  const commandStatus = latestCommand && isLiveCommandCompleted(latestCommand) ? "completed" : "running";
+
+  return (
+    <section className="mobileTaskContext" aria-label="当前任务">
+      <div className="mobileTaskContextHeader">
+        <span>CURRENT TASK</span>
+        {changedFiles.length > 0 ? <small>{changedFiles.length} FILE{changedFiles.length === 1 ? "" : "S"}</small> : null}
+      </div>
+      <h3>{session.title}</h3>
+      <p>{taskStatus} · {workspaceDisplayName(session.workspace)}</p>
+      {latestCommand?.command ? (
+        <div className="mobileTaskCommand">
+          <span aria-hidden="true">⌄</span>
+          <code>{latestCommand.command}</code>
+          <strong className={commandStatus}>{commandStatus}</strong>
+        </div>
+      ) : null}
+      {changedFiles.length > 0 ? (
+        <div className="mobileTaskChanges">
+          <span aria-hidden="true">↳</span>
+          <span>{changedFiles.length} changed file{changedFiles.length === 1 ? "" : "s"}</span>
+          <span>Review changes</span>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -1647,7 +2403,6 @@ function RuntimePanel({
   error,
   modelState,
   updatingModel,
-  onResume,
   onPermissionModeChange,
   onOpenModelPicker
 }: {
@@ -1657,11 +2412,9 @@ function RuntimePanel({
   error: string | null;
   modelState: SessionModelState;
   updatingModel: boolean;
-  onResume: () => Promise<void>;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
   onOpenModelPicker: () => void;
 }) {
-  const [submitting, setSubmitting] = useState(false);
   const [updatingPermission, setUpdatingPermission] = useState(false);
   const [confirmFullAccess, setConfirmFullAccess] = useState(false);
   const status = runtime?.status ?? "history";
@@ -1670,15 +2423,6 @@ function RuntimePanel({
   const actualModel = runtime?.model ?? modelState.actualModel;
   const actualProvider = runtime?.modelProvider ?? modelState.actualModelProvider;
   const actualEffort = runtime?.reasoningEffort ?? modelState.actualReasoningEffort;
-
-  async function handleResume() {
-    setSubmitting(true);
-    try {
-      await onResume();
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function applyPermissionMode(nextMode: SessionPermissionMode) {
     setUpdatingPermission(true);
@@ -1757,9 +2501,6 @@ function RuntimePanel({
         {runtime?.lastError ? <p className="errorText">{runtime.lastError}</p> : null}
         {error ? <p className="errorText">{error}</p> : null}
       </div>
-      <button className="ghostButton" type="button" onClick={handleResume} disabled={submitting || status === "starting" || status === "running" || status === "waiting_input" || status === "waiting_approval"}>
-        {submitting ? "恢复中" : status === "history" || status === "failed" || status === "exited" ? "恢复会话" : "已恢复"}
-      </button>
       {confirmFullAccess ? (
         <FullAccessConfirmDialog
           submitting={updatingPermission}
@@ -1791,7 +2532,10 @@ function FullAccessConfirmDialog({
         </div>
         <div className="dialogBody fullAccessDialogBody">
           <div className="fullAccessWarning" role="alert">
-            <strong>该会话将跳过审批。</strong>
+            <div className="fullAccessWarningHeading">
+              <span className="approvalAlertIcon" aria-hidden="true">!</span>
+              <strong>该会话将跳过审批。</strong>
+            </div>
             <p>Codex 将以 Web 服务账号获得完整文件系统和网络访问权限。</p>
           </div>
           <div className="dialogActions">
@@ -1862,59 +2606,90 @@ function RetryLastMessageDialog({
 
 function ApprovalPanel({
   approvals,
+  pendingCount,
   onSubmitApproval
 }: {
   approvals: ApprovalSummary[];
+  pendingCount: number;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
-  if (approvals.length === 0) return null;
+  if (approvals.length === 0 && pendingCount === 0) return null;
 
   return (
-    <section className="approvalPanel" aria-label="审批请求">
+    <section id="session-approval-panel" className="approvalPanel" aria-label="审批请求" tabIndex={-1}>
       <div className="panelHeaderCompact">
         <h3>待审批</h3>
-        <span>{approvals.length}</span>
+        <span>{pendingCount}</span>
       </div>
-      <div className="approvalList">
-        {approvals.map((approval) => (
-          <ApprovalCard approval={approval} key={approval.id} onSubmitApproval={onSubmitApproval} />
-        ))}
-      </div>
+      {approvals.length > 0 ? (
+        <div className="approvalList">
+          {approvals.map((approval) => (
+            <ApprovalCard approval={approval} key={approval.id} onSubmitApproval={onSubmitApproval} />
+          ))}
+        </div>
+      ) : (
+        <div className="approvalLoadingState" role="status">正在加载审批请求，请稍候…</div>
+      )}
     </section>
   );
 }
 
 function ApprovalCard({
   approval,
-  onSubmitApproval
+  onSubmitApproval,
+  variant = "panel"
 }: {
   approval: ApprovalSummary;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
+  variant?: "panel" | "sheet";
 }) {
   const [submitting, setSubmitting] = useState<ApprovalDecision | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  async function submit(decision: ApprovalDecision) {
+  async function submit(decision: ApprovalDecision): Promise<boolean> {
     setSubmitting(decision);
+    setSubmitError(null);
     try {
       const answerPayload = Object.fromEntries(Object.entries(answers).map(([key, value]) => [key, value.trim() ? [value.trim()] : []]));
       await onSubmitApproval(approval, decision, answerPayload);
+      return true;
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : "审批处理失败，请重试。");
+      return false;
     } finally {
       setSubmitting(null);
     }
   }
 
   return (
-    <article className="approvalCard">
+    <article className={`approvalCard ${variant === "sheet" ? "approvalCardSheet" : ""}`}>
       <div className="approvalHeader">
         <div>
-          <strong>{approval.title}</strong>
-          {approval.reason ? <p className="muted">{approval.reason}</p> : null}
+          <strong>{variant === "sheet" ? "Review access" : approval.title}</strong>
+          <p className="approvalDescription">{approval.reason ?? approvalExplanation(approval)}</p>
         </div>
-        <span>{approval.kind}</span>
+        {variant === "panel" ? <span>{approvalKindLabel(approval.kind)}</span> : null}
       </div>
-      {approval.command ? <pre className="commandText">{approval.command}</pre> : null}
-      {approval.cwd ? <p className="muted">{approval.cwd}</p> : null}
+      <div className="approvalRiskRow">
+        <span className={`approvalRiskBadge ${approvalRiskLevel(approval)}`}><i aria-hidden="true" />{approvalRiskLabel(approval)}</span>
+        <span>{approvalRiskExplanation(approval)}</span>
+      </div>
+      {approval.command ? (
+        <div className="approvalDetailField">
+          <span>COMMAND</span>
+          <pre className="commandText approvalCommandText" title="命令过长时可在此区域滚动查看完整内容">{approval.command}</pre>
+        </div>
+      ) : null}
+      {approval.cwd ? (
+        <div className="approvalDetailField approvalScopeField">
+          <span>SCOPE</span>
+          <div>
+            <code>{approval.cwd}</code>
+            <strong>{approvalScopeLabel(approval)}</strong>
+          </div>
+        </div>
+      ) : null}
       {approval.questions.length > 0 ? (
         <div className="approvalQuestions">
           {approval.questions.map((question) => (
@@ -1938,114 +2713,86 @@ function ApprovalCard({
           ))}
         </div>
       ) : null}
+      {submitError ? <p className="errorText" role="alert">{submitError}</p> : null}
       <div className="approvalActions">
         <div className="approvalAllowActions">
-          <button className="approvalAcceptButton" type="button" onClick={() => submit("accept")} disabled={submitting !== null} aria-busy={submitting === "accept"}>
-            {submitting === "accept" ? "正在允许" : "允许一次"}
+          <button className="approvalAcceptButton" type="button" onClick={() => void submit("accept")} disabled={submitting !== null} aria-busy={submitting === "accept"}>
+            {submitting === "accept" ? "Allowing" : "Allow once"}
           </button>
-          <button className="approvalSessionButton" type="button" onClick={() => submit("acceptForSession")} disabled={submitting !== null} aria-busy={submitting === "acceptForSession"}>
-            {submitting === "acceptForSession" ? "正在设置" : "本会话允许"}
+          <button className="approvalSessionButton" type="button" onClick={() => void submit("acceptForSession")} disabled={submitting !== null} aria-busy={submitting === "acceptForSession"}>
+            {submitting === "acceptForSession" ? "Allowing" : "Allow for this session"}
           </button>
         </div>
         <div className="approvalDismissActions">
-          <button className="approvalDeclineButton" type="button" onClick={() => submit("decline")} disabled={submitting !== null} aria-busy={submitting === "decline"}>
-            {submitting === "decline" ? "正在拒绝" : "拒绝"}
+          <button className="approvalDeclineButton" type="button" onClick={() => void submit("decline")} disabled={submitting !== null} aria-busy={submitting === "decline"}>
+            {submitting === "decline" ? "Denying" : "Deny request"}
           </button>
-          <button className="ghostButton" type="button" onClick={() => submit("cancel")} disabled={submitting !== null} aria-busy={submitting === "cancel"}>
-            {submitting === "cancel" ? "正在取消" : "取消"}
+          <button className="ghostButton" type="button" onClick={() => void submit("cancel")} disabled={submitting !== null} aria-busy={submitting === "cancel"}>
+            {submitting === "cancel" ? "Cancelling" : "Cancel"}
           </button>
         </div>
       </div>
+      <p className="approvalSessionHint">Keeps this scope for the current session only</p>
+      <p className="approvalPausedHint" role="status">Conversation paused until resolved</p>
     </article>
   );
 }
 
-function LiveOutputPanel({
-  liveMessages,
-  liveCommands,
-  liveErrors,
-  runtimeStatus,
-  canRetry,
-  onChooseModel,
-  onRetry,
-  onShowHistory
-}: {
-  liveMessages: LiveMessage[];
-  liveCommands: LiveCommand[];
-  liveErrors: LiveErrorNotice[];
-  runtimeStatus: SessionStatus;
-  canRetry: boolean;
-  onChooseModel: () => void;
-  onRetry: () => void;
-  onShowHistory: () => void;
-}) {
-  const outputBodyRef = useRef<HTMLDivElement | null>(null);
-  const runningCommands = useMemo(() => liveCommands.filter((command) => !isLiveCommandCompleted(command)), [liveCommands]);
-  const visibleMessages = useMemo(() => liveMessages.slice(-MAX_VISIBLE_LIVE_MESSAGES), [liveMessages]);
-  const visibleCommands = useMemo(() => runningCommands.slice(-MAX_VISIBLE_LIVE_COMMANDS), [runningCommands]);
-  const hiddenCount = liveMessages.length + runningCommands.length - visibleMessages.length - visibleCommands.length;
-  const visibleCount = liveMessages.length + runningCommands.length + liveErrors.length;
+function isReadOnlyApproval(approval: ApprovalSummary): boolean {
+  if (approval.kind !== "command_execution" && approval.kind !== "legacy_exec") return false;
+  const command = approval.command?.trim() ?? "";
+  return /^(git\s+(diff|status|log|show)|rg\b|grep\b|cat\b|sed\b|ls\b|find\b|pwd\b|head\b|tail\b|which\b|npm\s+(test|run\s+(test|lint|typecheck)))/i.test(command);
+}
 
-  useEffect(() => {
-    if (!shouldAutoFollowLiveOutput(runtimeStatus)) return;
-    const outputBody = outputBodyRef.current;
-    if (!outputBody) return;
-    outputBody.scrollTop = outputBody.scrollHeight;
-  }, [runtimeStatus, visibleMessages, visibleCommands, liveErrors]);
+function approvalRiskLevel(approval: ApprovalSummary): "readOnly" | "elevated" | "high" {
+  if (approval.kind === "permissions") return "high";
+  return isReadOnlyApproval(approval) ? "readOnly" : "elevated";
+}
 
-  if (visibleCount === 0) return null;
+function approvalRiskLabel(approval: ApprovalSummary): string {
+  const level = approvalRiskLevel(approval);
+  return level === "readOnly" ? "READ-ONLY" : level === "high" ? "HIGH RISK" : "REQUIRES ACCESS";
+}
 
-  return (
-    <section className="livePanel" aria-label="实时输出">
-      <div className="panelHeaderCompact">
-        <h3>实时输出</h3>
-        <div className="panelHeaderActions">
-          <button className="ghostButton" type="button" onClick={onShowHistory}>
-            查看历史会话内容
-          </button>
-          <span>{visibleCount}</span>
-        </div>
-      </div>
-      <div className="liveOutputBody" ref={outputBodyRef}>
-        {hiddenCount > 0 ? <div className="liveHiddenNotice">已隐藏较早的 {hiddenCount} 条实时输出</div> : null}
-        {liveErrors.map((notice) => (
-          <LiveErrorCard
-            notice={notice}
-            canRetry={canRetry && !notice.willRetry}
-            onChooseModel={onChooseModel}
-            onRetry={onRetry}
-            key={notice.id}
-          />
-        ))}
-        {visibleMessages.map((message) => (
-          <article className={`messageItem ${message.role} liveMessage${message.deliveryStatus ? ` ${message.deliveryStatus}` : ""}`} key={message.id}>
-            <div className="messageHeader">
-              <strong>{message.role === "user" ? "用户" : "Codex"}</strong>
-              <span className={message.deliveryStatus ? `deliveryStatus ${message.deliveryStatus}` : undefined}>
-                {message.deliveryStatus ? deliveryStatusLabel(message.deliveryStatus) : "实时"}
-              </span>
-            </div>
-            <div className="messageBody"><MarkdownContent text={message.text || "..."} /></div>
-          </article>
-        ))}
-        {visibleCommands.map((command) => (
-          <LiveCommandCard command={command} key={command.id} />
-        ))}
-      </div>
-    </section>
-  );
+function approvalRiskExplanation(approval: ApprovalSummary): string {
+  const level = approvalRiskLevel(approval);
+  return level === "readOnly"
+    ? "No changes will be written"
+    : level === "high"
+      ? "Can change permissions or broaden access"
+      : "Review the command before allowing it";
+}
+
+function approvalScopeLabel(approval: ApprovalSummary): string {
+  return isReadOnlyApproval(approval) ? "read-only" : "command scope";
+}
+
+function approvalExplanation(approval: ApprovalSummary): string {
+  return isReadOnlyApproval(approval)
+    ? "This command only reads project files."
+    : "This request needs access to the current project scope.";
+}
+
+function approvalKindLabel(kind: ApprovalSummary["kind"]): string {
+  switch (kind) {
+    case "file_change": return "文件变更";
+    case "permissions": return "权限";
+    case "tool_user_input": return "需要输入";
+    case "legacy_apply_patch": return "应用改动";
+    case "legacy_exec": return "执行命令";
+    case "command_execution":
+    default: return "命令";
+  }
 }
 
 function LiveErrorCard({
   notice,
-  canRetry,
   onChooseModel,
   onRetry
 }: {
   notice: LiveErrorNotice;
-  canRetry: boolean;
-  onChooseModel: () => void;
-  onRetry: () => void;
+  onChooseModel: (retryContext: RetryContext | null) => void;
+  onRetry: (context: RetryContext) => void;
 }) {
   return (
     <article className={`liveErrorCard${notice.willRetry ? " retrying" : " terminal"}`} role={notice.willRetry ? "status" : "alert"}>
@@ -2057,8 +2804,8 @@ function LiveErrorCard({
       {notice.code ? <code>{notice.code}</code> : null}
       {!notice.willRetry ? (
         <div className="liveErrorActions">
-          <button className="ghostButton" type="button" onClick={onChooseModel}>选择其他模型</button>
-          {canRetry ? <button type="button" onClick={onRetry}>重试上一条消息</button> : null}
+          <button className="ghostButton" type="button" onClick={() => onChooseModel(notice.retryContext)}>选择其他模型</button>
+          {notice.retryContext ? <button type="button" onClick={() => onRetry(notice.retryContext!)}>重试上一条消息</button> : null}
         </div>
       ) : null}
     </article>
@@ -2104,7 +2851,8 @@ function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSen
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
-  const disabled = submitting || runtime?.status === "waiting_approval" || runtime?.status === "starting";
+  const waitingApproval = runtime?.status === "waiting_approval";
+  const disabled = submitting || waitingApproval || runtime?.status === "starting";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2132,101 +2880,22 @@ function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSen
 
   return (
     <form className="taskInput" onSubmit={handleSubmit}>
+      <span className="taskInputPlus" aria-hidden="true">+</span>
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={runtime?.status === "waiting_approval" ? "请先处理审批" : "输入继续任务内容"}
+        placeholder={waitingApproval ? "请先处理审批" : "Message Codex"}
         disabled={disabled}
         aria-keyshortcuts="Control+Enter Meta+Enter"
-        rows={3}
+        rows={1}
       />
-      <button type="submit" disabled={disabled || text.trim().length === 0}>{submitting ? "发送中" : "发送"}</button>
+      <button className="sendButton" type="submit" aria-label={submitting ? "发送中" : "发送消息"} title={submitting ? "发送中" : "发送消息"} disabled={disabled || text.trim().length === 0}>
+        <svg className="sendIcon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4.4 4.8 19.8 12 4.4 19.2l2.2-6.1 7.1-1.1-7.1-1.1-2.2-6.1Z" />
+        </svg>
+      </button>
     </form>
-  );
-}
-
-function SessionCommandsPanel({
-  commands,
-  diagnostics,
-  loading,
-  error,
-  loaded,
-  onOpen
-}: {
-  commands: SessionCommand[];
-  diagnostics: SessionCommandDiagnostics | null;
-  loading: boolean;
-  error: string | null;
-  loaded: boolean;
-  onOpen: () => void;
-}) {
-  return (
-    <details
-      className="commandsPanel"
-      aria-labelledby="commands-title"
-      onToggle={(event) => {
-        if (event.currentTarget.open && !loaded && !loading) onOpen();
-      }}
-    >
-      <summary className="commandsSummary">
-        <div>
-          <h3 id="commands-title">历史命令</h3>
-          <p className="muted">
-            {loading ? "正在加载历史命令..." : loaded ? `共 ${commands.length} 条命令` : "展开后加载历史命令"}
-            {diagnostics && !diagnostics.matchedSessionFile ? "，未匹配到 JSONL 文件" : ""}
-          </p>
-        </div>
-      </summary>
-      <div className="commandsPanelBody">
-        {error ? <div className="errorBanner">{error}</div> : null}
-        {!loaded && !loading && !error ? <div className="emptyState">展开面板后读取对应会话的 JSONL 文件。</div> : null}
-        {loaded && !loading && !error && commands.length === 0 ? <div className="emptyState">暂无历史命令</div> : null}
-        {commands.length > 0 ? (
-          <div className="commandList">
-            {commands.map((command) => (
-              <CommandCard command={command} key={command.callId} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </details>
-  );
-}
-
-function CommandCard({ command }: { command: SessionCommand }) {
-  const completed = command.status === "completed";
-  const output = command.output ?? "输出缺失，命令可能仍在运行或历史记录不完整。";
-
-  async function copyCommand() {
-    await navigator.clipboard?.writeText(command.cmd);
-  }
-
-  return (
-    <article className={`commandCard ${command.status}`}>
-      <div className="commandHeader">
-        <div>
-          <strong>{command.status === "completed" ? "已完成" : "运行中"}</strong>
-          <p className="muted">{command.workdir || "未知工作目录"}</p>
-        </div>
-        <button className="ghostButton" type="button" onClick={copyCommand}>复制</button>
-      </div>
-      <pre className="commandText">{command.cmd}</pre>
-      <div className="commandMeta">
-        {command.sandboxPermissions ? <span>{command.sandboxPermissions}</span> : null}
-        {command.justification ? <span>{command.justification}</span> : null}
-        {command.prefixRule ? <span>prefix: {command.prefixRule.join(" ")}</span> : null}
-        {command.tty ? <span>TTY</span> : null}
-      </div>
-      {completed ? (
-        <details className="commandOutputDetails">
-          <summary>查看输出（{command.outputLength} 字符）</summary>
-          <pre className="commandOutput completed">{output}</pre>
-        </details>
-      ) : (
-        <pre className="commandOutput running">{output}</pre>
-      )}
-    </article>
   );
 }
 
@@ -2234,40 +2903,94 @@ function SessionTimeline({
   detail,
   visibleTurnCount,
   onLoadMore,
-  onOpenMessage
+  onOpenMessage,
+  liveMessages,
+  liveCommands,
+  liveErrors,
+  liveTimeline,
+  onChooseModel,
+  onRetry
 }: {
-  detail: SessionDetail;
+  detail: Pick<SessionDetail, "turns">;
   visibleTurnCount: number;
   onLoadMore: () => void;
   onOpenMessage: (message: { title: string; text: string; meta?: string }) => void;
+  liveMessages: LiveMessage[];
+  liveCommands: LiveCommand[];
+  liveErrors: LiveErrorNotice[];
+  liveTimeline: LiveTimelineEntry[];
+  onChooseModel: (retryContext: RetryContext | null) => void;
+  onRetry: (context: RetryContext) => void;
 }) {
-  const hiddenTurnCount = Math.max(0, detail.turns.length - visibleTurnCount);
-  const visibleTurns = detail.turns.slice(hiddenTurnCount);
+  const turns = detail.turns
+    .map((turn) => ({ ...turn, items: turn.items.filter((item) => item.type !== "unknown") }))
+    .filter((turn) => turn.items.length > 0);
+  const latestTurnCount = Math.min(DEFAULT_VISIBLE_TURNS, turns.length);
+  const olderTurnsStart = Math.max(0, turns.length - visibleTurnCount);
+  const latestTurnsStart = Math.max(0, turns.length - latestTurnCount);
+  const loadedEarlierTurns = turns.slice(olderTurnsStart, latestTurnsStart);
+  const latestTurns = turns.slice(latestTurnsStart);
+  const hasMoreEarlierTurns = olderTurnsStart > 0;
+  const historicalItemIds = new Set(turns.flatMap((turn) => turn.items.map((item) => item.id)));
+
+  function renderTurn(turn: SessionDetail["turns"][number], absoluteIndex: number) {
+    return (
+      <section className="turnBlock" key={turn.id}>
+        <div className="turnHeader">
+          <h3>Turn {absoluteIndex + 1}</h3>
+          <span>{turn.status}</span>
+          <span>{formatDateTime(turn.startedAt)}</span>
+        </div>
+        <div className="turnItems">
+          {turn.items.map((item) => (
+            <TurnItemView item={item} key={item.id} onOpenMessage={onOpenMessage} />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  function renderLiveEntry(entry: LiveTimelineEntry) {
+    if (entry.kind === "message") {
+      const message = liveMessages.find((item) => item.id === entry.id);
+      if (!message) return null;
+      const alreadyInHistory = Boolean(message.itemId && historicalItemIds.has(message.itemId))
+        || (message.role === "user" && Boolean(message.turnId) && turns.some((turn) => turn.id === message.turnId
+          && turn.items.some((item) => item.type === "user_message" && item.text === message.text)));
+      if (alreadyInHistory) return null;
+      return (
+        <article className={`messageItem ${message.role} liveMessage${message.deliveryStatus ? ` ${message.deliveryStatus}` : ""}`} key={`live-message-${message.id}`}>
+          <div className="messageHeader">
+            <strong>{message.role === "user" ? "用户" : "Codex"}</strong>
+            <span className={message.deliveryStatus ? `deliveryStatus ${message.deliveryStatus}` : undefined}>
+              {message.deliveryStatus ? deliveryStatusLabel(message.deliveryStatus) : null}
+            </span>
+          </div>
+          <div className="messageBody"><MarkdownContent text={message.text || "..."} /></div>
+        </article>
+      );
+    }
+
+    if (entry.kind === "command") {
+      const command = liveCommands.find((item) => item.id === entry.id);
+      if (command?.itemId && historicalItemIds.has(command.itemId)) return null;
+      return command ? <LiveCommandCard command={command} key={`live-command-${command.id}`} /> : null;
+    }
+
+    const notice = liveErrors.find((item) => item.id === entry.id);
+    return notice ? <LiveErrorCard notice={notice} onChooseModel={onChooseModel} onRetry={onRetry} key={`live-error-${notice.id}`} /> : null;
+  }
 
   return (
-    <div className="timeline" aria-label="历史消息">
-      {hiddenTurnCount > 0 ? (
-        <button className="ghostButton loadMoreButton" onClick={onLoadMore}>
-          加载更早 {Math.min(DEFAULT_VISIBLE_TURNS, hiddenTurnCount)} 轮
+    <div className="timeline" aria-label="会话消息">
+      {hasMoreEarlierTurns ? (
+        <button className="ghostButton loadMoreButton" type="button" onClick={onLoadMore}>
+          加载更早 {Math.min(DEFAULT_VISIBLE_TURNS, olderTurnsStart)} 轮
         </button>
       ) : null}
-      {visibleTurns.map((turn, visibleIndex) => {
-        const absoluteIndex = hiddenTurnCount + visibleIndex;
-        return (
-          <section className="turnBlock" key={turn.id}>
-            <div className="turnHeader">
-              <h3>Turn {absoluteIndex + 1}</h3>
-              <span>{turn.status}</span>
-              <span>{formatDateTime(turn.startedAt)}</span>
-            </div>
-            <div className="turnItems">
-              {turn.items.map((item) => (
-                <TurnItemView item={item} key={item.id} onOpenMessage={onOpenMessage} />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+      {loadedEarlierTurns.map((turn, index) => renderTurn(turn, olderTurnsStart + index))}
+      {latestTurns.map((turn, index) => renderTurn(turn, latestTurnsStart + index))}
+      {liveTimeline.map(renderLiveEntry)}
     </div>
   );
 }
@@ -2308,7 +3031,7 @@ function TurnItemView({
       return <SystemItem text="上下文已压缩" />;
     case "unknown":
     default:
-      return <SystemItem text={item.rawType ? `未识别事件：${item.rawType}` : "未识别事件"} />;
+      return null;
   }
 }
 
@@ -2370,6 +3093,253 @@ function SystemItem({ text }: { text: string }) {
   return <div className="systemItem">{text}</div>;
 }
 
+const WORKSPACE_SIDEBAR_WIDTH_STORAGE_KEY = "codex-manage.workspace-sidebar-width.v1";
+const DEFAULT_WORKSPACE_SIDEBAR_WIDTH = 280;
+const MIN_WORKSPACE_SIDEBAR_WIDTH = 220;
+const MAX_WORKSPACE_SIDEBAR_WIDTH = 520;
+
+function clampWorkspaceSidebarWidth(width: number): number {
+  return Math.min(MAX_WORKSPACE_SIDEBAR_WIDTH, Math.max(MIN_WORKSPACE_SIDEBAR_WIDTH, width));
+}
+
+function readWorkspaceSidebarWidth(): number {
+  if (typeof window === "undefined") return DEFAULT_WORKSPACE_SIDEBAR_WIDTH;
+  const stored = Number(window.localStorage.getItem(WORKSPACE_SIDEBAR_WIDTH_STORAGE_KEY));
+  return Number.isFinite(stored) ? clampWorkspaceSidebarWidth(stored) : DEFAULT_WORKSPACE_SIDEBAR_WIDTH;
+}
+
+function ResizableWorkspaceLayout({
+  sidebar,
+  main,
+  className = ""
+}: {
+  sidebar: ReactNode;
+  main: ReactNode;
+  className?: string;
+}) {
+  const layoutRef = useRef<HTMLElement | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(() => readWorkspaceSidebarWidth());
+  const [resizing, setResizing] = useState(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(WORKSPACE_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+    } catch {
+      // A restricted browser storage must not prevent resizing the sidebar.
+    }
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!resizing) return;
+
+    function handlePointerMove(event: globalThis.PointerEvent) {
+      const layout = layoutRef.current;
+      if (!layout) return;
+      const nextWidth = event.clientX - layout.getBoundingClientRect().left;
+      setSidebarWidth(clampWorkspaceSidebarWidth(nextWidth));
+    }
+
+    function stopResizing() {
+      setResizing(false);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResizing);
+    window.addEventListener("pointercancel", stopResizing);
+    document.body.classList.add("workspaceSidebarResizing");
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResizing);
+      window.removeEventListener("pointercancel", stopResizing);
+      document.body.classList.remove("workspaceSidebarResizing");
+    };
+  }, [resizing]);
+
+  function handleResizeStart(event: PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    setResizing(true);
+  }
+
+  function handleResizeKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      const delta = event.key === "ArrowLeft" ? -16 : 16;
+      setSidebarWidth((current) => clampWorkspaceSidebarWidth(current + delta));
+    }
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      setSidebarWidth(event.key === "Home" ? MIN_WORKSPACE_SIDEBAR_WIDTH : MAX_WORKSPACE_SIDEBAR_WIDTH);
+    }
+  }
+
+  const layoutStyle = { "--workspace-sidebar-width": `${sidebarWidth}px` } as CSSProperties;
+
+  return (
+    <section ref={layoutRef} className={`workspaceLayout${className ? ` ${className}` : ""}${resizing ? " resizing" : ""}`} style={layoutStyle}>
+      <aside className="workspaceSidebar" aria-label="会话列表">
+        {sidebar}
+      </aside>
+      <button
+        className="workspaceSidebarResizeHandle"
+        type="button"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整会话列表宽度"
+        title="拖动调整会话列表宽度，双击恢复默认"
+        onPointerDown={handleResizeStart}
+        onKeyDown={handleResizeKeyDown}
+        onDoubleClick={() => setSidebarWidth(DEFAULT_WORKSPACE_SIDEBAR_WIDTH)}
+      />
+      {main}
+    </section>
+  );
+}
+
+function DesktopWorkspaceHome({
+  sessions,
+  search,
+  loadingSessions,
+  sessionError,
+  selectedSessionId,
+  onSearchChange,
+  onSearchSubmit,
+  onSelect,
+  onMetadataSaved
+}: {
+  sessions: SessionSummary[];
+  search: string;
+  loadingSessions: boolean;
+  sessionError: string | null;
+  selectedSessionId: string | null;
+  onSearchChange: (value: string) => void;
+  onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSelect: (session: SessionSummary) => void;
+  onMetadataSaved: (session: SessionSummary) => void;
+}) {
+  return (
+    <ResizableWorkspaceLayout
+      className="desktopWorkspaceHome"
+      sidebar={(
+        <>
+          <div className="workspaceSidebarHeading">
+            <strong>Codex</strong>
+            <span>{sessions.length > 0 ? `最近会话 · ${sessions.length}` : "最近会话"}</span>
+          </div>
+          <SessionBrowser
+            sessions={sessions}
+            search={search}
+            loadingSessions={loadingSessions}
+            sessionError={sessionError}
+            selectedSessionId={selectedSessionId}
+            showHeading={false}
+            onSearchChange={onSearchChange}
+            onSearchSubmit={onSearchSubmit}
+            onSelect={onSelect}
+            onMetadataSaved={onMetadataSaved}
+          />
+        </>
+      )}
+      main={(
+        <main className="workspaceConversation workspaceHomeMain">
+        <section className="workspaceWelcome" aria-labelledby="workspace-welcome-title">
+          <p className="workspaceWelcomeEyebrow">CODEX MANAGE</p>
+          <h2 id="workspace-welcome-title">选择一个会话开始工作</h2>
+          <p className="workspaceWelcomeDescription">从左侧浏览、搜索并继续本机 Codex 会话。打开后，任务进度与输入框会保留在此工作区。</p>
+
+          {loadingSessions ? <div className="workspaceWelcomeLoading" role="status">正在准备你的工作台…</div> : null}
+          {!loadingSessions && sessionError ? <div className="workspaceWelcomeHint">会话暂时无法加载，请在左侧重试。</div> : null}
+          {!loadingSessions && !sessionError && sessions.length === 0 ? (
+            <div className="workspaceWelcomeHint">还没有可显示的会话。请先在 Codex CLI 中创建会话，再返回这里刷新。</div>
+          ) : null}
+          {!loadingSessions && !sessionError ? <RecentSessions sessions={sessions} onSelect={onSelect} /> : null}
+        </section>
+        </main>
+      )}
+    />
+  );
+}
+
+function RecentSessions({
+  sessions,
+  onSelect,
+  onOpenDrawer,
+  onRefresh,
+  refreshing = false
+}: {
+  sessions: SessionSummary[];
+  onSelect: (session: SessionSummary) => void;
+  onOpenDrawer?: (trigger: HTMLButtonElement) => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
+  const [recentExpanded, setRecentExpanded] = useState(false);
+  const recentSessions = useMemo(() => sortSessionsByUpdatedAt(sessions).slice(0, 10), [sessions]);
+  const visibleRecentSessions = recentExpanded ? recentSessions : recentSessions.slice(0, 5);
+
+  useEffect(() => {
+    if (recentSessions.length <= 5) setRecentExpanded(false);
+  }, [recentSessions.length]);
+
+  if (recentSessions.length === 0) return null;
+
+  return (
+    <section className="workspaceRecent" aria-label="最近会话">
+      <div className="workspaceRecentHeading">
+        <h3>最近使用</h3>
+        <div className="workspaceRecentHeadingActions">
+          {onOpenDrawer ? (
+            <button
+              className="workspaceRecentBrowse"
+              type="button"
+              onClick={(event) => onOpenDrawer(event.currentTarget)}
+            >
+              从侧边栏查看全部
+            </button>
+          ) : (
+            <span>从侧边栏查看全部</span>
+          )}
+          {onRefresh ? (
+            <button
+              className="iconButton workspaceRecentRefresh"
+              type="button"
+              aria-label="刷新最近会话"
+              title="刷新最近会话"
+              onClick={onRefresh}
+              disabled={refreshing}
+            >
+              <span aria-hidden="true">↻</span>
+            </button>
+          ) : null}
+        </div>
+      </div>
+      <div className={`workspaceRecentList${recentExpanded ? " expanded" : ""}`}>
+        {visibleRecentSessions.map((session) => (
+          <button
+            className="workspaceRecentSession"
+            key={session.id}
+            type="button"
+            onClick={() => onSelect(session)}
+            aria-label={`打开会话：${session.title}`}
+          >
+            <span className={`workspaceRecentStatus ${session.status}`} aria-hidden="true" />
+            <span className="workspaceRecentCopy">
+              <strong>{session.title}</strong>
+              <small>{workspaceDisplayName(session.workspace)} · {formatDateTime(session.updatedAt)}</small>
+            </span>
+            {session.status !== "history" ? <span className="workspaceRecentMeta">{statusLabel(session.status)}</span> : null}
+          </button>
+        ))}
+      </div>
+      {recentSessions.length > 5 ? (
+        <button className="workspaceRecentToggle" type="button" onClick={() => setRecentExpanded((current) => !current)}>
+          {recentExpanded ? "收起" : `显示全部 ${recentSessions.length} 个`}
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
 function SessionBrowser({
   sessions,
   search,
@@ -2379,7 +3349,6 @@ function SessionBrowser({
   showHeading = true,
   onSearchChange,
   onSearchSubmit,
-  onRefresh,
   onSelect,
   onMetadataSaved
 }: {
@@ -2391,10 +3360,12 @@ function SessionBrowser({
   showHeading?: boolean;
   onSearchChange: (value: string) => void;
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onRefresh: () => void;
   onSelect: (session: SessionSummary) => void;
   onMetadataSaved: (session: SessionSummary) => void;
 }) {
+  const workspaceFilterId = `session-workspace-filter-${showHeading ? "mobile" : "desktop"}`;
+  const [mode, setMode] = useState<SessionListMode>("workspace");
+
   return (
     <>
       <div className={`sectionHeader${showHeading ? "" : " noHeading"}`}>
@@ -2411,11 +3382,31 @@ function SessionBrowser({
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="搜索 ID、标题、备注或工作目录"
           />
-          <button type="submit">搜索</button>
-          <button className="ghostButton" type="button" onClick={onRefresh} disabled={loadingSessions}>
-            {loadingSessions ? "刷新中" : "刷新"}
+          <button className="iconButton" type="submit" aria-label="搜索" title="搜索">
+            <span aria-hidden="true">⌕</span>
           </button>
         </form>
+      </div>
+
+      <div className="sessionViewTabs" role="tablist" aria-label="会话列表视图">
+        <button
+          className={mode === "workspace" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={mode === "workspace"}
+          onClick={() => setMode("workspace")}
+        >
+          按项目目录
+        </button>
+        <button
+          className={mode === "recent" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={mode === "recent"}
+          onClick={() => setMode("recent")}
+        >
+          最近 10 个
+        </button>
       </div>
 
       {sessionError ? <div className="errorBanner">{sessionError}</div> : null}
@@ -2425,6 +3416,8 @@ function SessionBrowser({
         <SessionList
           sessions={sessions}
           selectedSessionId={selectedSessionId}
+          workspaceFilterId={workspaceFilterId}
+          mode={mode}
           onSelect={onSelect}
           onMetadataSaved={onMetadataSaved}
         />
@@ -2433,19 +3426,164 @@ function SessionBrowser({
   );
 }
 
+function MobileSessionDrawer({
+  isOwner,
+  sessions,
+  selectedSessionId,
+  search,
+  loading,
+  error,
+  closeButtonRef,
+  onClose,
+  onOpenList,
+  onOpenSettings,
+  onSearchChange,
+  onSearchSubmit,
+  onSelect,
+  onMetadataSaved
+}: {
+  isOwner: boolean;
+  sessions: SessionSummary[];
+  selectedSessionId: string | null;
+  search: string;
+  loading: boolean;
+  error: string | null;
+  closeButtonRef: RefObject<HTMLButtonElement | null>;
+  onClose: () => void;
+  onOpenList: () => void;
+  onOpenSettings: () => void;
+  onSearchChange: (value: string) => void;
+  onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSelect: (session: SessionSummary) => void;
+  onMetadataSaved: (session: SessionSummary) => void;
+}) {
+  return (
+    <div className="mobileSessionDrawerContent">
+      <header className="drawerHeader mobileDrawerHeader">
+        <h2>Chats</h2>
+        <div>
+          {isOwner ? (
+            <button
+              className="drawerNewButton"
+              type="button"
+              aria-label="查看会话管理（不创建新会话）"
+              title="新会话由 Codex CLI 创建"
+              onClick={onOpenList}
+            >
+              <span aria-hidden="true">+</span> New
+            </button>
+          ) : null}
+          <button ref={closeButtonRef} className="iconButton" type="button" aria-label="关闭会话列表" title="关闭" onClick={onClose}>
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="mobileDrawerSessionBrowser">
+        <SessionBrowser
+          sessions={sessions}
+          search={search}
+          loadingSessions={loading}
+          sessionError={error}
+          selectedSessionId={selectedSessionId}
+          showHeading={false}
+          onSearchChange={onSearchChange}
+          onSearchSubmit={onSearchSubmit}
+          onSelect={onSelect}
+          onMetadataSaved={onMetadataSaved}
+        />
+      </div>
+
+      {isOwner ? (
+        <footer className="drawerUtility">
+          <button type="button" aria-label="打开设置和诊断" onClick={onOpenSettings}>
+            <span aria-hidden="true">⚙</span>
+            <span>Settings &amp; diagnostics</span>
+            <strong>Healthy</strong>
+          </button>
+        </footer>
+      ) : null}
+    </div>
+  );
+}
+
+function workspaceDisplayName(workspace: string): string {
+  const parts = workspace.split(/[\\/]/).filter(Boolean);
+  return parts.at(-1) || workspace || "Codex Manage";
+}
+
+function sessionUpdatedTimestamp(session: SessionSummary): number {
+  const timestamp = Date.parse(session.updatedAt);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sortSessionsByUpdatedAt(sessions: SessionSummary[]): SessionSummary[] {
+  return [...sessions].sort((left, right) => (
+    sessionUpdatedTimestamp(right) - sessionUpdatedTimestamp(left)
+    || left.title.localeCompare(right.title, "zh-Hans")
+    || left.id.localeCompare(right.id)
+  ));
+}
+
+function compareWorkspaceNames(left: string, right: string): number {
+  return left.localeCompare(right, "zh-Hans", { numeric: true, sensitivity: "base" })
+    || workspaceDisplayName(left).localeCompare(workspaceDisplayName(right), "zh-Hans");
+}
+
+function sortSessionsByWorkspace(sessions: SessionSummary[]): SessionSummary[] {
+  return [...sessions].sort((left, right) => (
+    compareWorkspaceNames(left.workspace.trim() || "未知工作目录", right.workspace.trim() || "未知工作目录")
+    || sessionUpdatedTimestamp(right) - sessionUpdatedTimestamp(left)
+    || left.title.localeCompare(right.title, "zh-Hans")
+  ));
+}
+
 function SessionList({
   sessions,
   selectedSessionId,
+  workspaceFilterId,
+  mode,
   onSelect,
   onMetadataSaved
 }: {
   sessions: SessionSummary[];
   selectedSessionId: string | null;
+  workspaceFilterId: string;
+  mode: SessionListMode;
   onSelect: (session: SessionSummary) => void;
   onMetadataSaved: (session: SessionSummary) => void;
 }) {
-  const groups = groupSessionsByWorkspace(sessions);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(() => new Set());
+  const [copiedWorkspace, setCopiedWorkspace] = useState<string | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState("");
+  const orderedSessions = useMemo(() => sortSessionsByWorkspace(sessions), [sessions]);
+  const groups = useMemo(() => groupSessionsByWorkspace(orderedSessions), [orderedSessions]);
+  const recentSessions = useMemo(() => sortSessionsByUpdatedAt(sessions).slice(0, 10), [sessions]);
+  const activeWorkspace = groups.some((group) => group.workspace === selectedWorkspace)
+    ? selectedWorkspace
+    : groups[0]?.workspace ?? "";
+  const activeGroup = groups.find((group) => group.workspace === activeWorkspace) ?? null;
+
+  useEffect(() => {
+    const selectedSession = selectedSessionId
+      ? sessions.find((session) => isSameSession(session, selectedSessionId))
+      : null;
+    if (!selectedSession) return;
+    const workspace = selectedSession.workspace.trim() || "未知工作目录";
+    if (groups.some((group) => group.workspace === workspace)) setSelectedWorkspace(workspace);
+  }, [groups, selectedSessionId, sessions]);
+
+  async function copyWorkspacePath(workspace: string) {
+    try {
+      await navigator.clipboard.writeText(workspace);
+    } catch {
+      return;
+    }
+    setCopiedWorkspace(workspace);
+    window.setTimeout(() => {
+      setCopiedWorkspace((current) => (current === workspace ? null : current));
+    }, 1500);
+  }
 
   function toggleWorkspace(workspace: string) {
     setExpandedWorkspaces((current) => {
@@ -2461,20 +3599,48 @@ function SessionList({
 
   return (
     <div className="sessionList">
-      {groups.map((group) => {
-        const expanded = expandedWorkspaces.has(group.workspace);
-        const visibleSessions = expanded ? group.sessions : group.sessions.slice(0, DEFAULT_VISIBLE_GROUP_SESSIONS);
-        const hiddenCount = group.sessions.length - visibleSessions.length;
+      {mode === "workspace" && activeGroup ? (
+        <div className="workspaceFilterRow">
+          <label htmlFor={workspaceFilterId}>项目路径</label>
+          <div className="workspaceSelectControl">
+            <select
+              id={workspaceFilterId}
+              aria-label="按项目路径切换会话列表"
+              value={activeWorkspace}
+              onChange={(event) => setSelectedWorkspace(event.target.value)}
+            >
+              {groups.map((group) => (
+                <option value={group.workspace} key={group.workspace}>
+                  {group.workspace} · {group.sessions.length} 个会话
+                </option>
+              ))}
+            </select>
+            <button
+              className="copyPathButton"
+              type="button"
+              title={copiedWorkspace === activeGroup.workspace ? "已复制" : "复制路径"}
+              aria-label={`复制路径 ${activeGroup.workspace}`}
+              onClick={() => copyWorkspacePath(activeGroup.workspace)}
+            >
+              <span aria-hidden="true">{copiedWorkspace === activeGroup.workspace ? "✓" : "⧉"}</span>
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {mode === "workspace" && activeGroup ? (() => {
+        const expanded = expandedWorkspaces.has(activeGroup.workspace);
+        const visibleSessions = expanded
+          ? activeGroup.sessions
+          : activeGroup.sessions.slice(0, DEFAULT_VISIBLE_GROUP_SESSIONS);
+        const hiddenCount = activeGroup.sessions.length - visibleSessions.length;
 
         return (
-          <section className="sessionWorkspaceGroup" key={group.workspace} aria-label={`${group.workspace} 的会话`}>
-            <div className="workspaceGroupHeader">
-              <div>
-                <h3>{group.workspace}</h3>
-                <p className="muted">
-                  {group.sessions.length} 个会话，默认显示最近 {Math.min(group.sessions.length, DEFAULT_VISIBLE_GROUP_SESSIONS)} 个
-                </p>
-              </div>
+          <section className="sessionWorkspaceGroup" aria-label={`${activeGroup.workspace} 的会话`}>
+            <div className="workspaceGroupSummary">
+              <p className="muted">
+                {activeGroup.sessions.length} 个会话，默认显示最近 {Math.min(activeGroup.sessions.length, DEFAULT_VISIBLE_GROUP_SESSIONS)} 个
+              </p>
             </div>
             <div className="workspaceGroupList">
               {visibleSessions.map((session) => (
@@ -2487,14 +3653,33 @@ function SessionList({
                 />
               ))}
             </div>
-            {group.sessions.length > DEFAULT_VISIBLE_GROUP_SESSIONS ? (
-              <button className="ghostButton workspaceToggleButton" type="button" onClick={() => toggleWorkspace(group.workspace)}>
+            {activeGroup.sessions.length > DEFAULT_VISIBLE_GROUP_SESSIONS ? (
+              <button className="ghostButton workspaceToggleButton" type="button" onClick={() => toggleWorkspace(activeGroup.workspace)}>
                 {expanded ? "收起" : `展开更多 ${hiddenCount} 个会话`}
               </button>
             ) : null}
           </section>
         );
-      })}
+      })() : null}
+
+      {mode === "recent" ? (
+        <section className="sessionWorkspaceGroup recentSessionGroup" aria-label="最近修改的会话">
+          <div className="workspaceGroupSummary">
+            <p className="muted">最近修改的 {recentSessions.length} 个会话，按时间倒序排列</p>
+          </div>
+          <div className="workspaceGroupList recentSessionList">
+            {recentSessions.map((session) => (
+              <SessionItem
+                key={session.id}
+                session={session}
+                selected={isSameSession(session, selectedSessionId)}
+                onSelect={onSelect}
+                onMetadataSaved={onMetadataSaved}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -2512,10 +3697,12 @@ function groupSessionsByWorkspace(sessions: SessionSummary[]): { workspace: stri
     }
   }
 
-  return [...groups.entries()].map(([workspace, groupedSessions]) => ({
-    workspace,
-    sessions: groupedSessions
-  }));
+  return [...groups.entries()]
+    .sort(([left], [right]) => compareWorkspaceNames(left, right))
+    .map(([workspace, groupedSessions]) => ({
+      workspace,
+      sessions: sortSessionsByUpdatedAt(groupedSessions)
+    }));
 }
 
 function SessionItem({
@@ -2595,7 +3782,9 @@ function SessionItem({
   }
 
   return (
-    <article className={`sessionItem${selected ? " selected" : ""}`}>
+    <article
+      className={`sessionItem${selected ? " selected" : ""}`}
+    >
       <div className="sessionMain">
         <div className="sessionTitleRow">
           {editingTitle ? (
@@ -2618,11 +3807,11 @@ function SessionItem({
               onClick={beginTitleEdit}
               disabled={saving}
             >
-              <span>{session.title}</span>
+              <span title={session.title}>{session.title}</span>
               <small className="titleEditIcon" aria-hidden="true">{saving ? "…" : "✎"}</small>
             </button>
           )}
-          <StatusBadge status={session.status} />
+          {session.status !== "history" ? <StatusBadge status={session.status} /> : null}
         </div>
         {session.remarkTitle ? <p className="remarkHint">默认标题：{session.defaultTitle}</p> : null}
         <p className="sessionSummary">{session.summary}</p>
@@ -2653,7 +3842,10 @@ type MarkdownBlock =
   | { type: "list"; ordered: boolean; items: string[] };
 
 function parseMarkdownBlocks(text: string): MarkdownBlock[] {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  // Realtime/history payloads can be incomplete while an item is being
+  // materialized. Rendering a missing body must not tear down the workspace.
+  const normalizedText = text ?? "";
+  const lines = normalizedText.replace(/\r\n/g, "\n").split("\n");
   const blocks: MarkdownBlock[] = [];
   let paragraph: string[] = [];
   let index = 0;
@@ -2730,7 +3922,7 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
   }
 
   flushParagraph();
-  return blocks.length > 0 ? blocks : [{ type: "paragraph", text }];
+  return blocks.length > 0 ? blocks : [{ type: "paragraph", text: normalizedText }];
 }
 
 function renderMarkdownBlock(block: MarkdownBlock, index: number) {
@@ -2815,19 +4007,26 @@ function StatusBadge({ status }: { status: SessionStatus }) {
 
 function Shell({
   title,
+  leadingAction,
   action,
   children,
-  reserveFloatingStatus = false
+  reserveFloatingStatus = false,
+  desktopWorkspace = false
 }: {
   title: string;
+  leadingAction?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
   reserveFloatingStatus?: boolean;
+  desktopWorkspace?: boolean;
 }) {
   return (
-    <main className={`appShell${reserveFloatingStatus ? " reserveFloatingStatus" : ""}`}>
+    <main className={`appShell${reserveFloatingStatus ? " reserveFloatingStatus" : ""}${desktopWorkspace ? " desktopWorkspaceShell" : ""}`}>
       <header className="topbar">
-        <h1>{title}</h1>
+        <div className="topbarLeading">
+          {leadingAction}
+          <h1>{title}</h1>
+        </div>
         {action}
       </header>
       <div className="content">{children}</div>
@@ -2966,6 +4165,11 @@ function updateLiveMessageDeliveryStatus(
   return messages.map((message) => (message.id === messageId ? { ...message, deliveryStatus } : message));
 }
 
+function bindLiveMessageToTurn(messages: LiveMessage[], messageId: string, turnId: string | null): LiveMessage[] {
+  if (!turnId) return messages;
+  return messages.map((message) => (message.id === messageId ? { ...message, turnId } : message));
+}
+
 function deliveryStatusLabel(status: Exclude<LiveMessage["deliveryStatus"], null>): string {
   switch (status) {
     case "sending":
@@ -3028,4 +4232,26 @@ function formatDateTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+
+async function copyTextToClipboard(value: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    // Fall through to the legacy copy path for non-secure local pages.
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  return copied;
 }

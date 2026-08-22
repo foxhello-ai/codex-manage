@@ -1,15 +1,20 @@
 import type { FastifyInstance } from "fastify";
-import { isAuthenticated } from "./session";
+import { resolveAuthUser } from "./session";
 import { sendError } from "../httpErrors";
+import type { CollaborationStore } from "../services/CollaborationStore";
 
-const PUBLIC_PATHS = new Set(["/api/login", "/api/me"]);
+const PUBLIC_PATHS = new Set(["/api/login", "/api/child-login", "/api/child-accounts", "/api/me"]);
 
-export function registerAuthHook(app: FastifyInstance) {
+export function registerAuthHook(app: FastifyInstance, collaborationStore?: CollaborationStore) {
   app.addHook("preHandler", async (request, reply) => {
     if (!request.url.startsWith("/api")) return;
     const pathname = new URL(request.url, "http://local").pathname;
     if (PUBLIC_PATHS.has(pathname)) return;
-    if (isAuthenticated(request)) return;
+    const user = await resolveAuthUser(request, collaborationStore);
+    if (user) {
+      request.authUser = user;
+      return;
+    }
 
     return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
   });

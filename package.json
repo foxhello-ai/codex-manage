@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:server": "tsx watch src/server/index.ts",
-    "dev:client": "vite --host 0.0.0.0",
+    "dev:server": "CODEX_WEB_PORT=4311 tsx watch src/server/index.ts",
+    "dev:client": "vite --host 0.0.0.0 --port 4310",
     "build": "npm run typecheck && npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --minify --legal-comments=none --outfile=dist/server/index.js",

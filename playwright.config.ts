@@ -36,9 +36,25 @@ export default defineConfig({
       }
     },
     {
-      name: "mobile",
+      name: "mobile-375",
+      use: {
+        viewport: { width: 375, height: 812 },
+        isMobile: true,
+        hasTouch: true
+      }
+    },
+    {
+      name: "mobile-390",
       use: {
         viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true
+      }
+    },
+    {
+      name: "mobile-430",
+      use: {
+        viewport: { width: 430, height: 932 },
         isMobile: true,
         hasTouch: true
       }

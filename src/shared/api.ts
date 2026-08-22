@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, HealthStatus, InputResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, Collaborator, CollaboratorsResponse, CreateCollaboratorResponse, HealthStatus, InputResponse, LoginAccountsResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -52,11 +52,15 @@ export function getHealthStatus(): Promise<HealthStatus> {
   return apiRequest<HealthStatus>("/api/health");
 }
 
-export function login(password: string): Promise<UserSession> {
+export function login(password: string, accountId = "owner"): Promise<UserSession> {
   return apiRequest<UserSession>("/api/login", {
     method: "POST",
-    body: JSON.stringify({ password })
+    body: JSON.stringify({ password, accountId })
   });
+}
+
+export function getLoginAccounts(): Promise<LoginAccountsResponse> {
+  return apiRequest<LoginAccountsResponse>("/api/child-accounts");
 }
 
 export function logout(): Promise<UserSession> {
@@ -70,6 +74,31 @@ export function getSessions(search?: string): Promise<SessionsResponse> {
   const params = new URLSearchParams();
   if (search?.trim()) params.set("search", search.trim());
   return apiRequest<SessionsResponse>(`/api/sessions${params.size ? `?${params.toString()}` : ""}`);
+}
+
+export function getCollaborators(): Promise<CollaboratorsResponse> {
+  return apiRequest<CollaboratorsResponse>("/api/collaborators");
+}
+
+export function createCollaborator(input: { displayName: string; localEmail: string; password?: string }): Promise<CreateCollaboratorResponse> {
+  return apiRequest<CreateCollaboratorResponse>("/api/collaborators", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export function updateCollaboratorStatus(userId: string, active: boolean): Promise<{ collaborator: Collaborator }> {
+  return apiRequest<{ collaborator: Collaborator }>(`/api/collaborators/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ active })
+  });
+}
+
+export function updateCollaboratorGrants(userId: string, sessionIds: string[]): Promise<{ collaborator: Collaborator }> {
+  return apiRequest<{ collaborator: Collaborator }>(`/api/collaborators/${encodeURIComponent(userId)}/grants`, {
+    method: "PUT",
+    body: JSON.stringify({ sessionIds })
+  });
 }
 
 export function getModels(forceRefresh = false): Promise<ModelCatalogResponse> {

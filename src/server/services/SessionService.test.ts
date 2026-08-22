@@ -77,6 +77,43 @@ describe("SessionService", () => {
     ]);
   });
 
+  it("deduplicates continuation records for the same logical session", async () => {
+    const service = new SessionService(
+      readyClient({
+        data: [
+          {
+            id: "thread-1",
+            sessionId: "session-1",
+            name: "设计 fox-21 UI 及实现",
+            preview: "旧的 rollout 记录",
+            cwd: "/workspace/app",
+            createdAt: 10,
+            updatedAt: 20
+          },
+          {
+            id: "thread-1",
+            sessionId: "session-1",
+            name: "设计 fox-21 UI 及实现",
+            preview: "最新的 rollout 记录",
+            cwd: "/workspace/app",
+            createdAt: 10,
+            updatedAt: 30
+          }
+        ]
+      })
+    );
+
+    await expect(service.listSessions()).resolves.toMatchObject([
+      {
+        id: "thread-1",
+        sessionId: "session-1",
+        title: "设计 fox-21 UI 及实现",
+        summary: "最新的 rollout 记录",
+        updatedAt: "1970-01-01T00:00:30.000Z"
+      }
+    ]);
+  });
+
   it("paginates app-server sessions and searches beyond the first page", async () => {
     const calls: Array<{ method: string; params?: unknown }> = [];
     const service = new SessionService({

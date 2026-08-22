@@ -1,6 +1,38 @@
+export type UserRole = "owner" | "child";
+
+export type UserIdentity = {
+  id: string;
+  role: UserRole;
+  displayName: string;
+  localEmail: string | null;
+  active: boolean;
+  ownerUserId: string | null;
+};
+
 export type UserSession = {
   authenticated: boolean;
   defaultPassword: boolean;
+  user?: UserIdentity;
+};
+
+export type LoginAccount = Pick<UserIdentity, "id" | "role" | "displayName" | "localEmail">;
+
+export type LoginAccountsResponse = {
+  accounts: LoginAccount[];
+};
+
+export type Collaborator = UserIdentity & {
+  grants: string[];
+  createdAt: string;
+};
+
+export type CollaboratorsResponse = {
+  collaborators: Collaborator[];
+};
+
+export type CreateCollaboratorResponse = {
+  collaborator: Collaborator;
+  initialPassword: string;
 };
 
 export type AppServerSnapshot = {

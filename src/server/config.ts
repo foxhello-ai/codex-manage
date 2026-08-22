@@ -2,15 +2,21 @@ import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+export const DEFAULT_OWNER_NAME = "Jamie Chen";
+export const DEFAULT_OWNER_EMAIL = "jamie@local";
+
 type AppConfig = {
   host: string;
   port: number;
   password: string;
   defaultPassword: boolean;
+  ownerName: string;
+  ownerEmail: string;
   sessionSecret: string;
   codexCliPath: string;
   sessionsDir: string;
   metadataFile: string;
+  collaborationFile?: string;
   clientDir: string;
 };
 
@@ -29,6 +35,8 @@ function expandHome(path: string): string {
 export function loadConfig(): AppConfig {
   const defaultPassword = process.env.CODEX_WEB_PASSWORD === undefined;
   const password = process.env.CODEX_WEB_PASSWORD ?? "admin";
+  const ownerName = process.env.CODEX_OWNER_NAME?.trim() || DEFAULT_OWNER_NAME;
+  const ownerEmail = process.env.CODEX_OWNER_EMAIL?.trim() || DEFAULT_OWNER_EMAIL;
   const sessionSecret = process.env.CODEX_WEB_SESSION_SECRET ?? randomBytes(32).toString("hex");
 
   return {
@@ -36,10 +44,13 @@ export function loadConfig(): AppConfig {
     port: readPort(process.env.CODEX_WEB_PORT, 4310),
     password,
     defaultPassword,
+    ownerName,
+    ownerEmail,
     sessionSecret,
     codexCliPath: process.env.CODEX_CLI_PATH ?? "codex",
     sessionsDir: expandHome(process.env.CODEX_SESSIONS_DIR ?? "~/.codex/sessions"),
     metadataFile: expandHome(process.env.CODEX_MANAGE_METADATA_FILE ?? join(process.cwd(), ".codex-manage/session-metadata.json")),
+    collaborationFile: expandHome(process.env.CODEX_MANAGE_COLLABORATION_FILE ?? join(process.cwd(), ".codex-manage/collaboration.json")),
     clientDir: expandHome(process.env.CODEX_WEB_CLIENT_DIR ?? join(process.cwd(), "dist/client"))
   };
 }

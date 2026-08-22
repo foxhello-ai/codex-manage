@@ -7,6 +7,8 @@ describe("loadConfig", () => {
       CODEX_WEB_HOST: process.env.CODEX_WEB_HOST,
       CODEX_WEB_PORT: process.env.CODEX_WEB_PORT,
       CODEX_WEB_PASSWORD: process.env.CODEX_WEB_PASSWORD,
+      CODEX_OWNER_NAME: process.env.CODEX_OWNER_NAME,
+      CODEX_OWNER_EMAIL: process.env.CODEX_OWNER_EMAIL,
       CODEX_CLI_PATH: process.env.CODEX_CLI_PATH,
       CODEX_SESSIONS_DIR: process.env.CODEX_SESSIONS_DIR,
       CODEX_MANAGE_METADATA_FILE: process.env.CODEX_MANAGE_METADATA_FILE,
@@ -16,6 +18,8 @@ describe("loadConfig", () => {
     delete process.env.CODEX_WEB_HOST;
     delete process.env.CODEX_WEB_PORT;
     delete process.env.CODEX_WEB_PASSWORD;
+    delete process.env.CODEX_OWNER_NAME;
+    delete process.env.CODEX_OWNER_EMAIL;
     delete process.env.CODEX_CLI_PATH;
     delete process.env.CODEX_SESSIONS_DIR;
     delete process.env.CODEX_MANAGE_METADATA_FILE;
@@ -27,6 +31,8 @@ describe("loadConfig", () => {
     expect(config.port).toBe(4310);
     expect(config.password).toBe("admin");
     expect(config.defaultPassword).toBe(true);
+    expect(config.ownerName).toBe("Jamie Chen");
+    expect(config.ownerEmail).toBe("jamie@local");
     expect(config.codexCliPath).toBe("codex");
     expect(config.sessionsDir).toContain(".codex/sessions");
     expect(config.metadataFile).toContain(".codex-manage/session-metadata.json");
@@ -54,6 +60,29 @@ describe("loadConfig", () => {
       delete process.env.CODEX_WEB_PASSWORD;
     } else {
       process.env.CODEX_WEB_PASSWORD = previousPassword;
+    }
+  });
+
+  it("reads the owner identity from the environment", () => {
+    const previousName = process.env.CODEX_OWNER_NAME;
+    const previousEmail = process.env.CODEX_OWNER_EMAIL;
+    process.env.CODEX_OWNER_NAME = "Morgan Lee";
+    process.env.CODEX_OWNER_EMAIL = "morgan@example.local";
+
+    const config = loadConfig();
+
+    expect(config.ownerName).toBe("Morgan Lee");
+    expect(config.ownerEmail).toBe("morgan@example.local");
+
+    if (previousName === undefined) {
+      delete process.env.CODEX_OWNER_NAME;
+    } else {
+      process.env.CODEX_OWNER_NAME = previousName;
+    }
+    if (previousEmail === undefined) {
+      delete process.env.CODEX_OWNER_EMAIL;
+    } else {
+      process.env.CODEX_OWNER_EMAIL = previousEmail;
     }
   });
 });

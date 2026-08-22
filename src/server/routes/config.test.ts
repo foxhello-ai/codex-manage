@@ -9,6 +9,8 @@ function testConfig(): AppConfig {
     port: 5902,
     password: "admin",
     defaultPassword: true,
+    ownerName: "Jamie Chen",
+    ownerEmail: "jamie@local",
     sessionSecret: "test-secret-at-least-thirty-two-chars",
     codexCliPath: "/usr/local/bin/codex",
     sessionsDir: "/home/test/.codex/sessions",

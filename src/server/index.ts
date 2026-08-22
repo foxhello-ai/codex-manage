@@ -8,6 +8,7 @@ import { registerConfigRoutes } from "./routes/config";
 import { registerModelRoutes } from "./routes/models";
 import { registerRuntimeRoutes } from "./routes/runtime";
 import { registerSessionRoutes } from "./routes/sessions";
+import { registerCollaborationRoutes } from "./routes/collaboration";
 import { AppRuntime } from "./services/AppRuntime";
 import { CodexConfigWatcher, type CodexConfigChange } from "./services/CodexConfigWatcher";
 import { SessionService } from "./services/SessionService";
@@ -16,6 +17,7 @@ import { JsonlSessionParser } from "./services/JsonlSessionParser";
 import { ModelCatalogService } from "./services/ModelCatalogService";
 import { SessionModelService } from "./services/SessionModelService";
 import { registerStaticClient } from "./staticClient";
+import { CollaborationStore } from "./services/CollaborationStore";
 
 const config = loadConfig();
 
@@ -24,6 +26,10 @@ const app = Fastify({
 });
 const runtime = new AppRuntime(config);
 const metadataStore = new SessionMetadataStore(config.metadataFile);
+const collaborationStore = new CollaborationStore(
+  config.collaborationFile ?? ".codex-manage/collaboration.json",
+  { displayName: config.ownerName, localEmail: config.ownerEmail }
+);
 const modelCatalog = new ModelCatalogService(runtime.appServer);
 let runtimeReloadRetryAttempt = 0;
 let runtimeReloadRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -51,12 +57,13 @@ await app.register(cookie, {
 });
 await app.register(websocket);
 
-registerAuthHook(app);
-registerAuthRoutes(app, config);
+registerAuthHook(app, collaborationStore);
+registerAuthRoutes(app, config, collaborationStore);
+registerCollaborationRoutes(app, collaborationStore);
 registerConfigRoutes(app, config, () => runtime.getSnapshot());
 registerModelRoutes(app, modelCatalog);
 registerRuntimeRoutes(app, runtime, modelCatalog);
-registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager, sessionModelService);
+registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager, sessionModelService, collaborationStore);
 
 if (process.env.NODE_ENV === "production") {
   await registerStaticClient(app, config.clientDir);
