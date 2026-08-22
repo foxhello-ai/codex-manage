@@ -1,6 +1,6 @@
 import { CSSProperties, FormEvent, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { getHealthStatus, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateSessionMetadata, updateSessionModel } from "../shared/api";
-import type { ApprovalDecision, ApprovalSummary, HealthStatus, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserSession, WebSessionEvent } from "../shared/models";
+import { createCollaborator, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel } from "../shared/api";
+import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
 import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
 import { findRetryContextForTurn, findRetryContextFromFailedTurns, isTaskSendShortcut, type RetryContext } from "./sessionInteractions";
@@ -8,7 +8,7 @@ import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
-type DashboardView = "list" | "settings" | "detail" | "invalid";
+type DashboardView = "list" | "settings" | "members" | "detail" | "invalid";
 type SessionListMode = "workspace" | "recent";
 
 type LiveCommand = {
@@ -85,7 +85,7 @@ export function App() {
 
   async function handleLoggedIn(nextSession: UserSession) {
     setSession(nextSession);
-    setConfig(await getPublicConfig());
+    setConfig(nextSession.user?.role === "child" ? null : await getPublicConfig());
   }
 
   async function handleLogout() {
@@ -106,7 +106,7 @@ export function App() {
     return <LoginView defaultPassword={session?.defaultPassword ?? true} onLoggedIn={handleLoggedIn} />;
   }
 
-  return <Dashboard config={config} defaultPassword={session.defaultPassword} onLogout={handleLogout} />;
+  return <Dashboard user={session.user ?? ownerFallbackIdentity()} config={config} defaultPassword={session.defaultPassword} onLogout={handleLogout} />;
 }
 
 function LoginView({
@@ -117,8 +117,14 @@ function LoginView({
   onLoggedIn: (session: UserSession) => Promise<void>;
 }) {
   const [password, setPassword] = useState("");
+  const [accounts, setAccounts] = useState<LoginAccount[]>([]);
+  const [accountId, setAccountId] = useState("owner");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getLoginAccounts().then((response) => setAccounts(response.accounts)).catch(() => setAccounts([]));
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -126,7 +132,7 @@ function LoginView({
     setError(null);
 
     try {
-      const session = await login(password);
+      const session = await login(password, accountId);
       await onLoggedIn(session);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "登录失败");
@@ -151,6 +157,26 @@ function LoginView({
         ) : null}
 
         <form className="loginForm" onSubmit={handleSubmit}>
+          {accounts.length > 0 ? (
+            <div className="loginAccounts" aria-label="选择登录账号">
+              <span className="loginFieldLabel">账号</span>
+              {accounts.map((account) => (
+                <button
+                  className={`loginAccountOption${account.id === accountId ? " selected" : ""}`}
+                  type="button"
+                  key={account.id}
+                  onClick={() => setAccountId(account.id)}
+                >
+                  <span className="accountAvatar">{account.displayName.slice(0, 2).toUpperCase()}</span>
+                  <span>
+                    <strong>{account.displayName}</strong>
+                    <small>{account.localEmail ?? (account.role === "owner" ? "Owner account" : "Child user")}</small>
+                  </span>
+                  {account.id === accountId ? <span aria-hidden="true">✓</span> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <label htmlFor="password">密码</label>
           <input
             id="password"
@@ -171,19 +197,35 @@ function LoginView({
   );
 }
 
+function ownerFallbackIdentity(): UserIdentity {
+  return {
+    id: "owner",
+    role: "owner",
+    displayName: "Owner",
+    localEmail: null,
+    active: true,
+    ownerUserId: null
+  };
+}
+
 function Dashboard({
+  user,
   config,
   defaultPassword,
   onLogout
 }: {
+  user: UserIdentity;
   config: PublicConfig | null;
   defaultPassword: boolean;
   onLogout: () => Promise<void>;
 }) {
   const [initialRoute] = useState(() => parseSessionRoute(window.location.pathname));
+  const safeInitialRoute = user.role === "child" && (initialRoute.kind === "settings" || initialRoute.kind === "members")
+    ? ({ kind: "list" } as const)
+    : initialRoute;
   const [currentConfig, setCurrentConfig] = useState(config);
   const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [loadingDiagnostics, setLoadingDiagnostics] = useState(initialRoute.kind === "settings");
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(safeInitialRoute.kind === "settings" && user.role === "owner");
   const [reloadingRuntime, setReloadingRuntime] = useState(false);
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
   const [runtimeReloadNotice, setRuntimeReloadNotice] = useState<string | null>(null);
@@ -193,16 +235,16 @@ function Dashboard({
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
-    initialRoute.kind === "detail" ? initialRoute.sessionId : null
+    safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null
   );
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(initialRoute.kind === "detail");
+  const [loadingDetail, setLoadingDetail] = useState(safeInitialRoute.kind === "detail");
   const [detailError, setDetailError] = useState<string | null>(null);
   const [historyLoadedSessionId, setHistoryLoadedSessionId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<DashboardView>(initialRoute.kind === "list" ? "list" : initialRoute.kind);
-  const [routeError, setRouteError] = useState<string | null>(initialRoute.kind === "invalid" ? initialRoute.message : null);
+  const [viewMode, setViewMode] = useState<DashboardView>(safeInitialRoute.kind === "list" ? "list" : safeInitialRoute.kind);
+  const [routeError, setRouteError] = useState<string | null>(safeInitialRoute.kind === "invalid" ? safeInitialRoute.message : null);
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
   const [permissionMode, setPermissionMode] = useState<SessionPermissionMode>("default");
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalSummary[]>([]);
@@ -223,7 +265,7 @@ function Dashboard({
   const [retryDialogOpen, setRetryDialogOpen] = useState(false);
   const lastEventSeqRef = useRef(0);
   const runtimeEventSeqRef = useRef(0);
-  const selectedSessionIdRef = useRef<string | null>(initialRoute.kind === "detail" ? initialRoute.sessionId : null);
+  const selectedSessionIdRef = useRef<string | null>(safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null);
   const historyLoadedSessionIdRef = useRef<string | null>(null);
   const historyLoadingSessionIdRef = useRef<string | null>(null);
   const sessionDetailRef = useRef<SessionDetail | null>(null);
@@ -313,6 +355,7 @@ function Dashboard({
   }, [currentConfig?.runtimeReload?.generation]);
 
   useEffect(() => {
+    if (user.role !== "owner") return;
     let active = true;
     async function pollRuntimeConfig() {
       try {
@@ -331,10 +374,10 @@ function Dashboard({
 
   useEffect(() => {
     void loadSessions("");
-    if (initialRoute.kind === "detail") {
-      void refreshCurrentSession(initialRoute.sessionId);
+    if (safeInitialRoute.kind === "detail") {
+      void refreshCurrentSession(safeInitialRoute.sessionId);
     }
-    if (initialRoute.kind === "settings") {
+    if (safeInitialRoute.kind === "settings" && user.role === "owner") {
       void loadDiagnostics();
     }
   }, []);
@@ -831,10 +874,25 @@ function Dashboard({
     }
 
     if (route.kind === "settings") {
+      if (user.role !== "owner") {
+        setViewMode("list");
+        return;
+      }
       setDrawerOpen(false);
       setRouteError(null);
       setViewMode("settings");
       void loadDiagnostics();
+      return;
+    }
+
+    if (route.kind === "members") {
+      if (user.role !== "owner") {
+        setViewMode("list");
+        return;
+      }
+      setDrawerOpen(false);
+      setRouteError(null);
+      setViewMode("members");
       return;
     }
 
@@ -1029,8 +1087,15 @@ function Dashboard({
   }
 
   function handleOpenSettings() {
+    if (user.role !== "owner") return;
     if (window.location.pathname !== "/settings") window.history.pushState(null, "", "/settings");
     applySessionRoute({ kind: "settings" });
+  }
+
+  function handleOpenMembers() {
+    if (user.role !== "owner") return;
+    if (window.location.pathname !== "/settings/members") window.history.pushState(null, "", "/settings/members");
+    applySessionRoute({ kind: "members" });
   }
 
   function renderSessionBrowser(showHeading = true) {
@@ -1071,16 +1136,18 @@ function Dashboard({
       desktopWorkspace={viewMode === "list" || (viewMode === "detail" && !compactViewport)}
       action={(
         <div className="topbarActions">
-          <button
-            className="iconButton"
-            type="button"
-            aria-label="打开设置和诊断"
-            title="设置和诊断"
-            onClick={handleOpenSettings}
-            disabled={viewMode === "settings"}
-          >
-            <span aria-hidden="true">⚙</span>
-          </button>
+          {user.role === "owner" ? (
+            <button
+              className="iconButton"
+              type="button"
+              aria-label="打开设置和诊断"
+              title="设置和诊断"
+              onClick={handleOpenSettings}
+              disabled={viewMode === "settings" || viewMode === "members"}
+            >
+              <span aria-hidden="true">⚙</span>
+            </button>
+          ) : null}
           <button className="ghostButton" onClick={onLogout}>登出</button>
         </div>
       )}
@@ -1091,7 +1158,9 @@ function Dashboard({
         </div>
       ) : null}
 
-      {viewMode === "list" ? (
+      {viewMode === "list" && user.role === "child" ? (
+        <ChildAccessPage sessions={sessions} loading={loadingSessions} error={sessionError} onSelect={handleSelectSession} />
+      ) : viewMode === "list" ? (
         <>
           <DesktopWorkspaceHome
             sessions={sessions}
@@ -1207,6 +1276,7 @@ function Dashboard({
                   liveTimeline={liveTimeline}
                   modelState={currentModelState}
                   updatingModel={updatingModel}
+                  isChild={user.role === "child"}
                   onPermissionModeChange={handlePermissionModeChange}
                   onOpenModelPicker={(context) => {
                     if (context !== undefined) {
@@ -1237,7 +1307,7 @@ function Dashboard({
           )}
         />
       ) : viewMode === "settings" ? (
-        <SettingsPage
+      <SettingsPage
           config={currentConfig}
           health={health}
           loading={loadingDiagnostics}
@@ -1247,7 +1317,10 @@ function Dashboard({
           onBack={handleBackToList}
           onRefresh={loadDiagnostics}
           onReloadRuntime={handleReloadRuntime}
+          onOpenMembers={handleOpenMembers}
         />
+      ) : viewMode === "members" ? (
+        <MembersPage user={user} onBack={handleOpenSettings} />
       ) : (
         <>
           <section className="toolbar detailToolbar">
@@ -1281,6 +1354,7 @@ function Dashboard({
             onClick={(event) => event.stopPropagation()}
           >
             <MobileSessionDrawer
+              isOwner={user.role === "owner"}
               sessions={sessions}
               selectedSessionId={selectedSessionId}
               search={search}
@@ -1371,7 +1445,8 @@ function SettingsPage({
   reloadNotice,
   onBack,
   onRefresh,
-  onReloadRuntime
+  onReloadRuntime,
+  onOpenMembers
 }: {
   config: PublicConfig | null;
   health: HealthStatus | null;
@@ -1382,6 +1457,7 @@ function SettingsPage({
   onBack: () => void;
   onRefresh: () => Promise<void>;
   onReloadRuntime: () => Promise<void>;
+  onOpenMembers: () => void;
 }) {
   const appServer = health?.appServer ?? config?.appServer ?? null;
   const cliAvailable = health?.codexCli.available ?? Boolean(config?.codexCliVersion);
@@ -1451,6 +1527,293 @@ function SettingsPage({
           <SettingsRow label="进程 ID" value={appServer?.pid ? String(appServer.pid) : "无"} monospace />
         </div>
       </section>
+
+      <section className="settingsSection" aria-labelledby="access-settings-title">
+        <div className="settingsSectionHeader">
+          <h3 id="access-settings-title">Access &amp; collaboration</h3>
+          <span>主用户管理</span>
+        </div>
+        <div className="settingsRows">
+          <div className="settingsRow settingsActionRow">
+            <div>
+              <span>Members &amp; access</span>
+              <small>创建子用户，并为既有会话授予或撤销访问权限。</small>
+            </div>
+            <button className="ghostButton" type="button" onClick={onOpenMembers}>Open</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ChildAccessPage({
+  sessions,
+  loading,
+  error,
+  onSelect
+}: {
+  sessions: SessionSummary[];
+  loading: boolean;
+  error: string | null;
+  onSelect: (session: SessionSummary) => void;
+}) {
+  return (
+    <main className="childAccessPage" aria-labelledby="child-access-title">
+      <section className="childAccessHero">
+        <div className="childAccessIcon" aria-hidden="true">✓</div>
+        <div>
+          <p className="eyebrow">受限工作区</p>
+          <h1 id="child-access-title">Authorized sessions</h1>
+          <p>你只能访问主用户授权的会话。会话操作始终使用默认受控模式，并固定在原始 workspace。</p>
+        </div>
+      </section>
+
+      {error ? <div className="errorBanner">{error}</div> : null}
+      <section className="childAccessSection" aria-labelledby="authorized-sessions-title">
+        <div className="childAccessSectionHeader">
+          <div>
+            <h2 id="authorized-sessions-title">Authorized sessions</h2>
+            <span>{loading ? "载入中" : `${sessions.length} 个会话`}</span>
+          </div>
+          <span className="permissionBadge controlled">默认受控</span>
+        </div>
+        {loading ? <div className="emptyState">正在加载已授权会话...</div> : null}
+        {!loading && sessions.length === 0 ? (
+          <div className="childAccessEmpty">
+            <strong>暂时没有已授权会话</strong>
+            <span>请联系主用户为你授权一个既有会话。</span>
+          </div>
+        ) : null}
+        {!loading && sessions.length > 0 ? (
+          <div className="childSessionList">
+            {sortSessionsByUpdatedAt(sessions).map((session) => (
+              <button className="childSessionCard" type="button" key={session.id} onClick={() => onSelect(session)}>
+                <span className={`workspaceRecentStatus ${session.status}`} aria-hidden="true" />
+                <span className="childSessionCopy">
+                  <strong>{session.title}</strong>
+                  <small>{workspaceDisplayName(session.workspace)} · {formatDateTime(session.updatedAt)}</small>
+                </span>
+                <span className="childSessionArrow" aria-hidden="true">›</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="childAccessNotice" aria-label="不可用功能">
+        <h2>Unavailable actions</h2>
+        <div>
+          <span>创建新会话</span><strong>由 Codex CLI 创建</strong>
+          <span>切换 workspace</span><strong>固定为授权会话 workspace</strong>
+          <span>Settings &amp; diagnostics</span><strong>仅主用户可用</strong>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void }) {
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedGrantIds, setSelectedGrantIds] = useState<string[]>([]);
+  const [savingGrants, setSavingGrants] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createdCredential, setCreatedCredential] = useState<{ displayName: string; password: string } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const selected = collaborators.find((item) => item.id === selectedId) ?? null;
+
+  async function loadMembers() {
+    setLoading(true);
+    setError(null);
+    try {
+      const [memberResponse, sessionResponse] = await Promise.all([getCollaborators(), getSessions()]);
+      setCollaborators(memberResponse.collaborators);
+      setSessions(sessionResponse.sessions);
+      setSelectedId((current) => current && memberResponse.collaborators.some((item) => item.id === current)
+        ? current
+        : memberResponse.collaborators[0]?.id ?? null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "成员信息加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadMembers();
+  }, []);
+
+  useEffect(() => {
+    setSelectedGrantIds(selected?.grants ?? []);
+  }, [selectedId, selected?.grants]);
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const displayName = String(form.get("displayName") ?? "").trim();
+    const localEmail = String(form.get("localEmail") ?? "").trim();
+    const password = String(form.get("password") ?? "").trim();
+    setCreating(true);
+    setFormError(null);
+    try {
+      const response = await createCollaborator({ displayName, localEmail, password: password || undefined });
+      setCollaborators((current) => [...current, response.collaborator]);
+      setSelectedId(response.collaborator.id);
+      setSelectedGrantIds([]);
+      setCreatedCredential({ displayName: response.collaborator.displayName, password: response.initialPassword });
+      setCreateOpen(false);
+      event.currentTarget.reset();
+    } catch (caught) {
+      setFormError(caught instanceof Error ? caught.message : "子用户创建失败");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleStatusChange(member: Collaborator) {
+    setUpdatingStatus(member.id);
+    setError(null);
+    try {
+      const response = await updateCollaboratorStatus(member.id, !member.active);
+      setCollaborators((current) => current.map((item) => item.id === member.id ? response.collaborator : item));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "成员状态更新失败");
+    } finally {
+      setUpdatingStatus(null);
+    }
+  }
+
+  async function handleSaveGrants() {
+    if (!selected) return;
+    setSavingGrants(true);
+    setError(null);
+    try {
+      const response = await updateCollaboratorGrants(selected.id, selectedGrantIds);
+      setCollaborators((current) => current.map((item) => item.id === selected.id ? response.collaborator : item));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "会话授权更新失败");
+    } finally {
+      setSavingGrants(false);
+    }
+  }
+
+  function toggleGrant(sessionId: string) {
+    setSelectedGrantIds((current) => current.includes(sessionId)
+      ? current.filter((id) => id !== sessionId)
+      : [...current, sessionId]);
+  }
+
+  return (
+    <div className="membersPage">
+      <section className="toolbar detailToolbar">
+        <div className="detailTitleBar">
+          <button className="iconButton" type="button" aria-label="返回设置" title="返回设置" onClick={onBack}>
+            <span aria-hidden="true">←</span>
+          </button>
+          <div>
+            <p className="detailEyebrow">Access &amp; collaboration</p>
+            <h2>Members &amp; access</h2>
+          </div>
+        </div>
+        <button className="primaryButton" type="button" onClick={() => { setFormError(null); setCreateOpen(true); }}>
+          Add child user
+        </button>
+      </section>
+
+      {error ? <div className="errorBanner">{error}</div> : null}
+      {createdCredential ? (
+        <section className="credentialNotice" role="status">
+          <div>
+            <strong>{createdCredential.displayName} 已创建</strong>
+            <span>请安全地把 initial password 交给该用户；关闭此提示后不会再次显示。</span>
+          </div>
+          <code>{createdCredential.password}</code>
+          <button className="ghostButton" type="button" onClick={() => void copyTextToClipboard(createdCredential.password)}>Copy</button>
+          <button className="iconButton" type="button" aria-label="关闭初始密码提示" onClick={() => setCreatedCredential(null)}>×</button>
+        </section>
+      ) : null}
+
+      <div className="membersLayout">
+        <section className="membersListPanel" aria-labelledby="members-list-title">
+          <div className="membersPanelHeader">
+            <div><h3 id="members-list-title">Members</h3><span>{loading ? "载入中" : `${collaborators.length + 1} 个账号`}</span></div>
+          </div>
+          <button className="memberRow ownerMemberRow" type="button">
+            <span className="memberAvatar">{user.displayName.slice(0, 2).toUpperCase()}</span>
+            <span className="memberRowCopy"><strong>{user.displayName}</strong><small>{user.localEmail ?? "未设置邮箱"} · Owner</small></span>
+            <span className="memberStatus active">Owner</span>
+          </button>
+          {collaborators.map((member) => (
+            <button
+              className={`memberRow${member.id === selectedId ? " selected" : ""}`}
+              type="button"
+              key={member.id}
+              onClick={() => setSelectedId(member.id)}
+            >
+              <span className="memberAvatar">{member.displayName.slice(0, 2).toUpperCase()}</span>
+              <span className="memberRowCopy"><strong>{member.displayName}</strong><small>{member.localEmail} · Child user</small></span>
+              <span className={`memberStatus ${member.active ? "active" : "inactive"}`}>{member.active ? "Active" : "Disabled"}</span>
+            </button>
+          ))}
+          {!loading && collaborators.length === 0 ? <div className="emptyState">还没有子用户。</div> : null}
+        </section>
+
+        <section className="memberDetailPanel" aria-labelledby="member-detail-title">
+          {selected ? (
+            <>
+              <div className="memberDetailHeader">
+                <div>
+                  <p className="detailEyebrow">Child user</p>
+                  <h3 id="member-detail-title">{selected.displayName}</h3>
+                  <span>{selected.localEmail}</span>
+                </div>
+                <button className="ghostButton" type="button" onClick={() => void handleStatusChange(selected)} disabled={updatingStatus === selected.id}>
+                  {updatingStatus === selected.id ? "Updating" : selected.active ? "Disable" : "Enable"}
+                </button>
+              </div>
+              <div className="memberPolicyNotice"><strong>受控访问</strong><span>该用户不能访问 Settings、切换 workspace 或使用 full access。</span></div>
+              <div className="grantHeader"><div><h4>Session access</h4><span>选择该用户可以打开的既有会话。</span></div><strong>{selectedGrantIds.length} selected</strong></div>
+              <div className="grantList">
+                {sessions.map((session) => (
+                  <label className="grantRow" key={session.id}>
+                    <input type="checkbox" checked={selectedGrantIds.includes(session.id)} onChange={() => toggleGrant(session.id)} />
+                    <span><strong>{session.title}</strong><small>{workspaceDisplayName(session.workspace)} · {formatDateTime(session.updatedAt)}</small></span>
+                  </label>
+                ))}
+                {sessions.length === 0 ? <div className="emptyState">当前没有可授权的既有 session。</div> : null}
+              </div>
+              <div className="memberDetailActions">
+                <span>授权变更会立即影响下一次访问。</span>
+                <button className="primaryButton" type="button" onClick={() => void handleSaveGrants()} disabled={savingGrants}>{savingGrants ? "Saving" : "Save access"}</button>
+              </div>
+            </>
+          ) : (
+            <div className="memberEmptyDetail"><strong>选择一个 child user</strong><span>管理其状态和 session access。</span></div>
+          )}
+        </section>
+      </div>
+
+      {createOpen ? (
+        <div className="modalBackdrop" role="presentation" onClick={creating ? undefined : () => setCreateOpen(false)}>
+          <section className="messageDialog collaboratorDialog" role="dialog" aria-modal="true" aria-labelledby="create-child-title" onClick={(event) => event.stopPropagation()}>
+            <div className="dialogHeader"><div><h2 id="create-child-title">Add child user</h2><p className="muted">创建后可为该用户授权既有 session。</p></div><button className="iconButton" type="button" aria-label="关闭" onClick={() => setCreateOpen(false)}>×</button></div>
+            <form className="dialogBody collaboratorForm" onSubmit={(event) => void handleCreate(event)}>
+              <label>Display name<input name="displayName" required maxLength={80} placeholder="例如 Alex" /></label>
+              <label>Local email<input name="localEmail" required type="email" maxLength={160} placeholder="alex@local" /></label>
+              <label>Password <span className="muted">（留空自动生成）</span><input name="password" minLength={8} maxLength={200} type="password" autoComplete="new-password" placeholder="至少 8 位" /></label>
+              {formError ? <div className="errorBanner">{formError}</div> : null}
+              <div className="dialogActions"><button className="ghostButton" type="button" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</button><button className="primaryButton" type="submit" disabled={creating}>{creating ? "Creating" : "Create user"}</button></div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1611,6 +1974,7 @@ function SessionDetailPanel({
   liveTimeline,
   modelState,
   updatingModel,
+  isChild,
   onPermissionModeChange,
   onOpenModelPicker,
   onSendInput,
@@ -1635,6 +1999,7 @@ function SessionDetailPanel({
   liveTimeline: LiveTimelineEntry[];
   modelState: SessionModelState;
   updatingModel: boolean;
+  isChild: boolean;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
   onOpenModelPicker: (retryContext?: RetryContext | null) => void;
   onSendInput: (text: string) => Promise<void>;
@@ -1858,6 +2223,7 @@ function SessionDetailPanel({
           modelState={modelState}
           permissionMode={permissionMode}
           pendingApprovalCount={pendingApprovalCount}
+          isChild={isChild}
           updatingModel={updatingModel}
           onPermissionModeChange={onPermissionModeChange}
           onFocusApprovals={() => {
@@ -1881,7 +2247,8 @@ function ComposerRuntimeBar({
   updatingModel,
   onPermissionModeChange,
   onFocusApprovals,
-  onOpenModelPicker
+  onOpenModelPicker,
+  isChild
 }: {
   runtime: RuntimeSnapshot | null;
   modelState: SessionModelState;
@@ -1891,6 +2258,7 @@ function ComposerRuntimeBar({
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
   onFocusApprovals: () => void;
   onOpenModelPicker: () => void;
+  isChild: boolean;
 }) {
   const status = runtime?.status ?? "history";
   const model = runtime?.model ?? modelState.actualModel ?? modelState.preferredModel;
@@ -1939,15 +2307,19 @@ function ComposerRuntimeBar({
             <span className="approvalCount">待审批 {pendingApprovalCount}</span>
           </div>
         ) : null}
-        <button
-          className="ghostButton composerPermissionButton"
-          type="button"
-          onClick={handlePermissionToggle}
-          disabled={!canChangePermission || updatingPermission}
-          title={!canChangePermission ? "当前状态不可切换权限模式" : "切换权限模式"}
-        >
-          {updatingPermission ? "切换中" : permissionMode === "full_access" ? "完全权限" : "需审批"}
-        </button>
+        {isChild ? (
+          <span className="permissionBadge controlled">受控模式 · 原始 workspace</span>
+        ) : (
+          <button
+            className="ghostButton composerPermissionButton"
+            type="button"
+            onClick={handlePermissionToggle}
+            disabled={!canChangePermission || updatingPermission}
+            title={!canChangePermission ? "当前状态不可切换权限模式" : "切换权限模式"}
+          >
+            {updatingPermission ? "切换中" : permissionMode === "full_access" ? "完全权限" : "需审批"}
+          </button>
+        )}
         {pendingApprovalCount > 0 ? (
           <button className="ghostButton composerApprovalButton" type="button" onClick={onFocusApprovals}>
             查看审批（{pendingApprovalCount}）
@@ -3055,6 +3427,7 @@ function SessionBrowser({
 }
 
 function MobileSessionDrawer({
+  isOwner,
   sessions,
   selectedSessionId,
   search,
@@ -3069,6 +3442,7 @@ function MobileSessionDrawer({
   onSelect,
   onMetadataSaved
 }: {
+  isOwner: boolean;
   sessions: SessionSummary[];
   selectedSessionId: string | null;
   search: string;
@@ -3088,15 +3462,17 @@ function MobileSessionDrawer({
       <header className="drawerHeader mobileDrawerHeader">
         <h2>Chats</h2>
         <div>
-          <button
-            className="drawerNewButton"
-            type="button"
-            aria-label="查看会话管理（不创建新会话）"
-            title="新会话由 Codex CLI 创建"
-            onClick={onOpenList}
-          >
-            <span aria-hidden="true">+</span> New
-          </button>
+          {isOwner ? (
+            <button
+              className="drawerNewButton"
+              type="button"
+              aria-label="查看会话管理（不创建新会话）"
+              title="新会话由 Codex CLI 创建"
+              onClick={onOpenList}
+            >
+              <span aria-hidden="true">+</span> New
+            </button>
+          ) : null}
           <button ref={closeButtonRef} className="iconButton" type="button" aria-label="关闭会话列表" title="关闭" onClick={onClose}>
             <span aria-hidden="true">×</span>
           </button>
@@ -3118,13 +3494,15 @@ function MobileSessionDrawer({
         />
       </div>
 
-      <footer className="drawerUtility">
-        <button type="button" aria-label="打开设置和诊断" onClick={onOpenSettings}>
-          <span aria-hidden="true">⚙</span>
-          <span>Settings &amp; diagnostics</span>
-          <strong>Healthy</strong>
-        </button>
-      </footer>
+      {isOwner ? (
+        <footer className="drawerUtility">
+          <button type="button" aria-label="打开设置和诊断" onClick={onOpenSettings}>
+            <span aria-hidden="true">⚙</span>
+            <span>Settings &amp; diagnostics</span>
+            <strong>Healthy</strong>
+          </button>
+        </footer>
+      ) : null}
     </div>
   );
 }
