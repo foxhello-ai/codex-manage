@@ -1585,6 +1585,746 @@ h2 {
   background: #f4f9fd;
 }
 
+/* Final visual polish: compact, layered dark UI with deliberate control states. */
+:root {
+  --ui-bg: #18181a;
+  --ui-surface: #232325;
+  --ui-surface-raised: #2a2a2d;
+  --ui-surface-hover: #303034;
+  --ui-border: #3d3d42;
+  --ui-border-strong: #505057;
+  --ui-text: #f5f5f7;
+  --ui-muted: #a1a1a8;
+  --ui-subtle: #77777f;
+  --ui-green: #32d158;
+  --ui-green-hover: #43df68;
+  --ui-blue: #0a84ff;
+  --ui-shadow: 0 20px 60px rgb(0 0 0 / 28%);
+}
+
+body,
+#root,
+.appShell,
+.loginPage {
+  background:
+    radial-gradient(circle at 50% -18%, rgb(66 66 72 / 18%), transparent 38%),
+    var(--ui-bg);
+}
+
+button,
+input,
+textarea,
+select {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+button:not(:disabled):hover {
+  background: var(--ui-green-hover);
+}
+
+.loginPage {
+  padding: 28px 20px;
+}
+
+.loginPanel {
+  width: min(100%, 468px);
+  gap: 26px;
+  border: 1px solid var(--ui-border);
+  border-radius: 22px;
+  padding: 32px;
+  background: linear-gradient(145deg, rgb(43 43 46 / 98%), rgb(33 33 35 / 98%));
+  box-shadow: var(--ui-shadow), inset 0 1px 0 rgb(255 255 255 / 3%);
+}
+
+.loginPanel .eyebrow {
+  margin-bottom: 10px;
+  color: var(--ui-green);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+}
+
+.loginPanel h1 {
+  margin-bottom: 10px;
+  color: var(--ui-text);
+  font-size: clamp(1.65rem, 4vw, 2rem);
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.loginPanel .muted {
+  color: var(--ui-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.loginForm {
+  gap: 13px;
+}
+
+.loginForm > label,
+.loginFieldLabel {
+  color: var(--ui-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.loginAccounts {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.loginAccountOption {
+  width: 100%;
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--ui-text);
+  text-align: left;
+  background: rgb(255 255 255 / 3%);
+}
+
+.loginAccountOption:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface-hover);
+}
+
+.loginAccountOption.selected {
+  border-color: rgb(50 209 88 / 70%);
+  background: linear-gradient(135deg, rgb(50 209 88 / 15%), rgb(50 209 88 / 5%));
+  box-shadow: 0 0 0 3px rgb(50 209 88 / 8%);
+}
+
+.loginAccountOption > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.loginAccountOption strong,
+.loginAccountOption small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loginAccountOption strong {
+  color: var(--ui-text);
+  font-size: 0.84rem;
+}
+
+.loginAccountOption small {
+  color: var(--ui-muted);
+  font-size: 0.71rem;
+}
+
+.loginAccountOption > span[aria-hidden="true"] {
+  grid-column: 3;
+  grid-row: 1;
+  color: var(--ui-green);
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.loginAccountOption > .accountAvatar {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.accountAvatar {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(50 209 88 / 35%);
+  border-radius: 12px;
+  color: #d9ffe1;
+  background: #285b3d;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.loginForm input {
+  min-height: 50px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 12px;
+  padding: 0 14px;
+  color: var(--ui-text);
+  background: #1d1d1f;
+}
+
+.loginForm input:hover {
+  border-color: #68686f;
+}
+
+.loginForm input:focus {
+  border-color: var(--ui-blue);
+  box-shadow: 0 0 0 4px rgb(10 132 255 / 14%);
+}
+
+.loginForm > button[type="submit"] {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 4px;
+  border-radius: 12px;
+  color: #0d1710;
+  background: linear-gradient(180deg, var(--ui-green-hover), var(--ui-green));
+  box-shadow: 0 8px 18px rgb(50 209 88 / 16%);
+  font-weight: 800;
+}
+
+.loginForm > button[type="submit"]:hover:not(:disabled) {
+  color: #071009;
+  background: linear-gradient(180deg, #5bea7c, var(--ui-green-hover));
+  box-shadow: 0 10px 24px rgb(50 209 88 / 24%);
+}
+
+.loginForm > button[type="submit"]:disabled {
+  color: #7f8d82;
+  background: #2c5035;
+  box-shadow: none;
+}
+
+.loginPanel .warning {
+  border-color: #6d5522;
+  border-radius: 12px;
+  color: #f8d78a;
+  background: rgb(120 89 19 / 18%);
+  font-size: 0.76rem;
+}
+
+.errorText {
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: #ffb3ae;
+  background: rgb(255 69 58 / 10%);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 767px) {
+  .loginPage {
+    padding: 16px;
+  }
+
+  .loginPanel {
+    border-radius: 18px;
+    padding: 24px 20px;
+  }
+}
+
+/* FOX-21 access and collaboration surfaces. */
+.settingsActionRow {
+  align-items: center;
+}
+
+.settingsActionRow > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.settingsActionRow small {
+  color: #8e8e93;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.settingsActionRow > .ghostButton {
+  justify-self: end;
+  min-width: 74px;
+}
+
+.childAccessPage,
+.membersPage {
+  width: min(100%, 1080px);
+  display: grid;
+  gap: 16px;
+  margin: 0 auto;
+}
+
+.childAccessHero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  border: 1px solid #3f3f43;
+  border-radius: 16px;
+  padding: 24px;
+  background: linear-gradient(135deg, #2b2b2e 0%, #252528 100%);
+}
+
+.childAccessIcon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  color: #101112;
+  background: #30d158;
+  font-weight: 800;
+}
+
+.childAccessHero h1,
+.childAccessHero p,
+.childAccessHero .eyebrow {
+  margin: 0;
+}
+
+.childAccessHero h1 {
+  color: #f5f5f7;
+  font-size: 1.35rem;
+}
+
+.childAccessHero p:not(.eyebrow) {
+  max-width: 700px;
+  margin-top: 8px;
+  color: #aeaeb2;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.childAccessSection,
+.childAccessNotice,
+.membersListPanel,
+.memberDetailPanel {
+  border: 1px solid #3f3f43;
+  border-radius: 14px;
+  background: #28282a;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 14%);
+}
+
+.childAccessSectionHeader,
+.membersPanelHeader,
+.memberDetailHeader,
+.grantHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #3f3f43;
+  padding: 16px 18px;
+}
+
+.childAccessSectionHeader h2,
+.membersPanelHeader h3,
+.memberDetailHeader h3,
+.grantHeader h4,
+.childAccessNotice h2 {
+  margin: 0;
+  color: #f5f5f7;
+  font-size: 0.95rem;
+}
+
+.childAccessSectionHeader > div,
+.membersPanelHeader > div,
+.grantHeader > div {
+  display: grid;
+  gap: 5px;
+}
+
+.childAccessSectionHeader span:not(.permissionBadge),
+.membersPanelHeader span,
+.grantHeader span,
+.memberDetailHeader > div > span,
+.memberDetailActions > span {
+  color: #8e8e93;
+  font-size: 0.74rem;
+}
+
+.childSessionList,
+.membersListPanel,
+.grantList {
+  display: grid;
+}
+
+.childSessionCard,
+.memberRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid #3a3a3c;
+  padding: 14px 18px;
+  color: #f5f5f7;
+  text-align: left;
+  background: transparent;
+}
+
+.childSessionCard:last-child,
+.memberRow:last-child {
+  border-bottom: 0;
+}
+
+.childSessionCard:hover,
+.memberRow:hover,
+.memberRow.selected {
+  background: #303034;
+}
+
+.childSessionCopy,
+.memberRowCopy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.childSessionCopy strong,
+.memberRowCopy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+}
+
+.childSessionCopy small,
+.memberRowCopy small {
+  overflow: hidden;
+  color: #8e8e93;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+.childSessionArrow {
+  color: #8e8e93;
+  font-size: 1.4rem;
+}
+
+.childAccessEmpty,
+.memberEmptyDetail {
+  display: grid;
+  gap: 8px;
+  padding: 34px 20px;
+  text-align: center;
+}
+
+.childAccessEmpty strong,
+.memberEmptyDetail strong {
+  color: #f5f5f7;
+  font-size: 0.88rem;
+}
+
+.childAccessEmpty span,
+.memberEmptyDetail span {
+  color: #8e8e93;
+  font-size: 0.76rem;
+}
+
+.childAccessNotice {
+  padding: 18px;
+}
+
+.childAccessNotice h2 {
+  margin-bottom: 14px;
+}
+
+.childAccessNotice > div {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1fr);
+  gap: 10px 16px;
+}
+
+.childAccessNotice span {
+  color: #aeaeb2;
+  font-size: 0.78rem;
+}
+
+.childAccessNotice strong {
+  color: #8e8e93;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.membersPage > .detailToolbar {
+  margin-bottom: 0;
+}
+
+.membersLayout {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.45fr);
+  gap: 16px;
+}
+
+.memberAvatar {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #d7eaff;
+  background: #294763;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.ownerMemberRow .memberAvatar {
+  color: #d9ffe1;
+  background: #285b3d;
+}
+
+.memberStatus {
+  flex: 0 0 auto;
+  border: 1px solid #4a4a4e;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.66rem;
+}
+
+.memberStatus.active {
+  border-color: #2d8650;
+  color: #9ce7b2;
+  background: #173d27;
+}
+
+.memberStatus.inactive {
+  color: #aeaeb2;
+}
+
+.memberDetailPanel {
+  min-width: 0;
+}
+
+.memberDetailHeader {
+  align-items: flex-start;
+}
+
+.memberDetailHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.memberDetailHeader h3 {
+  font-size: 1.12rem;
+}
+
+.memberPolicyNotice {
+  display: grid;
+  gap: 5px;
+  margin: 16px 18px 0;
+  border: 1px solid #315276;
+  border-radius: 10px;
+  padding: 12px;
+  color: #c9e2ff;
+  background: #1e3043;
+}
+
+.memberPolicyNotice strong {
+  font-size: 0.78rem;
+}
+
+.memberPolicyNotice span {
+  color: #9fb7cf;
+  font-size: 0.72rem;
+}
+
+.grantHeader {
+  margin-top: 16px;
+}
+
+.grantHeader > strong {
+  color: #9ce7b2;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.grantRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #3a3a3c;
+  padding: 11px 18px;
+  cursor: pointer;
+}
+
+.grantRow:last-child {
+  border-bottom: 0;
+}
+
+.grantRow input {
+  accent-color: #0a84ff;
+}
+
+.grantRow > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.grantRow strong,
+.grantRow small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grantRow strong {
+  color: #f5f5f7;
+  font-size: 0.78rem;
+}
+
+.grantRow small {
+  color: #8e8e93;
+  font-size: 0.7rem;
+}
+
+.memberDetailActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #3f3f43;
+  padding: 14px 18px;
+}
+
+.credentialNotice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #2d8650;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #d9ffe1;
+  background: #173d27;
+}
+
+.credentialNotice > div {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.credentialNotice span {
+  color: #9ce7b2;
+  font-size: 0.72rem;
+}
+
+.credentialNotice code {
+  border: 1px solid #4a9b67;
+  border-radius: 7px;
+  padding: 5px 8px;
+  color: #f5fff7;
+  background: #214c31;
+  font-size: 0.78rem;
+}
+
+.collaboratorDialog {
+  width: min(100%, 520px);
+}
+
+.collaboratorForm {
+  display: grid;
+  gap: 14px;
+}
+
+.collaboratorForm label {
+  display: grid;
+  gap: 7px;
+  color: #aeaeb2;
+  font-size: 0.76rem;
+}
+
+.collaboratorForm input {
+  min-height: 42px;
+  border: 1px solid #4a4a4e;
+  border-radius: 9px;
+  padding: 0 11px;
+  color: #f5f5f7;
+  background: #1f1f21;
+}
+
+@media (max-width: 767px) {
+  .childAccessPage,
+  .membersPage {
+    gap: 12px;
+  }
+
+  .childAccessHero {
+    padding: 18px;
+  }
+
+  .childAccessHero h1 {
+    font-size: 1.15rem;
+  }
+
+  .membersLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .memberDetailPanel {
+    order: -1;
+  }
+
+  .membersPage > .detailToolbar {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .membersPage > .detailToolbar .primaryButton {
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 0.72rem;
+  }
+
+  .credentialNotice {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .credentialNotice code {
+    margin-left: 46px;
+  }
+
+  .childAccessNotice > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .childAccessNotice strong {
+    margin-bottom: 7px;
+  }
+
+  .memberDetailActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .memberDetailActions .primaryButton {
+    width: 100%;
+  }
+
+  .settingsActionRow {
+    align-items: stretch;
+  }
+
+  .settingsActionRow > .ghostButton {
+    justify-self: stretch;
+    width: 100%;
+  }
+}
+
 .sessionHero h3 {
   margin: 0;
   font-size: 1.25rem;
@@ -6869,5 +7609,695 @@ textarea::placeholder {
     color: #d1d1d6;
     font-size: 1.2rem;
     line-height: 1;
+  }
+}
+
+/* Login surface override kept last so it wins on desktop and mobile. */
+.loginPage {
+  min-height: 100dvh;
+  padding: 28px 20px;
+  background:
+    radial-gradient(circle at 50% -18%, rgb(66 66 72 / 18%), transparent 38%),
+    #18181a;
+}
+
+.loginPanel {
+  width: min(100%, 468px);
+  gap: 26px;
+  border: 1px solid #3d3d42;
+  border-radius: 22px;
+  padding: 32px;
+  background: linear-gradient(145deg, rgb(43 43 46 / 98%), rgb(33 33 35 / 98%));
+  box-shadow: 0 20px 60px rgb(0 0 0 / 28%), inset 0 1px 0 rgb(255 255 255 / 3%);
+}
+
+.loginPanel .eyebrow {
+  margin-bottom: 10px;
+  color: #32d158;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+}
+
+.loginPanel h1 {
+  margin-bottom: 10px;
+  color: #f5f5f7;
+  font-size: clamp(1.65rem, 4vw, 2rem);
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.loginPanel .muted {
+  color: #a1a1a8;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.loginForm {
+  gap: 13px;
+}
+
+.loginForm > label,
+.loginFieldLabel {
+  color: #f5f5f7;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.loginAccounts {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.loginAccountOption {
+  width: 100%;
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid #3d3d42;
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: #f5f5f7;
+  text-align: left;
+  background: rgb(255 255 255 / 3%);
+}
+
+.loginAccountOption:hover {
+  border-color: #505057;
+  color: #f5f5f7;
+  background: #303034;
+}
+
+.loginAccountOption.selected {
+  border-color: rgb(50 209 88 / 70%);
+  background: linear-gradient(135deg, rgb(50 209 88 / 15%), rgb(50 209 88 / 5%));
+  box-shadow: 0 0 0 3px rgb(50 209 88 / 8%);
+}
+
+.loginAccountOption > .accountAvatar {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.loginAccountOption > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.loginAccountOption strong,
+.loginAccountOption small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loginAccountOption strong {
+  color: #f5f5f7;
+  font-size: 0.84rem;
+}
+
+.loginAccountOption small {
+  color: #a1a1a8;
+  font-size: 0.71rem;
+}
+
+.loginAccountOption > span[aria-hidden="true"] {
+  grid-column: 3;
+  grid-row: 1;
+  color: #32d158;
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.accountAvatar {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(50 209 88 / 35%);
+  border-radius: 12px;
+  color: #d9ffe1;
+  background: #285b3d;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.loginForm input {
+  min-height: 50px;
+  border: 1px solid #505057;
+  border-radius: 12px;
+  padding: 0 14px;
+  color: #f5f5f7;
+  background: #1d1d1f;
+}
+
+.loginForm input:focus {
+  border-color: #0a84ff;
+  box-shadow: 0 0 0 4px rgb(10 132 255 / 14%);
+}
+
+.loginForm > button[type="submit"] {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 4px;
+  border-radius: 12px;
+  color: #0d1710;
+  background: linear-gradient(180deg, #43df68, #32d158);
+  box-shadow: 0 8px 18px rgb(50 209 88 / 16%);
+  font-weight: 800;
+}
+
+.loginForm > button[type="submit"]:hover:not(:disabled) {
+  color: #071009;
+  background: linear-gradient(180deg, #5bea7c, #43df68);
+  box-shadow: 0 10px 24px rgb(50 209 88 / 24%);
+}
+
+.loginForm > button[type="submit"]:disabled {
+  color: #7f8d82;
+  background: #2c5035;
+  box-shadow: none;
+}
+
+@media (max-width: 767px) {
+  .loginPage {
+    padding: 16px;
+  }
+
+  .loginPanel {
+    border-radius: 18px;
+    padding: 24px 20px;
+  }
+}
+
+/* Members and access surfaces: shared desktop baseline, mobile rules remain above. */
+.settingsActionRow {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center;
+}
+
+.settingsActionRow > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.settingsActionRow > .ghostButton {
+  width: auto;
+  min-width: 76px;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.membersPage,
+.childAccessPage {
+  width: min(100%, 1080px);
+  display: grid;
+  gap: 16px;
+  margin: 0 auto;
+}
+
+.membersPage > .detailToolbar {
+  width: 100%;
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.membersPage > .detailToolbar .primaryButton {
+  width: auto;
+  min-width: 142px;
+  white-space: nowrap;
+}
+
+.membersLayout {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.45fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.membersListPanel,
+.memberDetailPanel,
+.childAccessSection,
+.childAccessNotice {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #3d3d42;
+  border-radius: 16px;
+  color: #f5f5f7;
+  background: #232325;
+  box-shadow: 0 14px 34px rgb(0 0 0 / 16%);
+}
+
+.membersPanelHeader,
+.memberDetailHeader,
+.grantHeader,
+.childAccessSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #3d3d42;
+  padding: 16px 18px;
+  background: #2a2a2d;
+}
+
+.membersPanelHeader > div,
+.memberDetailHeader > div,
+.grantHeader > div,
+.childAccessSectionHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.membersPanelHeader h3,
+.memberDetailHeader h3,
+.grantHeader h4,
+.childAccessSectionHeader h2 {
+  margin: 0;
+  color: #f5f5f7;
+  font-size: 0.98rem;
+}
+
+.membersPanelHeader span,
+.memberDetailHeader > div > span,
+.grantHeader span,
+.childAccessSectionHeader > div > span {
+  color: #a1a1a8;
+  font-size: 0.73rem;
+}
+
+.memberRow {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid #38383d;
+  border-radius: 0;
+  padding: 12px 18px;
+  color: #f5f5f7;
+  text-align: left;
+  background: transparent;
+}
+
+.memberRow:last-child {
+  border-bottom: 0;
+}
+
+.memberRow:hover,
+.memberRow.selected {
+  color: #f5f5f7;
+  background: #303034;
+}
+
+.memberAvatar {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(10 132 255 / 24%);
+  border-radius: 11px;
+  color: #d7eaff;
+  background: #294763;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.ownerMemberRow .memberAvatar {
+  border-color: rgb(50 209 88 / 30%);
+  color: #d9ffe1;
+  background: #285b3d;
+}
+
+.memberRowCopy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.memberRowCopy strong,
+.memberRowCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberRowCopy strong {
+  color: #f5f5f7;
+  font-size: 0.84rem;
+}
+
+.memberRowCopy small {
+  color: #a1a1a8;
+  font-size: 0.71rem;
+}
+
+.memberStatus {
+  flex: 0 0 auto;
+  border: 1px solid #505057;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #a1a1a8;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.memberStatus.active {
+  border-color: #2d8650;
+  color: #9ce7b2;
+  background: #173d27;
+}
+
+.memberDetailHeader {
+  align-items: flex-start;
+}
+
+.memberDetailHeader h3 {
+  font-size: 1.14rem;
+}
+
+.memberDetailHeader .ghostButton,
+.memberDetailActions .primaryButton {
+  width: auto;
+  white-space: nowrap;
+}
+
+.memberPolicyNotice {
+  display: grid;
+  gap: 5px;
+  margin: 16px 18px 0;
+  border: 1px solid #315276;
+  border-radius: 11px;
+  padding: 12px;
+  color: #c9e2ff;
+  background: #1e3043;
+}
+
+.memberPolicyNotice strong {
+  color: #d7eaff;
+  font-size: 0.78rem;
+}
+
+.memberPolicyNotice span {
+  color: #9fb7cf;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.grantHeader {
+  margin-top: 16px;
+}
+
+.grantHeader > strong {
+  color: #9ce7b2;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.grantList {
+  max-height: min(58vh, 620px);
+  overflow: auto;
+}
+
+.grantRow {
+  width: 100%;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid #38383d;
+  padding: 10px 18px;
+  cursor: pointer;
+}
+
+.grantRow:last-child {
+  border-bottom: 0;
+}
+
+.grantRow input {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: #0a84ff;
+}
+
+.grantRow > span {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.grantRow strong,
+.grantRow small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grantRow strong {
+  color: #f5f5f7;
+  font-size: 0.78rem;
+}
+
+.grantRow small {
+  color: #8e8e93;
+  font-size: 0.7rem;
+}
+
+.memberDetailActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #3d3d42;
+  padding: 14px 18px;
+}
+
+.memberDetailActions > span {
+  color: #8e8e93;
+  font-size: 0.72rem;
+}
+
+.credentialNotice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #2d8650;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #d9ffe1;
+  background: #173d27;
+}
+
+.credentialNotice > div {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.credentialNotice span {
+  color: #9ce7b2;
+  font-size: 0.72rem;
+}
+
+.credentialNotice code {
+  border: 1px solid #4a9b67;
+  border-radius: 7px;
+  padding: 5px 8px;
+  color: #f5fff7;
+  background: #214c31;
+  font-size: 0.78rem;
+}
+
+.childAccessHero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  border: 1px solid #3d3d42;
+  border-radius: 16px;
+  padding: 24px;
+  background: linear-gradient(135deg, #2b2b2e 0%, #252528 100%);
+}
+
+.childAccessHero h1,
+.childAccessHero p,
+.childAccessHero .eyebrow {
+  margin: 0;
+}
+
+.childAccessHero h1 {
+  color: #f5f5f7;
+  font-size: 1.35rem;
+}
+
+.childAccessHero p:not(.eyebrow) {
+  max-width: 700px;
+  margin-top: 8px;
+  color: #a1a1a8;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 767px) {
+  .settingsActionRow {
+    grid-template-columns: 1fr !important;
+    align-items: stretch;
+  }
+
+  .settingsActionRow > .ghostButton,
+  .membersPage > .detailToolbar .primaryButton,
+  .memberDetailHeader .ghostButton,
+  .memberDetailActions .primaryButton {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .membersLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .memberDetailPanel {
+    order: -1;
+  }
+
+  .membersPage > .detailToolbar {
+    align-items: center;
+  }
+
+  .credentialNotice {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .credentialNotice code {
+    margin-left: 46px;
+  }
+
+  .memberDetailActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* Child-user dialog: keep the form readable against the dark V5 surface. */
+.collaboratorDialog {
+  width: min(100%, 520px);
+  max-height: min(720px, calc(100dvh - 32px));
+  border: 1px solid #3d3d42;
+  border-radius: 16px;
+  background: #232325;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 42%);
+}
+
+.collaboratorDialog .dialogHeader {
+  padding: 20px 22px 16px;
+  border-color: #3d3d42;
+  background: #2a2a2d;
+}
+
+.collaboratorDialog .dialogHeader h2 {
+  color: #f5f5f7;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.collaboratorDialog .dialogHeader p {
+  margin: 0;
+  color: #a1a1a8;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.collaboratorDialog .dialogBody {
+  padding: 20px 22px 22px;
+  background: #232325;
+}
+
+.collaboratorForm {
+  display: grid;
+  gap: 16px;
+}
+
+.collaboratorForm label {
+  display: grid;
+  gap: 7px;
+  color: #f5f5f7;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.collaboratorForm label > .muted {
+  color: #a1a1a8;
+  font-size: 0.74rem;
+  font-weight: 500;
+}
+
+.collaboratorForm input {
+  min-height: 46px;
+  border: 1px solid #505057;
+  border-radius: 10px;
+  padding: 0 13px;
+  color: #f5f5f7;
+  background: #1d1d1f;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.collaboratorForm input:hover {
+  border-color: #68686f;
+  background: #202023;
+}
+
+.collaboratorForm input:focus {
+  border-color: #0a84ff;
+  background: #1d1d1f;
+  box-shadow: 0 0 0 4px rgb(10 132 255 / 14%);
+  outline: 0;
+}
+
+.collaboratorForm .errorBanner {
+  margin: 0;
+}
+
+.collaboratorForm .dialogActions {
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.collaboratorForm .dialogActions button {
+  min-width: 116px;
+}
+
+@media (max-width: 767px) {
+  .collaboratorDialog .dialogHeader,
+  .collaboratorDialog .dialogBody {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .collaboratorForm .dialogActions {
+    flex-direction: column-reverse;
+  }
+
+  .collaboratorForm .dialogActions button {
+    width: 100%;
   }
 }
