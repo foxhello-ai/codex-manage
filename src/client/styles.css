@@ -8301,3 +8301,141 @@ textarea::placeholder {
     width: 100%;
   }
 }
+
+/* Child access page: keep the content compact outside the conversation workspace. */
+.appShell.desktopWorkspaceShell:has(.childAccessPage) .content {
+  width: min(1120px, 100%);
+  min-height: 0;
+  margin: 0 auto;
+  padding: 24px;
+  gap: 16px;
+}
+
+.childAccessPage {
+  width: 100%;
+  min-height: 0;
+  align-content: start;
+  gap: 16px;
+}
+
+.childAccessHero {
+  min-height: 0;
+  padding: 20px 22px;
+}
+
+.childAccessSection,
+.childAccessNotice {
+  min-height: 0;
+}
+
+.childSessionList {
+  display: grid;
+}
+
+.childSessionCard {
+  width: 100%;
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid #38383d;
+  border-radius: 0;
+  padding: 12px 18px;
+  color: #f5f5f7;
+  text-align: left;
+  background: transparent;
+}
+
+.childSessionCard:last-child {
+  border-bottom: 0;
+}
+
+.childSessionCard:hover {
+  color: #f5f5f7;
+  background: #303034;
+}
+
+.childSessionCard .workspaceRecentStatus {
+  width: 8px;
+  height: 8px;
+  margin: 0;
+}
+
+.childSessionCopy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.childSessionCopy strong,
+.childSessionCopy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.childSessionCopy strong {
+  color: #f5f5f7;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.childSessionCopy small {
+  color: #a1a1a8;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.childSessionArrow {
+  color: #8e8e93;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.childAccessNotice {
+  padding: 18px;
+}
+
+.childAccessNotice > div {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1fr);
+  gap: 10px 16px;
+}
+
+.childAccessNotice h2 {
+  margin: 0 0 14px;
+}
+
+.childAccessNotice span {
+  color: #a1a1a8;
+  font-size: 0.78rem;
+}
+
+.childAccessNotice strong {
+  color: #8e8e93;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+@media (max-width: 767px) {
+  .appShell.desktopWorkspaceShell:has(.childAccessPage) .content {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .childAccessHero {
+    padding: 18px;
+  }
+
+  .childAccessNotice > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .childAccessNotice strong {
+    margin-bottom: 7px;
+  }
+}

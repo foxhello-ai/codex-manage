@@ -63,7 +63,7 @@ export function App() {
         if (cancelled) return;
         setSession(me);
 
-        if (me.authenticated) {
+        if (me.authenticated && me.user?.role !== "child") {
           const publicConfig = await getPublicConfig();
           if (cancelled) return;
           setConfig(publicConfig);
