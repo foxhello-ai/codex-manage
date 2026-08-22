@@ -6,8 +6,10 @@ import type { SessionService } from "../services/SessionService";
 import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 import type { RuntimeManager } from "../services/RuntimeManager";
 import type { SessionModelService } from "../services/SessionModelService";
-import { isAuthenticated } from "../auth/session";
+import { isAuthenticated, ownerIdentity, resolveAuthUser } from "../auth/session";
 import type { LocalAuthService } from "../auth/LocalAuthService";
+import type { UserIdentity } from "../../shared/models";
+import type { CollaborationStore } from "../services/CollaborationStore";
 
 const ListQuery = z.object({
   search: z.string().optional(),
@@ -68,8 +70,11 @@ export function registerSessionRoutes(
   jsonlSessionParser?: JsonlSessionParser,
   runtimeManager?: RuntimeManager,
   sessionModelService?: SessionModelService,
-  authService?: LocalAuthService
+  authOrCollaboration?: LocalAuthService | CollaborationStore,
+  collaborationStoreOption?: CollaborationStore
 ) {
+  const authService = isLocalAuthService(authOrCollaboration) ? authOrCollaboration : undefined;
+  const collaborationStore = isCollaborationStore(authOrCollaboration) ? authOrCollaboration : collaborationStoreOption;
   app.get("/api/sessions", async (request, reply) => {
     const parsed = ListQuery.safeParse(request.query);
     if (!parsed.success) {
@@ -77,8 +82,10 @@ export function registerSessionRoutes(
     }
 
     try {
+      const user = await resolveRouteUser(request, collaborationStore, authService);
+      if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
       const sessions = await sessionService.listSessions(parsed.data);
-      return reply.send({ sessions });
+      return reply.send({ sessions: collaborationStore ? await collaborationStore.filterSessions(user.id, sessions) : sessions });
     } catch (error) {
       return sendError(
         reply,
@@ -102,7 +109,17 @@ export function registerSessionRoutes(
       return sendError(reply, 503, "RUNTIME_UNAVAILABLE", "运行态管理器不可用");
     }
 
-    return reply.send({ runtime: runtimeManager.getRuntime(params.data.id) });
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore, authService);
+    if (!user) return;
+
+    try {
+      const runtime = user.role === "child"
+        ? await ensureChildControlledRuntime(user, params.data.id, runtimeManager)
+        : runtimeManager.getRuntime(params.data.id);
+      return reply.send({ runtime });
+    } catch (error) {
+      return sendChildRuntimeError(reply, error);
+    }
   });
 
   app.patch("/api/sessions/:id/model", async (request, reply) => {
@@ -118,10 +135,17 @@ export function registerSessionRoutes(
       return sendError(reply, 503, "MODEL_SERVICE_UNAVAILABLE", "模型服务不可用");
     }
 
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore, authService);
+    if (!user) return;
+
     try {
+      if (runtimeManager) await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
       const result = await sessionModelService.updateSelection(params.data.id, body.data);
       return reply.status(result.confirmationPending ? 202 : 200).send(result);
     } catch (error) {
+      if (error instanceof Error && error.message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") {
+        return sendChildRuntimeError(reply, error);
+      }
       return sendModelError(reply, error);
     }
   });
@@ -141,7 +165,14 @@ export function registerSessionRoutes(
       return sendError(reply, 503, "RUNTIME_UNAVAILABLE", "运行态管理器不可用");
     }
 
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore, authService);
+    if (!user) return;
+    if (user.role === "child" && body.data.permissionMode === "full_access") {
+      return sendError(reply, 403, "FULL_ACCESS_FORBIDDEN", "子用户只能使用默认受控模式");
+    }
+
     try {
+      await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
       const modelOverride = sessionModelService
         ? await sessionModelService.resolveForResume(
             params.data.id,
@@ -149,12 +180,15 @@ export function registerSessionRoutes(
           )
         : undefined;
       const runtime = await runtimeManager.resumeThread(params.data.id, {
-        permissionMode: body.data.permissionMode,
+        permissionMode: user.role === "child" ? "default" : body.data.permissionMode,
         modelOverride
       });
       return reply.send({ runtime });
     } catch (error) {
       if (error instanceof ModelDomainError) return sendModelError(reply, error);
+      if (error instanceof Error && error.message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") {
+        return sendChildRuntimeError(reply, error);
+      }
       return sendError(reply, 503, "SESSION_RESUME_FAILED", sanitizeModelError(error));
     }
   });
@@ -174,17 +208,28 @@ export function registerSessionRoutes(
       return sendError(reply, 503, "RUNTIME_UNAVAILABLE", "运行态管理器不可用");
     }
 
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore, authService);
+    if (!user) return;
+    if (user.role === "child" && body.data.permissionMode === "full_access") {
+      return sendError(reply, 403, "FULL_ACCESS_FORBIDDEN", "子用户只能使用默认受控模式");
+    }
+
     try {
+      await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
       const modelOverride = sessionModelService
         ? await sessionModelService.resolveForTurn(params.data.id)
         : undefined;
       const runtime = await runtimeManager.sendInput(params.data.id, {
         ...body.data,
+        permissionMode: user.role === "child" ? "default" : body.data.permissionMode,
         modelOverride
       });
       return reply.send({ runtime });
     } catch (error) {
       if (error instanceof ModelDomainError) return sendModelError(reply, error);
+      if (error instanceof Error && error.message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") {
+        return sendChildRuntimeError(reply, error);
+      }
       return sendError(reply, 409, "SESSION_INPUT_FAILED", sanitizeModelError(error));
     }
   });
@@ -204,24 +249,41 @@ export function registerSessionRoutes(
       return sendError(reply, 503, "RUNTIME_UNAVAILABLE", "运行态管理器不可用");
     }
 
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore, authService);
+    if (!user) return;
+
     try {
+      await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
       const result = runtimeManager.submitApproval(params.data.id, params.data.approvalId, body.data);
       return reply.send(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "审批处理失败";
+      if (message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") return sendChildRuntimeError(reply, error);
       return sendError(reply, message.includes("not found") ? 404 : 409, "APPROVAL_FAILED", message);
     }
   });
 
   if (runtimeManager) {
-    app.get("/api/sessions/:id/ws", { websocket: true }, (socket, request) => {
+    app.get("/api/sessions/:id/ws", { websocket: true }, async (socket, request) => {
       const params = SessionParams.safeParse(request.params);
-      if (!params.success || !isAuthenticated(request, authService)) {
+      if (!params.success || (authService && !isAuthenticated(request, authService))) {
         socket.close(1008, "unauthenticated");
         return;
       }
 
+      const user = await resolveRouteUser(request, collaborationStore, authService);
+      if (!user || (collaborationStore && user.role === "child" && !(await collaborationStore.canAccessSession(user.id, params.data.id)))) {
+        socket.close(1008, "forbidden");
+        return;
+      }
+
       const threadId = params.data.id;
+      try {
+        await ensureChildControlledRuntime(user, threadId, runtimeManager);
+      } catch {
+        socket.close(1008, "controlled mode required");
+        return;
+      }
       const query = request.query && typeof request.query === "object" ? (request.query as Record<string, unknown>) : {};
       const afterSeq = Number(query.afterSeq ?? 0);
 
@@ -244,8 +306,25 @@ export function registerSessionRoutes(
       });
 
       const unsubscribe = runtimeManager.eventHub.subscribe(threadId, send);
-      socket.on("close", unsubscribe);
-      socket.on("error", unsubscribe);
+      let closed = false;
+      const accessTimer = collaborationStore && user.role === "child"
+        ? setInterval(() => {
+            void collaborationStore.canAccessSession(user.id, threadId).then((allowed) => {
+              if (!allowed && socket.readyState === socket.OPEN) socket.close(1008, "access revoked");
+            }).catch(() => {
+              if (socket.readyState === socket.OPEN) socket.close(1011, "access check failed");
+            });
+          }, 1000)
+        : null;
+      accessTimer?.unref?.();
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        if (accessTimer) clearInterval(accessTimer);
+        unsubscribe();
+      };
+      socket.on("close", cleanup);
+      socket.on("error", cleanup);
     });
   }
 
@@ -258,6 +337,9 @@ export function registerSessionRoutes(
     if (!jsonlSessionParser) {
       return sendError(reply, 503, "JSONL_PARSER_UNAVAILABLE", "历史命令解析器不可用");
     }
+
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore, authService);
+    if (!user) return;
 
     try {
       const result = await jsonlSessionParser.listCommands(params.data.id);
@@ -281,6 +363,9 @@ export function registerSessionRoutes(
     if (!query.success) {
       return sendError(reply, 400, "INVALID_SESSION_QUERY", "会话详情查询参数不正确");
     }
+
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore, authService);
+    if (!user) return;
 
     try {
       const session = await sessionService.getSessionDetail(params.data.id, {
@@ -312,6 +397,10 @@ export function registerSessionRoutes(
       return sendError(reply, 400, "INVALID_SESSION_METADATA", "会话备注标题不正确");
     }
 
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore, authService);
+    if (!user) return;
+    if (user.role === "child") return sendError(reply, 403, "OWNER_REQUIRED", "子用户不能修改会话元数据");
+
     const remarkTitle = body.data.remarkTitle?.trim() || null;
 
     try {
@@ -332,6 +421,42 @@ export function registerSessionRoutes(
   });
 }
 
+async function resolveRouteUser(
+  request: Parameters<typeof resolveAuthUser>[0],
+  collaborationStore?: CollaborationStore,
+  authService?: LocalAuthService
+): Promise<UserIdentity | null> {
+  if (!collaborationStore && !authService) return request.authUser ?? ownerIdentity();
+  return await resolveAuthUser(request, collaborationStore, authService);
+}
+
+async function requireSessionAccess(
+  request: Parameters<typeof resolveAuthUser>[0],
+  reply: Parameters<typeof sendError>[0],
+  sessionId: string,
+  collaborationStore?: CollaborationStore,
+  authService?: LocalAuthService
+): Promise<UserIdentity | null> {
+  const user = await resolveRouteUser(request, collaborationStore, authService);
+  if (!user) {
+    sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
+    return null;
+  }
+  if (collaborationStore && user.role === "child" && !(await collaborationStore.canAccessSession(user.id, sessionId))) {
+    sendError(reply, 403, "SESSION_ACCESS_DENIED", "你没有权限访问该会话");
+    return null;
+  }
+  return user;
+}
+
+function isLocalAuthService(value: LocalAuthService | CollaborationStore | undefined): value is LocalAuthService {
+  return Boolean(value && "authenticate" in value);
+}
+
+function isCollaborationStore(value: LocalAuthService | CollaborationStore | undefined): value is CollaborationStore {
+  return Boolean(value && "resolveIdentity" in value);
+}
+
 function sendModelError(reply: Parameters<typeof sendError>[0], error: unknown) {
   if (error instanceof ModelDomainError) {
     return sendError(reply, error.statusCode, error.code, error.message, error.details);
@@ -339,4 +464,27 @@ function sendModelError(reply: Parameters<typeof sendError>[0], error: unknown) 
   return sendError(reply, 502, "MODEL_SWITCH_FAILED", "模型切换失败", {
     cause: sanitizeModelError(error)
   });
+}
+
+async function ensureChildControlledRuntime(
+  user: UserIdentity,
+  sessionId: string,
+  runtimeManager: RuntimeManager
+) {
+  if (user.role !== "child") return null;
+  const runtime = runtimeManager.getRuntime(sessionId);
+  if (runtime.permissionMode !== "full_access") return runtime;
+
+  if (runtime.status === "history" || runtime.status === "waiting_input" || runtime.status === "exited" || runtime.status === "failed") {
+    return runtimeManager.resumeThread(sessionId, { permissionMode: "default" });
+  }
+
+  throw new Error("CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE");
+}
+
+function sendChildRuntimeError(reply: Parameters<typeof sendError>[0], error: unknown) {
+  if (error instanceof Error && error.message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") {
+    return sendError(reply, 409, "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE", "该会话当前未处于受控运行模式，请先由主用户切换为受控模式");
+  }
+  return sendError(reply, 503, "RUNTIME_UNAVAILABLE", error instanceof Error ? error.message : "运行态管理器不可用");
 }

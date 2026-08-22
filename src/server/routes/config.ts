@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import type { AppConfig } from "../config";
 import type { RuntimeSnapshot } from "../services/AppRuntime";
+import { isOwner } from "../auth/session";
+import { sendError } from "../httpErrors";
 
 export function registerConfigRoutes(
   app: FastifyInstance,
@@ -8,7 +10,8 @@ export function registerConfigRoutes(
   getRuntimeSnapshot?: () => RuntimeSnapshot,
   getDefaultPasswordState?: () => boolean
 ) {
-  app.get("/api/config", async () => {
+  app.get("/api/config", async (request, reply) => {
+    if (!isOwner(request)) return sendError(reply, 403, "OWNER_REQUIRED", "只有主用户可以查看系统配置");
     const runtime = getRuntimeSnapshot?.();
     return {
       host: config.host,
@@ -23,7 +26,8 @@ export function registerConfigRoutes(
     };
   });
 
-  app.get("/api/health", async () => {
+  app.get("/api/health", async (request, reply) => {
+    if (!isOwner(request)) return sendError(reply, 403, "OWNER_REQUIRED", "只有主用户可以查看系统诊断");
     const runtime = getRuntimeSnapshot?.();
     const appServer = runtime?.appServer ?? null;
     const codexAvailable = Boolean(runtime?.codexCliVersion);

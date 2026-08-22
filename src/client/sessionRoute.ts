@@ -1,6 +1,7 @@
 export type SessionRoute =
   | { kind: "list" }
   | { kind: "settings" }
+  | { kind: "members" }
   | { kind: "detail"; sessionId: string }
   | { kind: "invalid"; message: string };
 
@@ -11,6 +12,10 @@ export function parseSessionRoute(pathname: string): SessionRoute {
 
   if (pathname === "/settings") {
     return { kind: "settings" };
+  }
+
+  if (pathname === "/settings/members") {
+    return { kind: "members" };
   }
 
   if (!pathname.startsWith("/") || pathname.slice(1).includes("/")) {

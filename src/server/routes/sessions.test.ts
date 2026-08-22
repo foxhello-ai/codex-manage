@@ -1,9 +1,14 @@
 import cookie from "@fastify/cookie";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { registerAuthHook } from "../auth/hooks";
+import { registerAuthRoutes } from "./auth";
 import { registerSessionRoutes } from "./sessions";
+import { CollaborationStore } from "../services/CollaborationStore";
 import type { SessionService } from "../services/SessionService";
 import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 import type { RuntimeManager } from "../services/RuntimeManager";
@@ -101,6 +106,168 @@ describe("session routes", () => {
     expect(response.statusCode).toBe(401);
     expect(response.json()).toMatchObject({ error: { code: "UNAUTHENTICATED" } });
     await expect(app.injectWS("/api/sessions/thread-1/ws")).rejects.toThrow(/401/);
+  });
+
+  it("filters child session access on list and detail routes", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "codex-manage-session-acl-"));
+    try {
+      const store = new CollaborationStore(join(directory, "collaboration.json"));
+      const child = await store.createChild({
+        displayName: "Alex",
+        localEmail: "alex@local",
+        password: "secret-pass"
+      });
+      await store.replaceGrants(child.collaborator.id, ["session-a"]);
+
+      const app = Fastify();
+      const config = {
+        runtimeMode: "standalone" as const,
+        host: "0.0.0.0",
+        port: 3000,
+        password: "admin",
+        defaultPassword: false,
+        ownerName: "Jamie Chen",
+        ownerEmail: "jamie@local",
+        sessionSecret: "test-secret-at-least-thirty-two-characters",
+        codexCliPath: "codex",
+        sessionsDir: "/tmp/sessions",
+        userDataDir: "/tmp/codex-manage-session-test",
+        metadataFile: "/tmp/session-metadata.json",
+        localDatabaseFile: ":memory:",
+        collaborationFile: join(directory, "collaboration.json"),
+        allowedHosts: ["localhost", "127.0.0.1"],
+        enforceHostCheck: false,
+        sessionTtlSeconds: 3600,
+        pairingCodeTtlSeconds: 300,
+        desktopControlToken: null,
+        clientDir: "/tmp/client"
+      };
+      await app.register(cookie, { secret: config.sessionSecret });
+      registerAuthHook(app, store);
+      registerAuthRoutes(app, config, store);
+      registerSessionRoutes(
+        app,
+        {
+          listSessions: async () => [
+            { id: "session-a", sessionId: "thread-a" },
+            { id: "session-b", sessionId: "thread-b" }
+          ] as never,
+          getSessionDetail: async (sessionId: string) => ({ id: sessionId }) as never,
+          updateMetadata: async () => ({}) as never
+        } as unknown as SessionService,
+        undefined,
+        undefined,
+        undefined,
+        store
+      );
+      await app.ready();
+
+      const login = await app.inject({
+        method: "POST",
+        url: "/api/login",
+        payload: { accountId: child.collaborator.id, password: "secret-pass" }
+      });
+      const cookieHeader = login.headers["set-cookie"];
+      const sessionCookie = Array.isArray(cookieHeader) ? cookieHeader[0] : cookieHeader;
+
+      const list = await app.inject({ method: "GET", url: "/api/sessions", headers: { cookie: sessionCookie } });
+      expect(list.statusCode).toBe(200);
+      expect(list.json()).toEqual({ sessions: [{ id: "session-a", sessionId: "thread-a" }] });
+
+      const denied = await app.inject({ method: "GET", url: "/api/sessions/session-b", headers: { cookie: sessionCookie } });
+      expect(denied.statusCode).toBe(403);
+      expect(denied.json()).toMatchObject({ error: { code: "SESSION_ACCESS_DENIED" } });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("downgrades an existing full-access session before child input", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "codex-manage-controlled-runtime-"));
+    try {
+      const store = new CollaborationStore(join(directory, "collaboration.json"));
+      const child = await store.createChild({
+        displayName: "Alex",
+        localEmail: "alex@local",
+        password: "secret-pass"
+      });
+      await store.replaceGrants(child.collaborator.id, ["session-a"]);
+
+      let resumeOptions: { permissionMode?: "default" | "full_access" } | undefined;
+      let inputOptions: { permissionMode?: "default" | "full_access" } | undefined;
+      const app = Fastify();
+      const config = {
+        runtimeMode: "standalone" as const,
+        host: "0.0.0.0",
+        port: 3000,
+        password: "admin",
+        defaultPassword: false,
+        ownerName: "Jamie Chen",
+        ownerEmail: "jamie@local",
+        sessionSecret: "test-secret-at-least-thirty-two-characters",
+        codexCliPath: "codex",
+        sessionsDir: "/tmp/sessions",
+        userDataDir: "/tmp/codex-manage-session-test",
+        metadataFile: "/tmp/session-metadata.json",
+        localDatabaseFile: ":memory:",
+        collaborationFile: join(directory, "collaboration.json"),
+        allowedHosts: ["localhost", "127.0.0.1"],
+        enforceHostCheck: false,
+        sessionTtlSeconds: 3600,
+        pairingCodeTtlSeconds: 300,
+        desktopControlToken: null,
+        clientDir: "/tmp/client"
+      };
+      await app.register(cookie, { secret: config.sessionSecret });
+      registerAuthHook(app, store);
+      registerAuthRoutes(app, config, store);
+      registerSessionRoutes(
+        app,
+        {
+          listSessions: async () => [],
+          getSessionDetail: async () => { throw new Error("not used"); },
+          updateMetadata: async () => { throw new Error("not used"); }
+        } as unknown as SessionService,
+        undefined,
+        {
+          getRuntime: () => runtimeSnapshot("session-a", { status: "waiting_input", permissionMode: "full_access" }),
+          resumeThread: async (threadId: string, options: { permissionMode?: "default" | "full_access" }) => {
+            resumeOptions = options;
+            return runtimeSnapshot(threadId, { status: "waiting_input", permissionMode: options.permissionMode ?? "default" });
+          },
+          sendInput: async (threadId: string, options: { permissionMode?: "default" | "full_access" }) => {
+            inputOptions = options;
+            return runtimeSnapshot(threadId, { status: "running", permissionMode: options.permissionMode ?? "default" });
+          },
+          submitApproval: () => { throw new Error("not used"); },
+          eventHub: {} as any,
+          approvalService: {} as any
+        } as unknown as RuntimeManager,
+        undefined,
+        store
+      );
+      await app.ready();
+
+      const login = await app.inject({
+        method: "POST",
+        url: "/api/login",
+        payload: { accountId: child.collaborator.id, password: "secret-pass" }
+      });
+      const cookieHeader = login.headers["set-cookie"];
+      const sessionCookie = Array.isArray(cookieHeader) ? cookieHeader[0] : cookieHeader;
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/sessions/session-a/input",
+        headers: { cookie: sessionCookie },
+        payload: { text: "继续", permissionMode: "default" }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(resumeOptions).toEqual({ permissionMode: "default" });
+      expect(inputOptions).toEqual({ text: "继续", permissionMode: "default" });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("returns session detail", async () => {

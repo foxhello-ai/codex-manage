@@ -10,6 +10,7 @@ import { registerDesktopRoutes } from "./routes/desktop";
 import { registerModelRoutes } from "./routes/models";
 import { registerRuntimeRoutes } from "./routes/runtime";
 import { registerSessionRoutes } from "./routes/sessions";
+import { registerCollaborationRoutes } from "./routes/collaboration";
 import { AppRuntime } from "./services/AppRuntime";
 import { CodexConfigWatcher, type CodexConfigChange } from "./services/CodexConfigWatcher";
 import { JsonlSessionParser } from "./services/JsonlSessionParser";
@@ -17,6 +18,7 @@ import { ModelCatalogService } from "./services/ModelCatalogService";
 import { SessionMetadataStore } from "./services/SessionMetadataStore";
 import { SessionModelService } from "./services/SessionModelService";
 import { SessionService } from "./services/SessionService";
+import { CollaborationStore } from "./services/CollaborationStore";
 import { registerRequestSecurityHook } from "./security/requestSecurity";
 import { registerStaticClient } from "./staticClient";
 
@@ -46,6 +48,10 @@ export async function createLocalWebApplication(
     bootstrapPasswordIsDefault: config.defaultPassword,
     sessionTtlSeconds: config.sessionTtlSeconds,
     pairingCodeTtlSeconds: config.pairingCodeTtlSeconds
+  });
+  const collaborationStore = new CollaborationStore(config.collaborationFile, {
+    displayName: config.ownerName,
+    localEmail: config.ownerEmail
   });
   const metadataStore = new SessionMetadataStore(config.metadataFile);
   const modelCatalog = new ModelCatalogService(runtime.appServer);
@@ -83,8 +89,9 @@ export async function createLocalWebApplication(
   });
 
   registerRequestSecurityHook(app, config);
-  registerAuthHook(app, authService, config.desktopControlToken);
-  registerAuthRoutes(app, config, authService);
+  registerAuthHook(app, authService, config.desktopControlToken, collaborationStore);
+  registerAuthRoutes(app, config, authService, collaborationStore);
+  registerCollaborationRoutes(app, collaborationStore);
   if (config.runtimeMode === "desktop" && config.desktopControlToken) {
     registerDesktopRoutes(app, authService);
   }
@@ -97,7 +104,8 @@ export async function createLocalWebApplication(
     jsonlSessionParser,
     runtime.runtimeManager,
     sessionModelService,
-    authService
+    authService,
+    collaborationStore
   );
 
   if (options.serveStatic ?? process.env.NODE_ENV === "production") {

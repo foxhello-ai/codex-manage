@@ -3,18 +3,24 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+export const DEFAULT_OWNER_NAME = "Jamie Chen";
+export const DEFAULT_OWNER_EMAIL = "jamie@local";
+
 type AppConfig = {
   runtimeMode: "standalone" | "desktop";
   host: string;
   port: number;
   password: string;
   defaultPassword: boolean;
+  ownerName: string;
+  ownerEmail: string;
   sessionSecret: string;
   codexCliPath: string;
   sessionsDir: string;
   userDataDir: string;
   metadataFile: string;
   localDatabaseFile: string;
+  collaborationFile: string;
   clientDir: string;
   allowedHosts: string[];
   enforceHostCheck: boolean;
@@ -58,7 +64,9 @@ function readAllowedHosts(value: string | undefined): string[] {
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   const runtimeMode = process.env.CODEX_MANAGE_RUNTIME_MODE === "desktop" ? "desktop" : "standalone";
   const defaultPassword = process.env.CODEX_WEB_PASSWORD === undefined;
-  const password = process.env.CODEX_WEB_PASSWORD ?? "fmzh2026";
+  const password = process.env.CODEX_WEB_PASSWORD ?? "admin";
+  const ownerName = process.env.CODEX_OWNER_NAME?.trim() || DEFAULT_OWNER_NAME;
+  const ownerEmail = process.env.CODEX_OWNER_EMAIL?.trim() || DEFAULT_OWNER_EMAIL;
   const userDataDir = expandHome(
     process.env.CODEX_MANAGE_USER_DATA_DIR ?? join(process.cwd(), ".codex-manage")
   );
@@ -71,12 +79,15 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     port: readPort(process.env.CODEX_WEB_PORT, 4310),
     password,
     defaultPassword,
+    ownerName,
+    ownerEmail,
     sessionSecret,
     codexCliPath: process.env.CODEX_CLI_PATH ?? "codex",
     sessionsDir: expandHome(process.env.CODEX_SESSIONS_DIR ?? "~/.codex/sessions"),
     userDataDir,
     metadataFile: expandHome(process.env.CODEX_MANAGE_METADATA_FILE ?? join(userDataDir, "session-metadata.json")),
     localDatabaseFile: expandHome(process.env.CODEX_MANAGE_DATABASE_FILE ?? join(userDataDir, "local.db")),
+    collaborationFile: expandHome(process.env.CODEX_MANAGE_COLLABORATION_FILE ?? join(userDataDir, "collaboration.json")),
     clientDir: expandHome(process.env.CODEX_WEB_CLIENT_DIR ?? join(process.cwd(), "dist/client")),
     allowedHosts: readAllowedHosts(process.env.CODEX_WEB_ALLOWED_HOSTS),
     enforceHostCheck: process.env.CODEX_WEB_ENFORCE_HOST_CHECK !== "false",

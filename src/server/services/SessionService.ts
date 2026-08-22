@@ -124,9 +124,11 @@ export class SessionService {
 
     const metadata = await this.readMetadata();
     const searchTerm = params.search?.trim().toLocaleLowerCase() ?? "";
-    const sessions = threads
-      .map((thread) => this.toSummary(thread, metadata))
-      .filter((session) => session !== null);
+    const sessions = deduplicateSessions(
+      threads
+        .map((thread) => this.toSummary(thread, metadata))
+        .filter((session): session is SessionSummary => session !== null)
+    );
 
     if (!searchTerm) return params.limit ? sessions.slice(0, params.limit) : sessions;
 
@@ -328,6 +330,36 @@ function matchesSearch(session: SessionSummary, searchTerm: string): boolean {
   return [session.id, session.sessionId, session.title, session.defaultTitle, session.remarkTitle, session.summary, session.workspace]
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .some((value) => value.toLocaleLowerCase().includes(searchTerm));
+}
+
+function deduplicateSessions(sessions: SessionSummary[]): SessionSummary[] {
+  const unique: SessionSummary[] = [];
+
+  for (const session of sessions) {
+    const duplicateIndex = unique.findIndex((existing) => sameSessionIdentity(existing, session));
+    if (duplicateIndex === -1) {
+      unique.push(session);
+      continue;
+    }
+
+    if (sessionUpdatedAt(session) > sessionUpdatedAt(unique[duplicateIndex])) {
+      unique[duplicateIndex] = session;
+    }
+  }
+
+  return unique;
+}
+
+function sameSessionIdentity(left: SessionSummary, right: SessionSummary): boolean {
+  return left.id === right.id
+    || left.sessionId === right.sessionId
+    || left.id === right.sessionId
+    || left.sessionId === right.id;
+}
+
+function sessionUpdatedAt(session: SessionSummary): number {
+  const timestamp = Date.parse(session.updatedAt);
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 function readArray(value: unknown): unknown[] {

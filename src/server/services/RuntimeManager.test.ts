@@ -304,6 +304,7 @@ describe("RuntimeManager", () => {
       modelChangeStatus: "confirming",
       modelSelection: { confirmationPending: true, applied: false }
     });
+    expect(manager.getReloadBlockers()).toEqual([]);
 
     appServer.emit("notification", {
       method: "thread/settings/updated",
