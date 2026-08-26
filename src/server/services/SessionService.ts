@@ -5,6 +5,7 @@ import type { JsonlSessionParser } from "./JsonlSessionParser";
 import type { ModelCatalogService } from "./ModelCatalogService";
 import type { RuntimeManager } from "./RuntimeManager";
 import { sanitizeModelError } from "../modelErrors";
+import { stripAmbientBrowserContext } from "../../shared/messageText";
 
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
 
@@ -286,7 +287,7 @@ function toTurnItem(value: unknown, index: number): SessionTurnItem {
       return {
         id,
         type: "user_message",
-        text: readTextContent(source.content)
+        text: stripAmbientBrowserContext(readTextContent(source.content))
       };
     case "agentMessage":
       return {

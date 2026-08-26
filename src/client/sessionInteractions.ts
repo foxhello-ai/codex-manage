@@ -1,4 +1,5 @@
 import type { SessionTurn } from "../shared/models";
+import { stripAmbientBrowserContext } from "../shared/messageText";
 
 type SendShortcutInput = {
   key: string;
@@ -38,6 +39,7 @@ export function findRetryContextForTurn(
 
   const liveMessage = [...liveMessages]
     .reverse()
+    .map((message) => ({ ...message, text: stripAmbientBrowserContext(message.text) }))
     .find((message) => message.role === "user" && message.turnId === turnId && message.text.trim().length > 0);
   if (liveMessage) return { messageId: liveMessage.id, turnId, text: liveMessage.text };
 
@@ -45,6 +47,7 @@ export function findRetryContextForTurn(
   if (!turn) return null;
   const historyMessage = [...turn.items]
     .reverse()
+    .map((item) => item.type === "user_message" ? { ...item, text: stripAmbientBrowserContext(item.text) } : item)
     .find((item) => item.type === "user_message" && item.text.trim().length > 0);
   return historyMessage && historyMessage.type === "user_message"
     ? { messageId: historyMessage.id, turnId: turn.id, text: historyMessage.text }
