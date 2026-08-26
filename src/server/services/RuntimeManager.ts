@@ -311,6 +311,10 @@ export class RuntimeManager {
       }
 
       const input = [{ type: "text", text, text_elements: [] }];
+      if (latest?.status === "running" && !latest.activeTurnId) {
+        throw new Error("当前会话正在运行，尚未同步活动任务标识，请稍后再试");
+      }
+
       if (latest?.activeTurnId && latest.status === "running") {
         await this.appServer.request("turn/steer", {
           threadId,
@@ -319,12 +323,16 @@ export class RuntimeManager {
         });
       } else {
         const override = params.modelOverride;
-        await this.appServer.request("turn/start", {
+        const response = asRecord(await this.appServer.request("turn/start", {
           threadId,
           input,
           ...(override?.mode === "override" && override.model ? { model: override.model } : {}),
           ...(override?.mode === "override" && override.reasoningEffort ? { effort: override.reasoningEffort } : {})
-        });
+        }));
+        const turn = asRecord(response.turn);
+        const turnId = readString(turn.id) ?? readString(response.turnId);
+        this.setRuntime(threadId, { status: "running", activeTurnId: turnId, lastError: null });
+        return this.snapshot(threadId);
       }
 
       this.setRuntime(threadId, { status: "running", lastError: null });
@@ -548,7 +556,15 @@ export class RuntimeManager {
 
   private handleNotification(notification: JsonRpcNotification) {
     const params = asRecord(notification.params);
-    const threadId = readString(params.threadId) ?? readString(asRecord(params.thread).id);
+    const turn = asRecord(params.turn);
+    const item = asRecord(params.item);
+    const threadId =
+      readString(params.threadId)
+      ?? readString(asRecord(params.thread).id)
+      ?? readString(turn.threadId)
+      ?? readString(turn.thread_id)
+      ?? readString(item.threadId)
+      ?? readString(item.thread_id);
     if (!threadId) return;
 
     switch (notification.method) {
@@ -566,7 +582,6 @@ export class RuntimeManager {
         break;
       }
       case "turn/completed": {
-        const turn = asRecord(params.turn);
         this.setRuntime(threadId, {
           status: this.approvalService.getPendingCount(threadId) > 0 ? "waiting_approval" : "waiting_input",
           activeTurnId: null

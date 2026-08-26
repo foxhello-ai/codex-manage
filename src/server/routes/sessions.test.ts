@@ -108,6 +108,53 @@ describe("session routes", () => {
     await expect(app.injectWS("/api/sessions/thread-1/ws")).rejects.toThrow(/401/);
   });
 
+  it("subscribes before the initial snapshot so an approval cannot be missed", async () => {
+    const app = Fastify();
+    await app.register(websocket);
+    let lastSeq = 0;
+    const callOrder: string[] = [];
+    registerSessionRoutes(
+      app,
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        getSessionDetail: async () => { throw new Error("not used"); }
+      } as unknown as SessionService,
+      undefined,
+      {
+        getRuntime: () => {
+          callOrder.push("getRuntime");
+          return runtimeSnapshot("thread-1", { status: "waiting_approval", pendingApprovalCount: 1, eventSeq: lastSeq });
+        },
+        eventHub: {
+          getLastSeq: () => {
+            callOrder.push("getLastSeq");
+            return lastSeq;
+          },
+          getEvents: () => [],
+          subscribe: (_threadId: string, subscriber: (event: unknown) => void) => {
+            callOrder.push("subscribe");
+            lastSeq = 1;
+            void subscriber;
+            return () => undefined;
+          }
+        },
+        approvalService: {
+          listPending: () => {
+            callOrder.push("listPending");
+            return [];
+          }
+        }
+      } as unknown as RuntimeManager
+    );
+    await app.ready();
+
+    const socket = await app.injectWS("/api/sessions/thread-1/ws");
+    socket.terminate();
+
+    expect(callOrder).toEqual(["subscribe", "getLastSeq", "getRuntime", "listPending"]);
+  });
+
   it("filters child session access on list and detail routes", async () => {
     const directory = await mkdtemp(join(tmpdir(), "codex-manage-session-acl-"));
     try {
@@ -469,6 +516,39 @@ describe("session routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ runtime: { threadId: "thread-1", status: "running" } });
     expect(submittedBody).toEqual({ text: "继续", permissionMode: "full_access" });
+  });
+
+  it("maps an active writer error to a clear session conflict", async () => {
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        getSessionDetail: async () => { throw new Error("not used"); }
+      },
+      undefined,
+      {
+        getRuntime: (() => { throw new Error("not used"); }) as any,
+        resumeThread: (() => { throw new Error("not used"); }) as any,
+        sendInput: async () => { throw new Error("thread already has an active writer"); },
+        submitApproval: (() => { throw new Error("not used"); }) as any,
+        eventHub: {} as any,
+        approvalService: {} as any
+      }
+    );
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions/thread-1/input",
+      payload: { text: "继续" }
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: "SESSION_ACTIVE_WRITER",
+        message: "该会话正在被其他 Codex 客户端写入，请先关闭其他客户端中的该会话或等待当前任务完成"
+      }
+    });
   });
 
   it("submits one approval decision through the API", async () => {

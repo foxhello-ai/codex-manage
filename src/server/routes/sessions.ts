@@ -185,6 +185,9 @@ export function registerSessionRoutes(
       if (error instanceof Error && error.message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") {
         return sendChildRuntimeError(reply, error);
       }
+      if (isActiveWriterError(error)) {
+        return sendActiveWriterError(reply, error);
+      }
       return sendError(reply, 503, "SESSION_RESUME_FAILED", sanitizeModelError(error));
     }
   });
@@ -225,6 +228,9 @@ export function registerSessionRoutes(
       if (error instanceof ModelDomainError) return sendModelError(reply, error);
       if (error instanceof Error && error.message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") {
         return sendChildRuntimeError(reply, error);
+      }
+      if (isActiveWriterError(error)) {
+        return sendActiveWriterError(reply, error);
       }
       return sendError(reply, 409, "SESSION_INPUT_FAILED", sanitizeModelError(error));
     }
@@ -289,6 +295,12 @@ export function registerSessionRoutes(
         }
       };
 
+      // Subscribe before taking/sending the initial snapshot. If an approval
+      // arrives between those two operations, the subscriber must receive it;
+      // otherwise the client can miss both the snapshot state and the live
+      // approval_requested event until the next browser refresh.
+      const unsubscribe = runtimeManager.eventHub.subscribe(threadId, send);
+
       send({
         seq: runtimeManager.eventHub.getLastSeq(threadId),
         threadId,
@@ -301,7 +313,6 @@ export function registerSessionRoutes(
         createdAt: new Date().toISOString()
       });
 
-      const unsubscribe = runtimeManager.eventHub.subscribe(threadId, send);
       let closed = false;
       const accessTimer = collaborationStore && user.role === "child"
         ? setInterval(() => {
@@ -470,4 +481,19 @@ function sendChildRuntimeError(reply: Parameters<typeof sendError>[0], error: un
     return sendError(reply, 409, "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE", "该会话当前未处于受控运行模式，请先由主用户切换为受控模式");
   }
   return sendError(reply, 503, "RUNTIME_UNAVAILABLE", error instanceof Error ? error.message : "运行态管理器不可用");
+}
+
+function isActiveWriterError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /already has an active writer|active writer|writer lock/i.test(message);
+}
+
+function sendActiveWriterError(reply: Parameters<typeof sendError>[0], error: unknown) {
+  return sendError(
+    reply,
+    409,
+    "SESSION_ACTIVE_WRITER",
+    "该会话正在被其他 Codex 客户端写入，请先关闭其他客户端中的该会话或等待当前任务完成",
+    { cause: sanitizeModelError(error) }
+  );
 }

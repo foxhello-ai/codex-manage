@@ -91,11 +91,49 @@ describe("RuntimeManager", () => {
     const runtime = await manager.sendInput("thread-1", { text: "继续" });
 
     expect(runtime.status).toBe("running");
+    expect(runtime.activeTurnId).toBe("turn-1");
     expect(appServer.requests.map((request) => request.method)).toEqual(["thread/resume", "turn/start"]);
     expect(appServer.requests[1].params).toMatchObject({
       threadId: "thread-1",
       input: [{ type: "text", text: "继续", text_elements: [] }]
     });
+  });
+
+  it("steers the active turn when a second input arrives", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    await manager.sendInput("thread-1", { text: "第一条" });
+    await manager.sendInput("thread-1", { text: "补充说明" });
+
+    expect(appServer.requests.map((request) => request.method)).toEqual([
+      "thread/resume",
+      "turn/start",
+      "turn/steer"
+    ]);
+    expect(appServer.requests[2].params).toMatchObject({
+      threadId: "thread-1",
+      expectedTurnId: "turn-1",
+      input: [{ type: "text", text: "补充说明", text_elements: [] }]
+    });
+  });
+
+  it("does not start a duplicate turn while the active turn id is not synchronized", async () => {
+    const appServer = new FakeAppServer();
+    appServer.request = async (method: string, params?: unknown) => {
+      appServer.requests.push({ method, params });
+      if (method === "thread/resume") return { thread: { id: "thread-1" } };
+      if (method === "turn/start") return {};
+      return {};
+    };
+    const manager = new RuntimeManager(appServer as any);
+
+    await manager.sendInput("thread-1", { text: "第一条" });
+    await expect(manager.sendInput("thread-1", { text: "第二条" })).rejects.toThrow("尚未同步活动任务标识");
+    expect(appServer.requests.map((request) => request.method)).toEqual([
+      "thread/resume",
+      "turn/start"
+    ]);
   });
 
   it("blocks app-server reload while a turn or model change is active", async () => {
