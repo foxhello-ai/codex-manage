@@ -2759,6 +2759,7 @@ textarea {
 .floatingRuntimeStatus {
   position: fixed;
   z-index: 30;
+  display: none;
   width: 280px;
   min-width: 240px;
   overflow: hidden;
@@ -5539,6 +5540,25 @@ textarea::placeholder {
     font-size: 0.74rem;
   }
 
+  .mobileTaskStatus {
+    color: #30d158;
+    font-weight: 800;
+  }
+
+  .mobileTaskStatus.waiting_input,
+  .mobileTaskStatus.waiting_approval {
+    color: #ffb340;
+  }
+
+  .mobileTaskStatus.failed {
+    color: #ff8d87;
+  }
+
+  .mobileTaskStatus.exited,
+  .mobileTaskStatus.history {
+    color: #aeaeb2;
+  }
+
   .mobileTaskCommand {
     min-height: 42px;
     border-radius: 9px;
@@ -6236,6 +6256,54 @@ textarea::placeholder {
   background: #202b32;
 }
 
+/* Live commands are rendered in the shared conversation timeline, not inside
+   the legacy livePanel wrapper. Keep the running card readable on H5. */
+.workspaceConversation .timeline .commandCard,
+.workspaceConversation .timeline .commandCard.completed {
+  border-color: #3a3a3c;
+  color: #f5f5f7;
+  background: #28282a;
+  box-shadow: none;
+}
+
+.workspaceConversation .timeline .commandCard.running {
+  border-color: #30d158;
+  background: #242426;
+}
+
+.workspaceConversation .timeline .commandHeader strong {
+  color: #f5f5f7;
+}
+
+.workspaceConversation .timeline .commandHeader .muted {
+  color: #aeaeb2;
+}
+
+.workspaceConversation .timeline .commandHeader button {
+  border-color: #49494d;
+  color: #f5f5f7;
+  background: #363638;
+}
+
+.workspaceConversation .timeline .commandText,
+.workspaceConversation .timeline .commandOutput {
+  border-color: #49494d;
+  color: #d1d1d6;
+  background: #1f1f21;
+}
+
+.workspaceConversation .timeline .commandText {
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.workspaceConversation .timeline .commandOutput.running {
+  color: #d9eeff;
+  background: #202b32;
+}
+
 /* Model cards use one surface; identifiers and effort hints must not create stripes. */
 .modelOption > code,
 .modelOption .modelEfforts {
@@ -6374,7 +6442,28 @@ textarea::placeholder {
   }
 
   .composerRuntimeState {
-    display: none;
+    min-width: 0;
+    display: flex;
+    flex: 0 1 auto;
+    gap: 5px;
+    overflow: hidden;
+  }
+
+  .composerRuntimeState > span:not(.composerRuntimeDot),
+  .composerRuntimeState strong {
+    overflow: hidden;
+    font-size: 0.65rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .composerRuntimeState strong {
+    max-width: 92px;
+  }
+
+  .composerRuntimeDot {
+    width: 6px;
+    height: 6px;
   }
 
   .composerRuntimeModel {
@@ -7609,6 +7698,26 @@ textarea::placeholder {
     color: #d1d1d6;
     font-size: 1.2rem;
     line-height: 1;
+  }
+}
+
+@media (max-width: 767px) {
+  .composerApprovalButton {
+    min-height: 30px;
+    border: 1px solid #ff9f0a;
+    border-radius: 999px;
+    padding: 0 10px;
+    color: #18120b;
+    background: #ff9f0a;
+    font-size: 0.66rem;
+    font-weight: 800;
+  }
+
+  .composerApprovalButton:hover,
+  .composerApprovalButton:focus-visible {
+    border-color: #ffb340;
+    color: #18120b;
+    background: #ffb340;
   }
 }
 

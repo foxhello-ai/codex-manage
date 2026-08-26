@@ -5,6 +5,7 @@ import { ModelSelector } from "./ModelSelector";
 import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
 import { findRetryContextForTurn, findRetryContextFromFailedTurns, isTaskSendShortcut, type RetryContext } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
+import { stripAmbientBrowserContext } from "../shared/messageText";
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
@@ -103,17 +104,15 @@ export function App() {
   }
 
   if (!session?.authenticated) {
-    return <LoginView defaultPassword={session?.defaultPassword ?? true} onLoggedIn={handleLoggedIn} />;
+    return <LoginView onLoggedIn={handleLoggedIn} />;
   }
 
-  return <Dashboard user={session.user ?? ownerFallbackIdentity()} config={config} defaultPassword={session.defaultPassword} onLogout={handleLogout} />;
+  return <Dashboard user={session.user ?? ownerFallbackIdentity()} config={config} onLogout={handleLogout} />;
 }
 
 function LoginView({
-  defaultPassword,
   onLoggedIn
 }: {
-  defaultPassword: boolean;
   onLoggedIn: (session: UserSession) => Promise<void>;
 }) {
   const [password, setPassword] = useState("");
@@ -149,12 +148,6 @@ function LoginView({
           <h1 id="login-title">登录管理台</h1>
           <p className="muted">管理本机 Codex 会话、恢复任务和处理审批。</p>
         </div>
-
-        {defaultPassword ? (
-          <div className="warning" role="status">
-            当前密码可通过 CODEX_WEB_PASSWORD 覆盖。
-          </div>
-        ) : null}
 
         <form className="loginForm" onSubmit={handleSubmit}>
           {accounts.length > 0 ? (
@@ -211,12 +204,10 @@ function ownerFallbackIdentity(): UserIdentity {
 function Dashboard({
   user,
   config,
-  defaultPassword,
   onLogout
 }: {
   user: UserIdentity;
   config: PublicConfig | null;
-  defaultPassword: boolean;
   onLogout: () => Promise<void>;
 }) {
   const [initialRoute] = useState(() => parseSessionRoute(window.location.pathname));
@@ -278,6 +269,7 @@ function Dashboard({
   const drawerCloseRef = useRef<HTMLButtonElement | null>(null);
   const drawerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const compactViewport = useCompactViewport();
+  const completionRefreshInFlightRef = useRef(new Set<string>());
 
   const selectedSession = sessions.find((session) => isSameSession(session, selectedSessionId))
     ?? (isSameSession(sessionDetail, selectedSessionId) ? sessionDetail : null);
@@ -511,6 +503,9 @@ function Dashboard({
           modelState: modelStateAfterRuntimeSnapshot(current.modelState, nextRuntime)
         }
       : current);
+    setSessions((current) => current.map((session) => isSameSession(session, nextRuntime.threadId)
+      ? { ...session, status: nextRuntime.status }
+      : session));
     if (nextRuntime.status !== "history") {
       setPermissionMode(nextRuntime.permissionMode);
     }
@@ -532,14 +527,34 @@ function Dashboard({
     }
   }
 
-  async function refreshCurrentSession(sessionId: string, options: { silent?: boolean } = {}) {
+  async function refreshCurrentSession(sessionId: string, options: { silent?: boolean; includeTurns?: boolean } = {}) {
+    const includeTurns = options.includeTurns ?? historyLoadedSessionIdRef.current === sessionId;
     await Promise.all([
       loadSessionDetail(sessionId, {
         ...options,
-        includeTurns: historyLoadedSessionIdRef.current === sessionId
+        includeTurns
       }),
       loadRuntime(sessionId, options)
     ]);
+  }
+
+  async function refreshAfterTurnCompleted(sessionId: string) {
+    if (completionRefreshInFlightRef.current.has(sessionId)) return;
+    completionRefreshInFlightRef.current.add(sessionId);
+    // The JSONL/thread view is committed just after the completion event. Retry
+    // once after the commit boundary so the UI does not require a browser refresh.
+    try {
+      for (const waitMs of [120, 500]) {
+        await delay(waitMs);
+        if (selectedSessionIdRef.current !== sessionId) return;
+        await Promise.all([
+          refreshCurrentSession(sessionId, { silent: true, includeTurns: true }),
+          loadSessions(search)
+        ]);
+      }
+    } finally {
+      completionRefreshInFlightRef.current.delete(sessionId);
+    }
   }
 
   async function pollCurrentSessionAfterInput(sessionId: string) {
@@ -548,10 +563,7 @@ function Dashboard({
       if (selectedSessionIdRef.current !== sessionId) return;
       const nextRuntime = await loadRuntime(sessionId, { silent: true });
       if (nextRuntime && ["waiting_input", "exited", "failed"].includes(nextRuntime.status)) {
-        await loadSessionDetail(sessionId, {
-          silent: true,
-          includeTurns: historyLoadedSessionIdRef.current === sessionId
-        });
+        await refreshAfterTurnCompleted(sessionId);
         return;
       }
     }
@@ -631,12 +643,16 @@ function Dashboard({
     const payload = event.payload as Record<string, unknown>;
 
     if (event.type === "session_status" && isRuntimeSnapshot(payload.runtime)) {
-      syncRuntimeSnapshot(payload.runtime);
+      const nextRuntime = payload.runtime;
+      syncRuntimeSnapshot(nextRuntime);
+      if (["waiting_input", "exited", "failed"].includes(nextRuntime.status)) {
+        void refreshAfterTurnCompleted(event.threadId);
+      }
       return;
     }
 
     if (event.type === "turn_completed") {
-      void refreshCurrentSession(event.threadId, { silent: true });
+      void refreshAfterTurnCompleted(event.threadId);
       return;
     }
 
@@ -839,6 +855,7 @@ function Dashboard({
 
   function resetSessionDetailState(sessionId: string | null) {
     selectedSessionIdRef.current = sessionId;
+    if (sessionId) completionRefreshInFlightRef.current.delete(sessionId);
     setSelectedSessionId(sessionId);
     setSessionDetail(null);
     historyLoadedSessionIdRef.current = null;
@@ -1152,12 +1169,6 @@ function Dashboard({
         </div>
       )}
     >
-      {defaultPassword ? (
-        <div className="warning" role="status">
-          当前密码可通过 CODEX_WEB_PASSWORD 覆盖。
-        </div>
-      ) : null}
-
       {viewMode === "list" && user.role === "child" ? (
         <ChildAccessPage sessions={sessions} loading={loadingSessions} error={sessionError} onSelect={handleSelectSession} />
       ) : viewMode === "list" ? (
@@ -1402,7 +1413,6 @@ function Dashboard({
 const DEFAULT_VISIBLE_TURNS = 5;
 const DEFAULT_VISIBLE_GROUP_SESSIONS = 5;
 const MAX_LIVE_COMMAND_OUTPUT_CHARS = 12000;
-const FLOATING_RUNTIME_POSITION_KEY = "codex-manage-floating-runtime-position";
 
 function useCompactViewport() {
   const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 767px)").matches);
@@ -1827,135 +1837,6 @@ function SettingsRow({ label, value, monospace = false }: { label: string; value
   );
 }
 
-type FloatingPosition = {
-  x: number;
-  y: number;
-};
-
-function FloatingRuntimeStatus({
-  sessionTitle,
-  runtime,
-  modelState,
-  wsStatus,
-  pendingApprovalCount
-}: {
-  sessionTitle: string;
-  runtime: RuntimeSnapshot | null;
-  modelState: SessionModelState;
-  wsStatus: WebSocketStatus;
-  pendingApprovalCount: number;
-}) {
-  const status = runtime?.status ?? "history";
-  const model = runtime?.model ?? modelState.actualModel ?? modelState.preferredModel;
-  const reasoningEffort = runtime?.reasoningEffort ?? modelState.actualReasoningEffort ?? modelState.preferredReasoningEffort;
-  const [position, setPosition] = useState<FloatingPosition>(() => readFloatingRuntimePosition());
-  const positionRef = useRef(position);
-  const dragOffsetRef = useRef<FloatingPosition | null>(null);
-
-  useEffect(() => {
-    positionRef.current = position;
-  }, [position]);
-
-  useEffect(() => {
-    function handleResize() {
-      setPosition((current) => clampFloatingRuntimePosition(current));
-    }
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  function beginDrag(event: PointerEvent<HTMLElement>) {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragOffsetRef.current = {
-      x: event.clientX - position.x,
-      y: event.clientY - position.y
-    };
-  }
-
-  function drag(event: PointerEvent<HTMLElement>) {
-    const offset = dragOffsetRef.current;
-    if (!offset) return;
-    const nextPosition = clampFloatingRuntimePosition({
-      x: event.clientX - offset.x,
-      y: event.clientY - offset.y
-    });
-    positionRef.current = nextPosition;
-    setPosition(nextPosition);
-  }
-
-  function endDrag() {
-    dragOffsetRef.current = null;
-    saveFloatingRuntimePosition(positionRef.current);
-  }
-
-  return (
-    <aside
-      className={`floatingRuntimeStatus ${status}`}
-      aria-label="浮动运行状态"
-      style={{ left: position.x, top: position.y }}
-    >
-      <div
-        className="floatingRuntimeDragHandle"
-        title="拖拽调整位置"
-        onPointerDown={beginDrag}
-        onPointerMove={drag}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      >
-        <span>运行状态</span>
-        <strong>{statusLabel(status)}</strong>
-      </div>
-      <div className="floatingRuntimeBody">
-        <span title={sessionTitle}>{sessionTitle}</span>
-        <div className="floatingRuntimeModel" title={[model, reasoningEffort].filter(Boolean).join(" · ") || "模型未识别"}>
-          <strong>{model ?? "模型未识别"}</strong>
-          {reasoningEffort ? <small>{reasoningEffort}</small> : null}
-        </div>
-        <div className="floatingRuntimeBadges">
-          <span>{wsStatusLabel(wsStatus)}</span>
-          {runtime?.permissionMode === "full_access" ? <span className="fullAccessBadge">完全权限</span> : null}
-          {pendingApprovalCount > 0 ? <span className="approvalCount">待审批 {pendingApprovalCount}</span> : null}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function readFloatingRuntimePosition(): FloatingPosition {
-  try {
-    const raw = window.localStorage.getItem(FLOATING_RUNTIME_POSITION_KEY);
-    if (!raw) return defaultFloatingRuntimePosition();
-    const parsed = JSON.parse(raw) as Partial<FloatingPosition>;
-    if (typeof parsed.x !== "number" || typeof parsed.y !== "number") return defaultFloatingRuntimePosition();
-    return clampFloatingRuntimePosition({ x: parsed.x, y: parsed.y });
-  } catch {
-    return defaultFloatingRuntimePosition();
-  }
-}
-
-function saveFloatingRuntimePosition(position: FloatingPosition) {
-  window.localStorage.setItem(FLOATING_RUNTIME_POSITION_KEY, JSON.stringify(position));
-}
-
-function defaultFloatingRuntimePosition(): FloatingPosition {
-  return clampFloatingRuntimePosition({
-    x: window.innerWidth - 304,
-    y: 88
-  });
-}
-
-function clampFloatingRuntimePosition(position: FloatingPosition): FloatingPosition {
-  const compact = window.innerWidth <= 767;
-  const width = compact ? 210 : 280;
-  const height = compact ? 82 : 126;
-  const margin = 12;
-  return {
-    x: Math.min(Math.max(position.x, margin), Math.max(margin, window.innerWidth - width - margin)),
-    y: Math.min(Math.max(position.y, margin), Math.max(margin, window.innerHeight - height - margin))
-  };
-}
-
 function SessionDetailPanel({
   fallbackSession,
   detail,
@@ -2016,7 +1897,13 @@ function SessionDetailPanel({
   const initialScrollSessionRef = useRef<string | null>(null);
   const pendingHistoryLoadRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
   const [timelineScrollState, setTimelineScrollState] = useState({ canScrollUp: false, canScrollDown: false });
-  const hasVisibleHistory = Boolean(detail?.turns.some((turn) => turn.items.some((item) => item.type !== "unknown")));
+  const hasVisibleHistory = Boolean(detail?.turns.some((turn) => turn.items.some((item) => item.type !== "unknown" && item.type !== "file_change")));
+  const visibleLiveTimeline = liveTimeline.filter((entry) => {
+    if (entry.kind !== "command") return true;
+    const command = liveCommands.find((item) => item.id === entry.id);
+    const activeRuntime = runtime?.status === "starting" || runtime?.status === "running" || runtime?.status === "waiting_approval";
+    return Boolean(activeRuntime && command && !isLiveCommandCompleted(command));
+  });
   const pendingApprovalCount = Math.max(
     runtime?.pendingApprovalCount ?? 0,
     pendingApprovals.length,
@@ -2095,13 +1982,6 @@ function SessionDetailPanel({
   return (
     <div className="detailStack">
       <div className="detailScrollContent">
-        <MobileTaskContext
-          session={session}
-          detail={detail}
-          runtime={runtime}
-          liveCommands={liveCommands}
-        />
-
         <div className="sessionHero sessionMetaStrip">
           <div className="sessionHeroContext">
             <span className="sessionMetaLabel">当前项目</span>
@@ -2143,7 +2023,7 @@ function SessionDetailPanel({
               ) : null}
             </div>
           ) : null}
-          {historyLoaded && detail && !hasVisibleHistory && liveTimeline.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
+          {historyLoaded && detail && !hasVisibleHistory && visibleLiveTimeline.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
           {historyLoaded && detail && hasVisibleHistory ? (
             <SessionTimeline
               detail={detail}
@@ -2162,11 +2042,11 @@ function SessionDetailPanel({
               liveMessages={liveMessages}
               liveCommands={liveCommands}
               liveErrors={liveErrors}
-              liveTimeline={liveTimeline}
+              liveTimeline={visibleLiveTimeline}
               onChooseModel={onOpenModelPicker}
               onRetry={onOpenRetry}
             />
-          ) : liveTimeline.length > 0 ? (
+          ) : visibleLiveTimeline.length > 0 ? (
             <SessionTimeline
               detail={{ turns: [] }}
               visibleTurnCount={0}
@@ -2175,7 +2055,7 @@ function SessionDetailPanel({
               liveMessages={liveMessages}
               liveCommands={liveCommands}
               liveErrors={liveErrors}
-              liveTimeline={liveTimeline}
+              liveTimeline={visibleLiveTimeline}
               onChooseModel={onOpenModelPicker}
               onRetry={onOpenRetry}
             />
@@ -2295,8 +2175,13 @@ function ComposerRuntimeBar({
     <>
       <section
         className={`composerRuntimeBar ${status}${pendingApprovalCount > 0 ? " hasApproval" : ""}`}
-        aria-label="当前模型与权限"
+        aria-label="当前运行状态、模型与权限"
       >
+        <div className="composerRuntimeState" title={runtimeStatusDescription(status, runtime?.activeTurnId)}>
+          <span className="composerRuntimeDot" aria-hidden="true" />
+          <span>状态</span>
+          <strong>{runtimeStatusDescription(status, runtime?.activeTurnId)}</strong>
+        </div>
         <div className="composerRuntimeModel" title={[model, effort].filter(Boolean).join(" · ") || "模型未识别"}>
           <span>模型</span>
           <strong>{model ?? "未识别"}</strong>
@@ -2321,8 +2206,13 @@ function ComposerRuntimeBar({
           </button>
         )}
         {pendingApprovalCount > 0 ? (
-          <button className="ghostButton composerApprovalButton" type="button" onClick={onFocusApprovals}>
-            查看审批（{pendingApprovalCount}）
+          <button
+            className="ghostButton composerApprovalButton"
+            type="button"
+            onClick={onFocusApprovals}
+            aria-label={`处理审批（${pendingApprovalCount}）`}
+          >
+            处理审批（{pendingApprovalCount}）
           </button>
         ) : null}
         <button
@@ -2343,172 +2233,6 @@ function ComposerRuntimeBar({
         />
       ) : null}
     </>
-  );
-}
-
-function MobileTaskContext({
-  session,
-  detail,
-  runtime,
-  liveCommands
-}: {
-  session: SessionSummary;
-  detail: SessionDetail | null;
-  runtime: RuntimeSnapshot | null;
-  liveCommands: LiveCommand[];
-}) {
-  const active = runtime?.status === "starting" || runtime?.status === "running" || runtime?.status === "waiting_approval";
-  const latestCommand = liveCommands.at(-1) ?? null;
-  const latestTurn = detail?.turns.at(-1) ?? null;
-  const changedFiles = latestTurn?.items
-    .filter((item): item is Extract<SessionTurnItem, { type: "file_change" }> => item.type === "file_change")
-    .flatMap((item) => item.changes) ?? [];
-
-  if (!active || (!runtime && !latestCommand && changedFiles.length === 0)) return null;
-
-  const taskStatus = runtime?.status === "waiting_approval" ? "Waiting for approval" : "Running";
-  const commandStatus = latestCommand && isLiveCommandCompleted(latestCommand) ? "completed" : "running";
-
-  return (
-    <section className="mobileTaskContext" aria-label="当前任务">
-      <div className="mobileTaskContextHeader">
-        <span>CURRENT TASK</span>
-        {changedFiles.length > 0 ? <small>{changedFiles.length} FILE{changedFiles.length === 1 ? "" : "S"}</small> : null}
-      </div>
-      <h3>{session.title}</h3>
-      <p>{taskStatus} · {workspaceDisplayName(session.workspace)}</p>
-      {latestCommand?.command ? (
-        <div className="mobileTaskCommand">
-          <span aria-hidden="true">⌄</span>
-          <code>{latestCommand.command}</code>
-          <strong className={commandStatus}>{commandStatus}</strong>
-        </div>
-      ) : null}
-      {changedFiles.length > 0 ? (
-        <div className="mobileTaskChanges">
-          <span aria-hidden="true">↳</span>
-          <span>{changedFiles.length} changed file{changedFiles.length === 1 ? "" : "s"}</span>
-          <span>Review changes</span>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-
-function RuntimePanel({
-  runtime,
-  permissionMode,
-  wsStatus,
-  error,
-  modelState,
-  updatingModel,
-  onPermissionModeChange,
-  onOpenModelPicker
-}: {
-  runtime: RuntimeSnapshot | null;
-  permissionMode: SessionPermissionMode;
-  wsStatus: WebSocketStatus;
-  error: string | null;
-  modelState: SessionModelState;
-  updatingModel: boolean;
-  onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
-  onOpenModelPicker: () => void;
-}) {
-  const [updatingPermission, setUpdatingPermission] = useState(false);
-  const [confirmFullAccess, setConfirmFullAccess] = useState(false);
-  const status = runtime?.status ?? "history";
-  const canChangePermission = status === "history" || status === "waiting_input" || status === "exited" || status === "failed";
-  const modelDisabledReason = modelSwitchDisabledReason(status);
-  const actualModel = runtime?.model ?? modelState.actualModel;
-  const actualProvider = runtime?.modelProvider ?? modelState.actualModelProvider;
-  const actualEffort = runtime?.reasoningEffort ?? modelState.actualReasoningEffort;
-
-  async function applyPermissionMode(nextMode: SessionPermissionMode) {
-    setUpdatingPermission(true);
-    try {
-      await onPermissionModeChange(nextMode);
-    } finally {
-      setUpdatingPermission(false);
-    }
-  }
-
-  function handlePermissionToggle() {
-    if (!canChangePermission || updatingPermission) return;
-    if (permissionMode === "default") {
-      setConfirmFullAccess(true);
-      return;
-    }
-    void applyPermissionMode("default").catch(() => undefined);
-  }
-
-  async function confirmPermissionMode() {
-    setConfirmFullAccess(false);
-    try {
-      await applyPermissionMode("full_access");
-    } catch {
-      return;
-    }
-  }
-
-
-  return (
-    <section className="runtimePanel" aria-label="运行状态">
-      <div>
-        <h3>运行状态</h3>
-        <div className="runtimeBadges">
-          <StatusBadge status={status} />
-          <span>{wsStatusLabel(wsStatus)}</span>
-          <span className={permissionMode === "full_access" ? "permissionBadge fullAccess" : "permissionBadge"}>{permissionMode === "full_access" ? "完全权限" : "需审批"}</span>
-          {runtime?.pendingApprovalCount ? <span>待审批 {runtime.pendingApprovalCount}</span> : null}
-        </div>
-        <div className="permissionControl">
-          <span className="permissionControlLabel">权限模式</span>
-          <label className={`permissionToggle ${permissionMode === "full_access" ? "enabled" : ""}`}>
-            <input type="checkbox" checked={permissionMode === "full_access"} disabled={!canChangePermission || updatingPermission} onChange={handlePermissionToggle} aria-label="完全权限" />
-            <span className="permissionToggleTrack" aria-hidden="true">
-              <span className="permissionToggleThumb" />
-            </span>
-            <strong>{updatingPermission ? "切换中" : permissionMode === "full_access" ? "已开启" : "需审批"}</strong>
-          </label>
-        </div>
-        {!canChangePermission ? <p className="permissionUnavailable">当前状态不可切换权限模式</p> : null}
-        <div className="modelControl">
-          <div className="modelStateGrid">
-            <span>当前模型</span>
-            <strong title={actualModel ?? "未识别"}>{actualModel ?? "未识别"}</strong>
-            {modelState.actualModelSupported === false ? <small className="unsupportedModelBadge">当前会话模型，不在可选列表</small> : null}
-            <span>提供方 / 推理强度</span>
-            <strong>{[actualProvider, actualEffort].filter(Boolean).join(" · ") || "未识别"}</strong>
-            <span>Web 偏好</span>
-            <strong title={modelState.preferredModel ?? undefined}>
-              {modelState.mode === "override"
-                ? [modelState.preferredModel, modelState.preferredReasoningEffort].filter(Boolean).join(" · ")
-                : "跟随会话"}
-            </strong>
-          </div>
-          <div className="modelControlActions">
-            <button className="ghostButton" type="button" onClick={onOpenModelPicker} disabled={Boolean(modelDisabledReason) || updatingModel}>
-              {updatingModel ? "切换中" : modelState.actualModelSupported === false ? "切换到支持模型" : "切换模型"}
-            </button>
-            {modelDisabledReason ? <p>{modelDisabledReason}</p> : null}
-            {!modelDisabledReason && modelState.mode === "override" && !modelState.applied ? <p>已保存，将在恢复会话时应用。</p> : null}
-            {modelState.confirmationPending || runtime?.modelChangeStatus === "confirming" ? <p>app-server 已接受，正在等待实际模型确认。</p> : null}
-            {runtime?.modelChangeStatus && runtime.modelChangeStatus !== "idle" ? <p>切换状态：{modelChangeStatusLabel(runtime.modelChangeStatus)}</p> : null}
-          </div>
-        </div>
-        {runtime?.modelChangeError || modelState.lastError ? <p className="errorText">{runtime?.modelChangeError ?? modelState.lastError}</p> : null}
-        {runtime?.lastError ? <p className="errorText">{runtime.lastError}</p> : null}
-        {error ? <p className="errorText">{error}</p> : null}
-      </div>
-      {confirmFullAccess ? (
-        <FullAccessConfirmDialog
-          submitting={updatingPermission}
-          onCancel={() => setConfirmFullAccess(false)}
-          onConfirm={confirmPermissionMode}
-        />
-      ) : null}
-    </section>
   );
 }
 
@@ -2852,7 +2576,8 @@ function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSen
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const waitingApproval = runtime?.status === "waiting_approval";
-  const disabled = submitting || waitingApproval || runtime?.status === "starting";
+  const waitingTurnId = runtime?.status === "running" && !runtime.activeTurnId;
+  const disabled = submitting || waitingApproval || waitingTurnId || runtime?.status === "starting";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2885,7 +2610,7 @@ function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSen
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={waitingApproval ? "请先处理审批" : "Message Codex"}
+        placeholder={waitingApproval ? "请先处理审批" : waitingTurnId ? "正在同步任务状态" : "Message Codex"}
         disabled={disabled}
         aria-keyshortcuts="Control+Enter Meta+Enter"
         rows={1}
@@ -2923,7 +2648,7 @@ function SessionTimeline({
   onRetry: (context: RetryContext) => void;
 }) {
   const turns = detail.turns
-    .map((turn) => ({ ...turn, items: turn.items.filter((item) => item.type !== "unknown") }))
+    .map((turn) => ({ ...turn, items: turn.items.filter((item) => item.type !== "unknown" && item.type !== "file_change") }))
     .filter((turn) => turn.items.length > 0);
   const latestTurnCount = Math.min(DEFAULT_VISIBLE_TURNS, turns.length);
   const olderTurnsStart = Math.max(0, turns.length - visibleTurnCount);
@@ -2954,9 +2679,10 @@ function SessionTimeline({
     if (entry.kind === "message") {
       const message = liveMessages.find((item) => item.id === entry.id);
       if (!message) return null;
+      const visibleMessageText = message.role === "user" ? stripAmbientBrowserContext(message.text) : message.text;
       const alreadyInHistory = Boolean(message.itemId && historicalItemIds.has(message.itemId))
         || (message.role === "user" && Boolean(message.turnId) && turns.some((turn) => turn.id === message.turnId
-          && turn.items.some((item) => item.type === "user_message" && item.text === message.text)));
+          && turn.items.some((item) => item.type === "user_message" && stripAmbientBrowserContext(item.text) === visibleMessageText)));
       if (alreadyInHistory) return null;
       return (
         <article className={`messageItem ${message.role} liveMessage${message.deliveryStatus ? ` ${message.deliveryStatus}` : ""}`} key={`live-message-${message.id}`}>
@@ -2966,15 +2692,17 @@ function SessionTimeline({
               {message.deliveryStatus ? deliveryStatusLabel(message.deliveryStatus) : null}
             </span>
           </div>
-          <div className="messageBody"><MarkdownContent text={message.text || "..."} /></div>
+          <div className="messageBody"><MarkdownContent text={visibleMessageText || "..."} /></div>
         </article>
       );
     }
 
     if (entry.kind === "command") {
       const command = liveCommands.find((item) => item.id === entry.id);
-      if (command?.itemId && historicalItemIds.has(command.itemId)) return null;
-      return command ? <LiveCommandCard command={command} key={`live-command-${command.id}`} /> : null;
+      // Command output is only a live execution aid. Once it completes, it
+      // belongs to the hidden command history and must not remain in the chat.
+      if (!command || isLiveCommandCompleted(command)) return null;
+      return <LiveCommandCard command={command} key={`live-command-${command.id}`} />;
     }
 
     const notice = liveErrors.find((item) => item.id === entry.id);
@@ -3004,29 +2732,11 @@ function TurnItemView({
 }) {
   switch (item.type) {
     case "user_message":
-      return <MessageItem role="user" label="用户" text={item.text} onOpenMessage={onOpenMessage} />;
+      return <MessageItem role="user" label="用户" text={stripAmbientBrowserContext(item.text)} onOpenMessage={onOpenMessage} />;
     case "agent_message":
       return <MessageItem role="agent" label="Codex" text={item.text} meta={item.phase ?? undefined} onOpenMessage={onOpenMessage} />;
     case "file_change":
-      return (
-        <article className="messageItem fileChangeItem">
-          <div className="messageHeader">
-            <strong>文件变更</strong>
-            {item.status ? <span>{item.status}</span> : null}
-          </div>
-          <div className="fileChangeList">
-            {item.changes.map((change, index) => (
-              <details key={`${change.path}-${index}`}>
-                <summary>
-                  <span>{change.path}</span>
-                  {change.kind ? <small>{change.kind}</small> : null}
-                </summary>
-                {change.diff ? <pre>{change.diff}</pre> : <p className="muted">无 diff</p>}
-              </details>
-            ))}
-          </div>
-        </article>
-      );
+      return null;
     case "context_compaction":
       return <SystemItem text="上下文已压缩" />;
     case "unknown":
@@ -4199,24 +3909,28 @@ function appendCommandOutput(commands: LiveCommand[], itemId: string, delta: str
   return commands.map((command) => (command.id === itemId ? { ...command, output: `${command.output}${delta}` } : command));
 }
 
-function statusLabel(status: SessionStatus): string {
+function runtimeStatusDescription(status: SessionStatus, activeTurnId?: string | null): string {
   switch (status) {
     case "starting":
       return "启动中";
     case "running":
-      return "运行中";
+      return activeTurnId === undefined ? "运行中" : activeTurnId ? "运行中" : "运行中 · 正在同步";
     case "waiting_input":
-      return "待输入";
+      return "已完成 · 等待输入";
     case "waiting_approval":
-      return "待审批";
+      return "等待审批";
     case "exited":
       return "已退出";
     case "failed":
-      return "失败";
+      return "执行失败";
     case "history":
     default:
-      return "历史";
+      return "历史会话";
   }
+}
+
+function statusLabel(status: SessionStatus): string {
+  return runtimeStatusDescription(status);
 }
 
 function shortId(value: string): string {
