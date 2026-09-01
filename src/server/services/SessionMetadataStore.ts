@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { PersistedModelSelection } from "../../shared/models";
+import type { PersistedModelSelection, SessionPermissionMode } from "../../shared/models";
 
 export type SessionMetadata = {
   remarkTitle: string | null;
+  permissionMode: SessionPermissionMode;
   modelSelection: PersistedModelSelection;
 };
 
@@ -42,6 +43,10 @@ export class SessionMetadataStore {
     return this.patch(sessionId, { remarkTitle });
   }
 
+  updatePermissionMode(sessionId: string, permissionMode: SessionPermissionMode): Promise<SessionMetadata> {
+    return this.patch(sessionId, { permissionMode });
+  }
+
   async updateModelSelection(sessionId: string, selection: PersistedModelSelection): Promise<SessionMetadata> {
     validateModelSelection(selection);
     return await this.patch(sessionId, { modelSelection: selection });
@@ -56,12 +61,14 @@ export class SessionMetadataStore {
       const next = normalizeMetadata({
         ...rawCurrent,
         remarkTitle: patch.remarkTitle !== undefined ? patch.remarkTitle : current.remarkTitle,
+        permissionMode: patch.permissionMode !== undefined ? patch.permissionMode : current.permissionMode,
         modelSelection: patch.modelSelection !== undefined ? patch.modelSelection : current.modelSelection
       });
 
       sessions[sessionId] = {
         ...rawCurrent,
         remarkTitle: next.remarkTitle,
+        permissionMode: next.permissionMode,
         modelSelection: next.modelSelection
       };
 
@@ -117,6 +124,7 @@ function normalizeMetadata(value: unknown): SessionMetadata {
   const remarkTitle = typeof record.remarkTitle === "string" ? record.remarkTitle.trim() : "";
   return {
     remarkTitle: remarkTitle.length > 0 ? remarkTitle : null,
+    permissionMode: record.permissionMode === "full_access" ? "full_access" : "default",
     modelSelection: normalizeModelSelection(record.modelSelection)
   };
 }

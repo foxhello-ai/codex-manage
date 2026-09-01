@@ -10,6 +10,7 @@ import type {
   ResolvedModelOverride,
   RuntimeSnapshot,
   RuntimeStatus,
+  SessionBranchMode,
   SessionModelState,
   SessionPermissionMode,
   ValidatedModelSelection
@@ -42,6 +43,11 @@ export type SendInputParams = {
   modelOverride?: ResolvedModelOverride;
 };
 
+export type SessionBranchResult = {
+  threadId: string;
+  runtime: RuntimeSnapshot;
+};
+
 type SubmitApprovalParams = {
   decision: ApprovalDecision;
   answers?: Record<string, string[]>;
@@ -59,6 +65,12 @@ type SettingsWaiter = {
 
 type TimedOutModelConfirmation = Pick<SettingsWaiter, "expectedModel" | "expectedEffort">;
 
+type CompactionWaiter = {
+  resolve: () => void;
+  reject: (error: Error) => void;
+  timer: NodeJS.Timeout;
+};
+
 export type RuntimeReloadBlocker = {
   threadId: string;
   status: RuntimeStatus;
@@ -67,7 +79,11 @@ export type RuntimeReloadBlocker = {
 
 export type RuntimeManagerOptions = {
   modelConfirmationTimeoutMs?: number;
+  writerLockRetryDelaysMs?: number[];
+  compactionTimeoutMs?: number;
 };
+
+const DEFAULT_WRITER_LOCK_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000, 4_000, 8_000];
 
 export class RuntimeManager {
   readonly eventHub = new EventHub();
@@ -76,7 +92,10 @@ export class RuntimeManager {
   private readonly operationChains = new Map<string, Promise<void>>();
   private readonly settingsWaiters = new Map<string, SettingsWaiter>();
   private readonly timedOutModelConfirmations = new Map<string, TimedOutModelConfirmation>();
+  private readonly compactionWaiters = new Map<string, CompactionWaiter>();
   private readonly modelConfirmationTimeoutMs: number;
+  private readonly writerLockRetryDelaysMs: number[];
+  private readonly compactionTimeoutMs: number;
   private appServerReloading = false;
 
   constructor(
@@ -84,6 +103,9 @@ export class RuntimeManager {
     options: RuntimeManagerOptions = {}
   ) {
     this.modelConfirmationTimeoutMs = options.modelConfirmationTimeoutMs ?? 5_000;
+    this.writerLockRetryDelaysMs = (options.writerLockRetryDelaysMs ?? DEFAULT_WRITER_LOCK_RETRY_DELAYS_MS)
+      .filter((delayMs) => Number.isFinite(delayMs) && delayMs >= 0);
+    this.compactionTimeoutMs = options.compactionTimeoutMs ?? 120_000;
     this.approvalService = new ApprovalService(appServer, this.eventHub, (threadId) => {
       this.refreshApprovalStatus(threadId);
     });
@@ -117,7 +139,7 @@ export class RuntimeManager {
           if (current.status !== "waiting_input") {
             throw new Error("会话运行中或正在等待审批，暂时不能切换权限模式");
           }
-          await this.appServer.request("thread/settings/update", buildPermissionSettings(threadId, permissionMode));
+          await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", buildPermissionSettings(threadId, permissionMode)));
           this.setRuntime(threadId, { permissionMode, lastError: null });
         }
         return this.snapshot(threadId);
@@ -150,7 +172,7 @@ export class RuntimeManager {
           ...(permissionMode === "full_access" ? { sandbox: "danger-full-access", approvalPolicy: "never" } : {}),
           ...(override?.mode === "override" && override.model ? { model: override.model } : {})
         };
-        const response = asRecord(await this.appServer.request("thread/resume", params));
+        const response = asRecord(await this.requestWithWriterLockRetry(() => this.appServer.request("thread/resume", params)));
         const thread = asRecord(response.thread);
         const actualModel = readString(response.model) ?? readString(thread.model) ?? override?.model ?? current?.model ?? null;
         const actualModelProvider =
@@ -165,11 +187,15 @@ export class RuntimeManager {
           ?? null;
 
         if (override?.mode === "override" && override.reasoningEffort) {
-          await this.appServer.request("thread/settings/update", {
+          await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", {
             threadId,
             effort: override.reasoningEffort
-          });
+          }));
           actualEffort = override.reasoningEffort;
+        }
+
+        if (options.permissionMode === "default") {
+          await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", buildPermissionSettings(threadId, "default")));
         }
 
         const applied = selection.mode === "override" ? selection.preferredModel === actualModel : false;
@@ -256,11 +282,11 @@ export class RuntimeManager {
       const confirmation = this.createSettingsWaiter(threadId, selection.model, selection.reasoningEffort);
 
       try {
-        await this.appServer.request("thread/settings/update", {
+        await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", {
           threadId,
           model: selection.model,
           ...(selection.reasoningEffort ? { effort: selection.reasoningEffort } : {})
-        });
+        }));
         if (this.runtimes.get(threadId)?.modelChangeStatus === "pending") {
           this.setRuntime(threadId, { modelChangeStatus: "confirming" });
         }
@@ -304,6 +330,10 @@ export class RuntimeManager {
       });
     }
 
+    return this.sendInputInRuntime(threadId, params, text);
+  }
+
+  private async sendInputInRuntime(threadId: string, params: SendInputParams, text: string): Promise<RuntimeSnapshot> {
     return this.runExclusive(threadId, async () => {
       const latest = this.runtimes.get(threadId);
       if (latest?.status === "waiting_approval") {
@@ -316,19 +346,19 @@ export class RuntimeManager {
       }
 
       if (latest?.activeTurnId && latest.status === "running") {
-        await this.appServer.request("turn/steer", {
+        await this.requestWithWriterLockRetry(() => this.appServer.request("turn/steer", {
           threadId,
           expectedTurnId: latest.activeTurnId,
           input
-        });
+        }));
       } else {
         const override = params.modelOverride;
-        const response = asRecord(await this.appServer.request("turn/start", {
+        const response = asRecord(await this.requestWithWriterLockRetry(() => this.appServer.request("turn/start", {
           threadId,
           input,
           ...(override?.mode === "override" && override.model ? { model: override.model } : {}),
           ...(override?.mode === "override" && override.reasoningEffort ? { effort: override.reasoningEffort } : {})
-        }));
+        })));
         const turn = asRecord(response.turn);
         const turnId = readString(turn.id) ?? readString(response.turnId);
         this.setRuntime(threadId, { status: "running", activeTurnId: turnId, lastError: null });
@@ -338,6 +368,101 @@ export class RuntimeManager {
       this.setRuntime(threadId, { status: "running", lastError: null });
       return this.snapshot(threadId);
     });
+  }
+
+  async branchThread(threadId: string, mode: SessionBranchMode): Promise<SessionBranchResult> {
+    return this.runExclusive(threadId, async () => {
+      const current = this.runtimes.get(threadId);
+      const response = asRecord(await this.requestWithWriterLockRetry(() => this.appServer.request("thread/fork", {
+        threadId
+      })));
+      const thread = asRecord(response.thread);
+      const forkedThreadId = readString(thread.id) ?? readString(response.threadId);
+      if (!forkedThreadId) throw new Error("Fork 未返回新会话 ID");
+
+      const permissionMode = current?.permissionMode ?? "default";
+      const resumed = permissionMode === "full_access"
+        ? await this.resumeThread(forkedThreadId, { permissionMode })
+        : await this.resumeThread(forkedThreadId);
+      if (mode === "full_fork") {
+        return { threadId: forkedThreadId, runtime: resumed };
+      }
+
+      const compacted = await this.compactThread(forkedThreadId);
+      return { threadId: forkedThreadId, runtime: compacted };
+    });
+  }
+
+  async compactThread(threadId: string): Promise<RuntimeSnapshot> {
+    const current = this.runtimes.get(threadId);
+    if (!current || current.status === "history" || current.status === "failed" || current.status === "exited") {
+      await this.resumeThread(threadId, { permissionMode: current?.permissionMode ?? "default" });
+    }
+
+    return this.runExclusive(threadId, async () => {
+      const waiter = this.createCompactionWaiter(threadId);
+      this.setRuntime(threadId, { status: "running", activeTurnId: null, lastError: null });
+      try {
+        await this.requestWithWriterLockRetry(() => this.appServer.request("thread/compact/start", { threadId }));
+        await waiter;
+        return this.snapshot(threadId);
+      } catch (error) {
+        this.cancelCompactionWaiter(threadId);
+        const message = sanitizeModelError(error);
+        this.setRuntime(threadId, { status: "failed", activeTurnId: null, lastError: message });
+        throw error;
+      }
+    });
+  }
+
+  hydratePermissionMode(threadId: string, permissionMode: SessionPermissionMode): RuntimeSnapshot {
+    const current = this.runtimes.get(threadId);
+    if (current && !["history", "failed", "exited"].includes(current.status)) {
+      return this.snapshot(threadId);
+    }
+    if (current?.permissionMode === permissionMode) {
+      return this.snapshot(threadId);
+    }
+    this.setRuntime(threadId, { permissionMode });
+    return this.snapshot(threadId);
+  }
+
+  private async requestWithWriterLockRetry<T>(operation: () => Promise<T>): Promise<T> {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        const delayMs = this.writerLockRetryDelaysMs[attempt];
+        if (!isActiveWriterError(error) || delayMs === undefined) throw error;
+        await wait(delayMs);
+      }
+    }
+  }
+
+  private createCompactionWaiter(threadId: string): Promise<void> {
+    this.cancelCompactionWaiter(threadId);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.compactionWaiters.delete(threadId);
+        reject(new Error("等待上下文压缩完成超时"));
+      }, this.compactionTimeoutMs);
+      this.compactionWaiters.set(threadId, { resolve, reject, timer });
+    });
+  }
+
+  private cancelCompactionWaiter(threadId: string) {
+    const waiter = this.compactionWaiters.get(threadId);
+    if (!waiter) return;
+    clearTimeout(waiter.timer);
+    this.compactionWaiters.delete(threadId);
+  }
+
+  private completeCompaction(threadId: string) {
+    const waiter = this.compactionWaiters.get(threadId);
+    if (!waiter) return;
+    clearTimeout(waiter.timer);
+    this.compactionWaiters.delete(threadId);
+    waiter.resolve();
   }
 
   getRuntime(threadId: string): RuntimeSnapshot {
@@ -589,6 +714,11 @@ export class RuntimeManager {
         this.eventHub.publish(threadId, "turn_completed", { turn });
         break;
       }
+      case "thread/compacted":
+        this.setRuntime(threadId, { status: "waiting_input", activeTurnId: null, lastError: null });
+        this.completeCompaction(threadId);
+        this.eventHub.publish(threadId, "warning", { message: "上下文已压缩" });
+        break;
       case "item/agentMessage/delta":
         this.eventHub.publish(threadId, "agent_message_delta", {
           turnId: readString(params.turnId),
@@ -655,6 +785,11 @@ export class RuntimeManager {
   }
 
   private markAllFailed(message: string) {
+    for (const waiter of this.compactionWaiters.values()) {
+      clearTimeout(waiter.timer);
+      waiter.reject(new Error(message));
+    }
+    this.compactionWaiters.clear();
     for (const threadId of this.runtimes.keys()) {
       this.setRuntime(threadId, { status: "failed", lastError: message });
     }
@@ -795,6 +930,15 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function isActiveWriterError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /already has an active writer|active writer|writer lock/i.test(message);
+}
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 function readError(value: unknown): string | null {

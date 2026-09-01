@@ -1,11 +1,12 @@
 import { CSSProperties, FormEvent, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createCollaborator, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel } from "../shared/api";
-import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
+import { ApiRequestError, branchSession, createCollaborator, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel } from "../shared/api";
+import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionBranchMode, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
 import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
 import { findRetryContextForTurn, findRetryContextFromFailedTurns, isTaskSendShortcut, type RetryContext } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 import { stripAmbientBrowserContext } from "../shared/messageText";
+import { clearBootstrapSession, readBootstrapSession, writeBootstrapSession } from "./bootstrapSession";
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
@@ -48,10 +49,15 @@ type LiveTimelineEntry = {
   id: string;
 };
 
+type SendInputOptions = {
+  isRetry?: boolean;
+};
+
 
 export function App() {
-  const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [session, setSession] = useState<UserSession | null>(null);
+  const [bootstrapSession] = useState(() => readBootstrapSession());
+  const [loadState, setLoadState] = useState<LoadState>(bootstrapSession ? "ready" : "loading");
+  const [session, setSession] = useState<UserSession | null>(bootstrapSession);
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +69,8 @@ export function App() {
         const me = await getMe();
         if (cancelled) return;
         setSession(me);
+        if (me.authenticated) writeBootstrapSession(me);
+        else clearBootstrapSession();
 
         if (me.authenticated && me.user?.role !== "child") {
           const publicConfig = await getPublicConfig();
@@ -73,6 +81,7 @@ export function App() {
         setLoadState("ready");
       } catch (caught) {
         if (cancelled) return;
+        if (bootstrapSession) return;
         setError(caught instanceof Error ? caught.message : "初始化失败");
         setLoadState("error");
       }
@@ -86,12 +95,14 @@ export function App() {
 
   async function handleLoggedIn(nextSession: UserSession) {
     setSession(nextSession);
+    writeBootstrapSession(nextSession);
     setConfig(nextSession.user?.role === "child" ? null : await getPublicConfig());
   }
 
   async function handleLogout() {
     const nextSession = await logout();
     setSession(nextSession);
+    clearBootstrapSession();
     setConfig(null);
   }
 
@@ -246,6 +257,8 @@ function Dashboard({
   const [wsStatus, setWsStatus] = useState<WebSocketStatus>("idle");
   const [wsReconnectKey, setWsReconnectKey] = useState(0);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  const [branchingMode, setBranchingMode] = useState<SessionBranchMode | null>(null);
   const [modelCatalog, setModelCatalog] = useState<ModelCatalogResponse | null>(null);
   const [loadingModels, setLoadingModels] = useState(false);
   const [modelCatalogError, setModelCatalogError] = useState<string | null>(null);
@@ -270,6 +283,7 @@ function Dashboard({
   const drawerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const compactViewport = useCompactViewport();
   const completionRefreshInFlightRef = useRef(new Set<string>());
+  const searchRef = useRef("");
 
   const selectedSession = sessions.find((session) => isSameSession(session, selectedSessionId))
     ?? (isSameSession(sessionDetail, selectedSessionId) ? sessionDetail : null);
@@ -386,6 +400,47 @@ function Dashboard({
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
+
+  useEffect(() => {
+    let wasHidden = document.visibilityState === "hidden";
+
+    function refreshAfterResume() {
+      if (document.visibilityState !== "visible") return;
+      void loadSessions(searchRef.current);
+      const sessionId = selectedSessionIdRef.current;
+      if (sessionId) {
+        void refreshCurrentSession(sessionId, {
+          silent: true,
+          includeTurns: historyLoadedSessionIdRef.current === sessionId
+        });
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        wasHidden = true;
+        return;
+      }
+      if (!wasHidden) return;
+      wasHidden = false;
+      refreshAfterResume();
+    }
+
+    function handlePageShow(event: PageTransitionEvent) {
+      if (event.persisted) refreshAfterResume();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, []);
 
   useEffect(() => {
     liveMessagesRef.current = liveMessages;
@@ -506,9 +561,7 @@ function Dashboard({
     setSessions((current) => current.map((session) => isSameSession(session, nextRuntime.threadId)
       ? { ...session, status: nextRuntime.status }
       : session));
-    if (nextRuntime.status !== "history") {
-      setPermissionMode(nextRuntime.permissionMode);
-    }
+    setPermissionMode(nextRuntime.permissionMode);
     return true;
   }
 
@@ -733,10 +786,13 @@ function Dashboard({
       const message = readRealtimeErrorMessage(payload) ?? "Codex 执行失败";
       const willRetry = payload.willRetry === true;
       const turnId = readPayloadString(payload.turnId);
+      const errorCode = readPayloadString(payload.errorCode);
+      const activeWriter = errorCode === "SESSION_ACTIVE_WRITER" || isActiveWriterMessage(message);
       const retryingId = `retrying-${event.threadId}-${turnId}`;
       const retryContext = willRetry
         ? null
-        : findRetryContextForTurn(turnId, liveMessagesRef.current, sessionDetailRef.current?.turns ?? []);
+        : findRetryContextForTurn(turnId, liveMessagesRef.current, sessionDetailRef.current?.turns ?? [])
+          ?? (activeWriter ? retryContextRef.current : null);
       if (willRetry) {
         registerLiveTimelineEntry("error", retryingId);
       } else {
@@ -747,7 +803,7 @@ function Dashboard({
             id: retryingId,
             turnId,
             message,
-            code: readPayloadString(payload.errorCode),
+            code: errorCode,
             willRetry,
             createdAt: event.createdAt,
             retryContext: null
@@ -758,7 +814,7 @@ function Dashboard({
               id: `terminal-${event.seq}`,
               turnId,
               message,
-              code: readPayloadString(payload.errorCode),
+              code: activeWriter ? "SESSION_ACTIVE_WRITER" : errorCode,
               willRetry: false,
               createdAt: event.createdAt,
               retryContext
@@ -873,6 +929,8 @@ function Dashboard({
     setLiveTimeline([]);
     liveTimelineRef.current = [];
     setRuntimeError(null);
+    setSessionNotice(null);
+    setBranchingMode(null);
     setModelActionError(null);
     setModelPickerOpen(false);
     setRetryContext(null);
@@ -985,14 +1043,22 @@ function Dashboard({
     };
   }, [selectedSessionId, wsReconnectKey]);
 
-  async function handleSendInput(text: string, options: { isRetry?: boolean } = {}) {
+  async function handleSendInput(text: string, options: SendInputOptions = {}) {
     if (!selectedSessionId) return;
+    await sendInputToSession(selectedSessionId, text, permissionMode, options);
+  }
+
+  async function sendInputToSession(
+    sessionId: string,
+    text: string,
+    nextPermissionMode: SessionPermissionMode,
+    options: SendInputOptions = {}
+  ): Promise<void> {
     if (!options.isRetry) {
       setRetryDialogOpen(false);
       setRetryContext(null);
       retryContextRef.current = null;
     }
-    const sessionId = selectedSessionId;
     const messageId = createLocalMessageId();
     const localMessage: LiveMessage = {
       id: messageId,
@@ -1004,10 +1070,11 @@ function Dashboard({
     };
     registerLiveTimelineEntry("message", messageId);
     setRuntimeError(null);
+    if (!options.isRetry) setSessionNotice(null);
     liveMessagesRef.current = [...liveMessagesRef.current, localMessage];
     setLiveMessages((current) => [...current, localMessage]);
     try {
-      const response = await sendSessionInput(sessionId, text, permissionMode);
+      const response = await sendSessionInput(sessionId, text, nextPermissionMode);
       if (selectedSessionIdRef.current !== sessionId) return;
       const acknowledgedMessages = bindLiveMessageToTurn(
         updateLiveMessageDeliveryStatus(liveMessagesRef.current, messageId, "sent"),
@@ -1024,21 +1091,84 @@ function Dashboard({
       liveMessagesRef.current = failedMessages;
       setLiveMessages(failedMessages);
       const message = caught instanceof Error ? caught.message : "任务发送失败";
-      setRuntimeError(message);
+      const code = caught instanceof ApiRequestError ? caught.code : null;
+      const activeWriter = code === "SESSION_ACTIVE_WRITER" || isActiveWriterMessage(message);
+      setRuntimeError(activeWriter ? null : message);
       registerLiveTimelineEntry("error", `input-${messageId}`);
+      const nextRetryContext = { messageId, turnId: null, text };
       setLiveErrors((current) => upsertById(current, {
         id: `input-${messageId}`,
         turnId: null,
         message,
-        code: null,
+        code: activeWriter ? "SESSION_ACTIVE_WRITER" : code,
         willRetry: false,
         createdAt: new Date().toISOString(),
-        retryContext: { messageId, turnId: null, text }
+        retryContext: nextRetryContext
       }));
-      const retryContext = { messageId, turnId: null, text };
-      retryContextRef.current = retryContext;
-      setRetryContext(retryContext);
+      retryContextRef.current = nextRetryContext;
+      setRetryContext(nextRetryContext);
       throw caught;
+    }
+  }
+
+  async function handleBranchSession(mode: SessionBranchMode, requestedRetryContext?: RetryContext | null) {
+    const sourceSessionId = selectedSession?.id ?? selectedSessionIdRef.current;
+    if (!sourceSessionId || branchingMode) return;
+    const branchRetryContext = requestedRetryContext ?? retryContextRef.current;
+
+    setBranchingMode(mode);
+    setRuntimeError(null);
+    setSessionNotice(null);
+    try {
+      const response = await branchSession(sourceSessionId, mode);
+      if (selectedSessionIdRef.current !== sourceSessionId) return;
+
+      setSessions((current) => upsertSession(current, response.session));
+      void loadSessions(search);
+      const nextSessionId = response.session.id;
+      const path = buildSessionDetailPath(nextSessionId);
+      if (window.location.pathname !== path) window.history.pushState(null, "", path);
+      applySessionRoute({ kind: "detail", sessionId: nextSessionId });
+      syncRuntimeSnapshot(response.runtime);
+
+      const branchNotice = mode === "compact_new_topic"
+        ? "已压缩上下文并创建新话题，原会话保持不变。"
+        : "已创建 Fork 新会话，保留全部已保存历史。";
+      if (!branchRetryContext) {
+        setSessionNotice(branchNotice);
+        return;
+      }
+
+      retryContextRef.current = branchRetryContext;
+      setRetryContext(branchRetryContext);
+      setSessionNotice(`${branchNotice} 正在自动重发上一条消息…`);
+      try {
+        await sendInputToSession(
+          nextSessionId,
+          branchRetryContext.text,
+          response.runtime.permissionMode,
+          { isRetry: true }
+        );
+        if (selectedSessionIdRef.current === nextSessionId) {
+          retryContextRef.current = null;
+          setRetryContext(null);
+          setRetryDialogOpen(false);
+          setSessionNotice(`${branchNotice} 已自动重发上一条消息。`);
+        }
+      } catch {
+        if (selectedSessionIdRef.current === nextSessionId) {
+          setSessionNotice(`${branchNotice} 已创建，但自动重发失败；原内容仍保留，可继续重试。`);
+        }
+      }
+    } catch (caught) {
+      if (selectedSessionIdRef.current === sourceSessionId) {
+        const message = caught instanceof Error ? caught.message : "创建分支会话失败";
+        const activeWriter = (caught instanceof ApiRequestError && caught.code === "SESSION_ACTIVE_WRITER")
+          || isActiveWriterMessage(message);
+        setRuntimeError(activeWriter ? null : message);
+      }
+    } finally {
+      setBranchingMode(null);
     }
   }
 
@@ -1047,7 +1177,7 @@ function Dashboard({
     const status = runtime?.status ?? "history";
     setRuntimeError(null);
 
-    if (status !== "waiting_input") {
+    if (!["history", "waiting_input", "exited", "failed"].includes(status)) {
       setPermissionMode(nextMode);
       return;
     }
@@ -1280,6 +1410,7 @@ function Dashboard({
                   runtime={runtime}
                   permissionMode={permissionMode}
                   runtimeError={runtimeError}
+                  sessionNotice={sessionNotice}
                   pendingApprovals={pendingApprovals}
                   liveCommands={liveCommands}
                   liveMessages={liveMessages}
@@ -1302,6 +1433,8 @@ function Dashboard({
                     setRetryContext(context);
                     setRetryDialogOpen(true);
                   }}
+                  branchingMode={branchingMode}
+                  onBranchSession={handleBranchSession}
                   onLoadHistory={handleLoadHistory}
                   onSubmitApproval={handleSubmitApproval}
                 />
@@ -1848,6 +1981,7 @@ function SessionDetailPanel({
   runtime,
   permissionMode,
   runtimeError,
+  sessionNotice,
   pendingApprovals,
   liveCommands,
   liveMessages,
@@ -1856,10 +1990,12 @@ function SessionDetailPanel({
   modelState,
   updatingModel,
   isChild,
+  branchingMode,
   onPermissionModeChange,
   onOpenModelPicker,
   onSendInput,
   onOpenRetry,
+  onBranchSession,
   onLoadHistory,
   onSubmitApproval
 }: {
@@ -1873,6 +2009,7 @@ function SessionDetailPanel({
   runtime: RuntimeSnapshot | null;
   permissionMode: SessionPermissionMode;
   runtimeError: string | null;
+  sessionNotice: string | null;
   pendingApprovals: ApprovalSummary[];
   liveCommands: LiveCommand[];
   liveMessages: LiveMessage[];
@@ -1881,10 +2018,12 @@ function SessionDetailPanel({
   modelState: SessionModelState;
   updatingModel: boolean;
   isChild: boolean;
+  branchingMode: SessionBranchMode | null;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
   onOpenModelPicker: (retryContext?: RetryContext | null) => void;
   onSendInput: (text: string) => Promise<void>;
   onOpenRetry: (context: RetryContext) => void;
+  onBranchSession: (mode: SessionBranchMode, retryContext?: RetryContext | null) => Promise<void>;
   onLoadHistory: () => Promise<void>;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
@@ -2045,6 +2184,8 @@ function SessionDetailPanel({
               liveTimeline={visibleLiveTimeline}
               onChooseModel={onOpenModelPicker}
               onRetry={onOpenRetry}
+              branchingMode={branchingMode}
+              onBranchSession={onBranchSession}
             />
           ) : visibleLiveTimeline.length > 0 ? (
             <SessionTimeline
@@ -2058,6 +2199,8 @@ function SessionDetailPanel({
               liveTimeline={visibleLiveTimeline}
               onChooseModel={onOpenModelPicker}
               onRetry={onOpenRetry}
+              branchingMode={branchingMode}
+              onBranchSession={onBranchSession}
             />
           ) : null}
           </div>
@@ -2088,6 +2231,7 @@ function SessionDetailPanel({
         </div>
       </div>
       <div className="composerDock">
+        {sessionNotice ? <div className="successBanner composerWarning" role="status">{sessionNotice}</div> : null}
         {runtimeError ? <div className="errorBanner composerWarning" role="alert">{runtimeError}</div> : null}
         {runtime?.permissionMode === "full_access" && pendingApprovals.length > 0 ? (
           <div className="errorBanner composerWarning" role="alert">完全权限模式收到未预期的审批请求，系统未自动处理；你仍可拒绝或取消该请求。</div>
@@ -2097,7 +2241,7 @@ function SessionDetailPanel({
           pendingCount={pendingApprovalCount}
           onSubmitApproval={onSubmitApproval}
         />
-        <TaskInput runtime={runtime} onSend={handleSendInput} />
+        <TaskInput key={session.id} runtime={runtime} onSend={handleSendInput} />
         <ComposerRuntimeBar
           runtime={runtime}
           modelState={modelState}
@@ -2512,21 +2656,45 @@ function approvalKindLabel(kind: ApprovalSummary["kind"]): string {
 function LiveErrorCard({
   notice,
   onChooseModel,
-  onRetry
+  onRetry,
+  branchingMode,
+  onBranchSession
 }: {
   notice: LiveErrorNotice;
   onChooseModel: (retryContext: RetryContext | null) => void;
   onRetry: (context: RetryContext) => void;
+  branchingMode: SessionBranchMode | null;
+  onBranchSession: (mode: SessionBranchMode, retryContext?: RetryContext | null) => Promise<void>;
 }) {
+  const activeWriter = notice.code === "SESSION_ACTIVE_WRITER";
   return (
     <article className={`liveErrorCard${notice.willRetry ? " retrying" : " terminal"}`} role={notice.willRetry ? "status" : "alert"}>
       <div>
-        <strong>{notice.willRetry ? "模型请求正在重试" : "模型请求失败"}</strong>
+        <strong>{activeWriter ? "会话暂时被占用" : notice.willRetry ? "模型请求正在重试" : "模型请求失败"}</strong>
         <span>{formatDateTime(notice.createdAt)}</span>
       </div>
       <p>{notice.message}</p>
+      {activeWriter ? <p className="muted">切换会话或关闭窗口可能不会释放锁。请完全退出 ChatGPT（⌘Q）或重启 ChatGPT。</p> : null}
       {notice.code ? <code>{notice.code}</code> : null}
-      {!notice.willRetry ? (
+      {activeWriter ? (
+        <div className="liveErrorActions">
+          <button
+            className="ghostButton"
+            type="button"
+            onClick={() => void onBranchSession("compact_new_topic", notice.retryContext)}
+            disabled={branchingMode !== null}
+          >
+            {branchingMode === "compact_new_topic" ? "压缩中…" : "压缩后进入新话题"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void onBranchSession("full_fork", notice.retryContext)}
+            disabled={branchingMode !== null}
+          >
+            {branchingMode === "full_fork" ? "Fork 中…" : "直接 Fork（保留全部历史）"}
+          </button>
+        </div>
+      ) : !notice.willRetry ? (
         <div className="liveErrorActions">
           <button className="ghostButton" type="button" onClick={() => onChooseModel(notice.retryContext)}>选择其他模型</button>
           {notice.retryContext ? <button type="button" onClick={() => onRetry(notice.retryContext!)}>重试上一条消息</button> : null}
@@ -2634,7 +2802,9 @@ function SessionTimeline({
   liveErrors,
   liveTimeline,
   onChooseModel,
-  onRetry
+  onRetry,
+  branchingMode,
+  onBranchSession
 }: {
   detail: Pick<SessionDetail, "turns">;
   visibleTurnCount: number;
@@ -2646,6 +2816,8 @@ function SessionTimeline({
   liveTimeline: LiveTimelineEntry[];
   onChooseModel: (retryContext: RetryContext | null) => void;
   onRetry: (context: RetryContext) => void;
+  branchingMode: SessionBranchMode | null;
+  onBranchSession: (mode: SessionBranchMode, retryContext?: RetryContext | null) => Promise<void>;
 }) {
   const turns = detail.turns
     .map((turn) => ({ ...turn, items: turn.items.filter((item) => item.type !== "unknown" && item.type !== "file_change") }))
@@ -2706,7 +2878,16 @@ function SessionTimeline({
     }
 
     const notice = liveErrors.find((item) => item.id === entry.id);
-    return notice ? <LiveErrorCard notice={notice} onChooseModel={onChooseModel} onRetry={onRetry} key={`live-error-${notice.id}`} /> : null;
+    return notice ? (
+      <LiveErrorCard
+        notice={notice}
+        onChooseModel={onChooseModel}
+        onRetry={onRetry}
+        branchingMode={branchingMode}
+        onBranchSession={onBranchSession}
+        key={`live-error-${notice.id}`}
+      />
+    ) : null;
   }
 
   return (
@@ -3849,6 +4030,10 @@ function readRealtimeErrorMessage(payload: Record<string, unknown>): string | nu
   return readPayloadString(error.message) ?? readPayloadString(error.error);
 }
 
+function isActiveWriterMessage(message: string): boolean {
+  return /already has an active writer|active writer|writer lock|正在被其他 Codex 客户端写入|ChatGPT 正在占用此会话/i.test(message);
+}
+
 function readPayloadNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -3858,6 +4043,14 @@ function upsertById<T extends { id: string }>(items: T[], item: T): T[] {
   if (index === -1) return [...items, item];
   const next = [...items];
   next[index] = { ...next[index], ...item };
+  return next;
+}
+
+function upsertSession(sessions: SessionSummary[], session: SessionSummary): SessionSummary[] {
+  const index = sessions.findIndex((current) => current.id === session.id);
+  if (index === -1) return [session, ...sessions];
+  const next = [...sessions];
+  next[index] = session;
   return next;
 }
 

@@ -7,7 +7,7 @@ import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 import type { RuntimeManager } from "../services/RuntimeManager";
 import type { SessionModelService } from "../services/SessionModelService";
 import { ownerIdentity, resolveAuthUser } from "../auth/session";
-import type { UserIdentity } from "../../shared/models";
+import type { SessionBranchMode, SessionPermissionMode, UserIdentity } from "../../shared/models";
 import type { CollaborationStore } from "../services/CollaborationStore";
 
 const ListQuery = z.object({
@@ -30,14 +30,18 @@ const MetadataBody = z.object({
 const PermissionMode = z.enum(["default", "full_access"]);
 
 const ResumeBody = z.object({
-  permissionMode: PermissionMode.optional().default("default"),
+  permissionMode: PermissionMode.optional(),
   model: z.string().trim().min(1).max(200).nullable().optional(),
   reasoningEffort: z.string().trim().min(1).max(40).nullable().optional()
 });
 
 const InputBody = z.object({
   text: z.string().trim().min(1).max(20000),
-  permissionMode: PermissionMode.optional().default("default")
+  permissionMode: PermissionMode.optional()
+});
+
+const BranchBody = z.object({
+  mode: z.enum(["compact_new_topic", "full_fork"] satisfies [SessionBranchMode, SessionBranchMode])
 });
 
 const UpdateModelBody = z.discriminatedUnion("mode", [
@@ -111,7 +115,10 @@ export function registerSessionRoutes(
     try {
       const runtime = user.role === "child"
         ? await ensureChildControlledRuntime(user, params.data.id, runtimeManager)
-        : runtimeManager.getRuntime(params.data.id);
+        : runtimeManager.hydratePermissionMode(
+            params.data.id,
+            await readStoredPermissionMode(sessionService, params.data.id) ?? "default"
+          );
       return reply.send({ runtime });
     } catch (error) {
       return sendChildRuntimeError(reply, error);
@@ -169,6 +176,14 @@ export function registerSessionRoutes(
 
     try {
       await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
+      const permissionMode = user.role === "child"
+        ? "default"
+        : body.data.permissionMode
+          ?? await readStoredPermissionMode(sessionService, params.data.id)
+          ?? "default";
+      if (user.role !== "child" && body.data.permissionMode !== undefined) {
+        await persistPermissionMode(sessionService, params.data.id, permissionMode);
+      }
       const modelOverride = sessionModelService
         ? await sessionModelService.resolveForResume(
             params.data.id,
@@ -176,7 +191,7 @@ export function registerSessionRoutes(
           )
         : undefined;
       const runtime = await runtimeManager.resumeThread(params.data.id, {
-        permissionMode: user.role === "child" ? "default" : body.data.permissionMode,
+        permissionMode,
         modelOverride
       });
       return reply.send({ runtime });
@@ -215,12 +230,26 @@ export function registerSessionRoutes(
 
     try {
       await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
+      const currentRuntime = runtimeManager.getRuntime(params.data.id);
+      const storedPermissionMode = user.role === "child"
+        ? null
+        : await readStoredPermissionMode(sessionService, params.data.id);
+      const permissionMode = user.role === "child"
+        ? "default"
+        : isLiveRuntime(currentRuntime)
+          ? currentRuntime.permissionMode
+          : body.data.permissionMode === "full_access"
+            ? "full_access"
+            : storedPermissionMode ?? "default";
+      if (user.role !== "child" && permissionMode === "full_access" && storedPermissionMode !== "full_access") {
+        await persistPermissionMode(sessionService, params.data.id, permissionMode);
+      }
       const modelOverride = sessionModelService
         ? await sessionModelService.resolveForTurn(params.data.id)
         : undefined;
       const runtime = await runtimeManager.sendInput(params.data.id, {
         ...body.data,
-        permissionMode: user.role === "child" ? "default" : body.data.permissionMode,
+        permissionMode,
         modelOverride
       });
       return reply.send({ runtime });
@@ -233,6 +262,50 @@ export function registerSessionRoutes(
         return sendActiveWriterError(reply, error);
       }
       return sendError(reply, 409, "SESSION_INPUT_FAILED", sanitizeModelError(error));
+    }
+  });
+
+  app.post("/api/sessions/:id/branch", async (request, reply) => {
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
+    }
+
+    const body = BranchBody.safeParse(request.body);
+    if (!body.success) {
+      return sendError(reply, 400, "INVALID_SESSION_BRANCH", "分支模式不正确");
+    }
+
+    if (!runtimeManager) {
+      return sendError(reply, 503, "RUNTIME_UNAVAILABLE", "运行态管理器不可用");
+    }
+
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore);
+    if (!user) return;
+
+    try {
+      await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
+      const sourceSession = await sessionService.getSessionDetail(params.data.id, { includeTurns: false });
+      const sourcePermissionMode = await readStoredPermissionMode(sessionService, params.data.id);
+      if (sourcePermissionMode && typeof runtimeManager.hydratePermissionMode === "function") {
+        runtimeManager.hydratePermissionMode(params.data.id, sourcePermissionMode);
+      }
+      const result = await runtimeManager.branchThread(params.data.id, body.data.mode);
+      await sessionService.updateMetadata(
+        result.threadId,
+        makeBranchTitle(sourceSession.title, body.data.mode)
+      );
+      await persistPermissionMode(sessionService, result.threadId, result.runtime.permissionMode);
+      const session = await sessionService.getSessionDetail(result.threadId, { includeTurns: true });
+      return reply.status(201).send({ session, runtime: result.runtime, mode: body.data.mode });
+    } catch (error) {
+      if (error instanceof Error && error.message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") {
+        return sendChildRuntimeError(reply, error);
+      }
+      if (isActiveWriterError(error)) {
+        return sendActiveWriterError(reply, error);
+      }
+      return sendError(reply, 409, "SESSION_BRANCH_FAILED", sanitizeModelError(error));
     }
   });
 
@@ -476,6 +549,20 @@ async function ensureChildControlledRuntime(
   throw new Error("CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE");
 }
 
+async function readStoredPermissionMode(sessionService: SessionService, sessionId: string): Promise<SessionPermissionMode | null> {
+  if (typeof sessionService.getPermissionMode !== "function") return null;
+  return await sessionService.getPermissionMode(sessionId);
+}
+
+async function persistPermissionMode(sessionService: SessionService, sessionId: string, permissionMode: SessionPermissionMode): Promise<void> {
+  if (typeof sessionService.updatePermissionMode !== "function") return;
+  await sessionService.updatePermissionMode(sessionId, permissionMode);
+}
+
+function isLiveRuntime(runtime: ReturnType<RuntimeManager["getRuntime"]>): boolean {
+  return ["starting", "running", "waiting_input", "waiting_approval"].includes(runtime.status);
+}
+
 function sendChildRuntimeError(reply: Parameters<typeof sendError>[0], error: unknown) {
   if (error instanceof Error && error.message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") {
     return sendError(reply, 409, "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE", "该会话当前未处于受控运行模式，请先由主用户切换为受控模式");
@@ -493,7 +580,16 @@ function sendActiveWriterError(reply: Parameters<typeof sendError>[0], error: un
     reply,
     409,
     "SESSION_ACTIVE_WRITER",
-    "该会话正在被其他 Codex 客户端写入，请先关闭其他客户端中的该会话或等待当前任务完成",
+    "检测到 ChatGPT 正在占用此会话。切换会话或关闭窗口可能不会释放锁，请完全退出 ChatGPT（⌘Q）或重启 ChatGPT，也可以从下方创建新分支",
     { cause: sanitizeModelError(error) }
   );
+}
+
+function makeBranchTitle(sourceTitle: string, mode: SessionBranchMode): string {
+  const suffix = mode === "compact_new_topic"
+    ? " · 压缩后新话题"
+    : " · Fork（保留全部历史）";
+  const title = sourceTitle.trim() || "未命名会话";
+  const maxSourceLength = Math.max(1, 120 - suffix.length);
+  return `${Array.from(title).slice(0, maxSourceLength).join("")}${suffix}`;
 }

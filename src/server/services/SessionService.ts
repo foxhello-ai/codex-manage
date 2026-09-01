@@ -1,6 +1,6 @@
 import type { CodexAppServerClient } from "./CodexAppServerClient";
 import type { SessionMetadataStore } from "./SessionMetadataStore";
-import type { SessionModelState } from "../../shared/models";
+import type { SessionModelState, SessionPermissionMode } from "../../shared/models";
 import type { JsonlSessionParser } from "./JsonlSessionParser";
 import type { ModelCatalogService } from "./ModelCatalogService";
 import type { RuntimeManager } from "./RuntimeManager";
@@ -77,6 +77,7 @@ type MetadataStore = {
   getAll(): Promise<Record<string, { remarkTitle: string | null }>>;
   get?(sessionId: string): Promise<{
     remarkTitle: string | null;
+    permissionMode?: SessionPermissionMode;
     modelSelection: {
       mode: "follow_session" | "override";
       preferredModel: string | null;
@@ -85,6 +86,7 @@ type MetadataStore = {
     };
   }>;
   update(sessionId: string, metadata: { remarkTitle: string | null }): Promise<{ remarkTitle: string | null }>;
+  updatePermissionMode?(sessionId: string, permissionMode: SessionPermissionMode): Promise<unknown>;
 };
 
 const DEFAULT_SESSION_SCAN_LIMIT = 1000;
@@ -177,6 +179,17 @@ export class SessionService {
     }
 
     return session;
+  }
+
+  async getPermissionMode(sessionId: string): Promise<SessionPermissionMode> {
+    return (await this.metadataStore?.get?.(sessionId))?.permissionMode ?? "default";
+  }
+
+  async updatePermissionMode(sessionId: string, permissionMode: SessionPermissionMode): Promise<void> {
+    if (!this.metadataStore?.updatePermissionMode) {
+      throw new Error("Session permission metadata store is not configured");
+    }
+    await this.metadataStore.updatePermissionMode(sessionId, permissionMode);
   }
 
   private async buildModelState(sessionId: string, threadModelProvider: string | null): Promise<SessionModelState> {
@@ -352,10 +365,11 @@ function deduplicateSessions(sessions: SessionSummary[]): SessionSummary[] {
 }
 
 function sameSessionIdentity(left: SessionSummary, right: SessionSummary): boolean {
+  // Forked threads intentionally share sessionId but must remain separate
+  // topics in the Web list. Only collapse duplicate records for the exact
+  // same thread, plus legacy records that expose only sessionId.
   return left.id === right.id
-    || left.sessionId === right.sessionId
-    || left.id === right.sessionId
-    || left.sessionId === right.id;
+    || (left.id === left.sessionId && right.id === right.sessionId && left.sessionId === right.sessionId);
 }
 
 function sessionUpdatedAt(session: SessionSummary): number {

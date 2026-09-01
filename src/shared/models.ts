@@ -101,6 +101,14 @@ export type SessionSummary = {
   source: string | null;
 };
 
+export type SessionBranchMode = "compact_new_topic" | "full_fork";
+
+export type SessionBranchResponse = {
+  session: SessionSummary;
+  runtime: RuntimeSnapshot;
+  mode: SessionBranchMode;
+};
+
 export type SessionsResponse = {
   sessions: SessionSummary[];
 };

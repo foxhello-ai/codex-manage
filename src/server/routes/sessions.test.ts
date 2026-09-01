@@ -53,9 +53,11 @@ function runtimeSnapshot(threadId: string, patch: Partial<RuntimeSnapshot> = {})
 }
 
 function buildApp(
-  service: Pick<SessionService, "listSessions" | "getSessionDetail" | "updateMetadata">,
+  service: Pick<SessionService, "listSessions" | "getSessionDetail" | "updateMetadata">
+    & Partial<Pick<SessionService, "getPermissionMode" | "updatePermissionMode">>,
   parser?: Pick<JsonlSessionParser, "listCommands">,
-  runtime?: Pick<RuntimeManager, "getRuntime" | "resumeThread" | "sendInput" | "submitApproval" | "eventHub" | "approvalService">,
+  runtime?: Pick<RuntimeManager, "getRuntime" | "resumeThread" | "sendInput" | "submitApproval" | "eventHub" | "approvalService">
+    & Partial<Pick<RuntimeManager, "branchThread" | "hydratePermissionMode">>,
   modelService?: Pick<SessionModelService, "updateSelection" | "resolveForResume" | "resolveForTurn">
 ) {
   const app = Fastify();
@@ -413,6 +415,7 @@ describe("session routes", () => {
 
   it("resumes a session", async () => {
     let resumedOptions: { permissionMode?: "default" | "full_access" } | undefined;
+    let persistedPermissionMode: "default" | "full_access" | undefined;
     const app = buildApp(
       {
         listSessions: async () => [],
@@ -421,13 +424,14 @@ describe("session routes", () => {
         },
         getSessionDetail: async () => {
           throw new Error("not used");
+        },
+        updatePermissionMode: async (_sessionId, permissionMode) => {
+          persistedPermissionMode = permissionMode;
         }
       },
       undefined,
       {
-        getRuntime: (() => {
-          throw new Error("not used");
-        }) as any,
+        getRuntime: () => runtimeSnapshot("thread-1"),
         resumeThread: async (threadId: string, options: { permissionMode?: "default" | "full_access" } = {}) => {
           resumedOptions = options;
           return runtimeSnapshot(threadId, {
@@ -451,6 +455,33 @@ describe("session routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ runtime: { threadId: "thread-1", status: "waiting_input" } });
     expect(resumedOptions).toEqual({ permissionMode: "full_access" });
+    expect(persistedPermissionMode).toBe("full_access");
+  });
+
+  it("restores the persisted permission mode after the runtime is recreated", async () => {
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        getSessionDetail: async () => { throw new Error("not used"); },
+        getPermissionMode: async () => "full_access"
+      },
+      undefined,
+      {
+        getRuntime: () => runtimeSnapshot("thread-1"),
+        hydratePermissionMode: (threadId, permissionMode) => runtimeSnapshot(threadId, { permissionMode }),
+        resumeThread: async () => { throw new Error("not used"); },
+        sendInput: async () => { throw new Error("not used"); },
+        submitApproval: (() => { throw new Error("not used"); }) as any,
+        eventHub: {} as any,
+        approvalService: {} as any
+      }
+    );
+
+    const response = await app.inject({ method: "GET", url: "/api/sessions/thread-1/runtime" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ runtime: { permissionMode: "full_access" } });
   });
 
   it("rejects an invalid permission mode", async () => {
@@ -489,9 +520,7 @@ describe("session routes", () => {
       },
       undefined,
       {
-        getRuntime: (() => {
-          throw new Error("not used");
-        }) as any,
+        getRuntime: () => runtimeSnapshot("thread-1"),
         resumeThread: (() => {
           throw new Error("not used");
         }) as any,
@@ -518,6 +547,39 @@ describe("session routes", () => {
     expect(submittedBody).toEqual({ text: "继续", permissionMode: "full_access" });
   });
 
+  it("uses the persisted permission mode when the refreshed browser sends a stale default", async () => {
+    let submittedBody: { text: string; permissionMode?: "default" | "full_access" } | undefined;
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        getSessionDetail: async () => { throw new Error("not used"); },
+        getPermissionMode: async () => "full_access"
+      },
+      undefined,
+      {
+        getRuntime: () => runtimeSnapshot("thread-1"),
+        resumeThread: async () => { throw new Error("not used"); },
+        sendInput: async (threadId, body) => {
+          submittedBody = body;
+          return runtimeSnapshot(threadId, { status: "running", permissionMode: body.permissionMode ?? "default", activeTurnId: "turn-1" });
+        },
+        submitApproval: (() => { throw new Error("not used"); }) as any,
+        eventHub: {} as any,
+        approvalService: {} as any
+      }
+    );
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions/thread-1/input",
+      payload: { text: "继续", permissionMode: "default" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(submittedBody).toEqual({ text: "继续", permissionMode: "full_access" });
+  });
+
   it("maps an active writer error to a clear session conflict", async () => {
     const app = buildApp(
       {
@@ -527,7 +589,7 @@ describe("session routes", () => {
       },
       undefined,
       {
-        getRuntime: (() => { throw new Error("not used"); }) as any,
+        getRuntime: () => runtimeSnapshot("thread-1"),
         resumeThread: (() => { throw new Error("not used"); }) as any,
         sendInput: async () => { throw new Error("thread already has an active writer"); },
         submitApproval: (() => { throw new Error("not used"); }) as any,
@@ -546,9 +608,61 @@ describe("session routes", () => {
     expect(response.json()).toMatchObject({
       error: {
         code: "SESSION_ACTIVE_WRITER",
-        message: "该会话正在被其他 Codex 客户端写入，请先关闭其他客户端中的该会话或等待当前任务完成"
+        message: "检测到 ChatGPT 正在占用此会话。切换会话或关闭窗口可能不会释放锁，请完全退出 ChatGPT（⌘Q）或重启 ChatGPT，也可以从下方创建新分支"
       }
     });
+  });
+
+  it.each([
+    ["full_fork", "原会话 · Fork（保留全部历史）"],
+    ["compact_new_topic", "原会话 · 压缩后新话题"]
+  ] as const)("creates a %s session branch with a distinguishable title", async (mode, expectedTitle) => {
+    let updatedMetadata: { sessionId: string; remarkTitle: string | null } | null = null;
+    let persistedPermissionMode: "default" | "full_access" | null = null;
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async (sessionId, remarkTitle) => {
+          updatedMetadata = { sessionId, remarkTitle };
+          return { id: sessionId, title: remarkTitle } as any;
+        },
+        updatePermissionMode: async (_sessionId, permissionMode) => {
+          persistedPermissionMode = permissionMode;
+        },
+        getSessionDetail: async (sessionId) => ({
+          id: sessionId,
+          title: sessionId === "thread-1" ? "原会话" : expectedTitle
+        } as any)
+      },
+      undefined,
+      {
+        getRuntime: () => runtimeSnapshot("thread-1"),
+        resumeThread: async () => runtimeSnapshot("thread-2", { status: "waiting_input" }),
+        sendInput: async () => runtimeSnapshot("thread-1"),
+        branchThread: async (threadId, mode) => ({
+          threadId: "thread-2",
+          runtime: runtimeSnapshot("thread-2", { status: "waiting_input" })
+        }),
+        submitApproval: (() => { throw new Error("not used"); }) as any,
+        eventHub: {} as any,
+        approvalService: {} as any
+      }
+    );
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions/thread-1/branch",
+      payload: { mode }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      mode,
+      session: { id: "thread-2", title: expectedTitle },
+      runtime: { threadId: "thread-2" }
+    });
+    expect(updatedMetadata).toEqual({ sessionId: "thread-2", remarkTitle: expectedTitle });
+    expect(persistedPermissionMode).toBe("default");
   });
 
   it("submits one approval decision through the API", async () => {

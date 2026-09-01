@@ -12,6 +12,7 @@ describe("SessionMetadataStore", () => {
 
     await expect(store.get("thread-1")).resolves.toEqual({
       remarkTitle: null,
+      permissionMode: "default",
       modelSelection: {
         mode: "follow_session",
         preferredModel: null,
@@ -28,6 +29,7 @@ describe("SessionMetadataStore", () => {
       sessions: {
         "thread-1": {
           remarkTitle: null,
+          permissionMode: "default",
           modelSelection: {
             mode: "follow_session",
             preferredModel: null,
@@ -60,6 +62,7 @@ describe("SessionMetadataStore", () => {
 
     await expect(store.get("thread-1")).resolves.toEqual({
       remarkTitle: "新标题",
+      permissionMode: "default",
       modelSelection: {
         mode: "override",
         preferredModel: "gpt-5.6-sol",
@@ -73,6 +76,7 @@ describe("SessionMetadataStore", () => {
       sessions: {
         "thread-1": {
           remarkTitle: "新标题",
+          permissionMode: "default",
           futureField: { enabled: true },
           modelSelection: { mode: "override", preferredModel: "gpt-5.6-sol" }
         }
@@ -97,7 +101,21 @@ describe("SessionMetadataStore", () => {
 
     await expect(store.get("thread-1")).resolves.toMatchObject({
       remarkTitle: "并发标题",
+      permissionMode: "default",
       modelSelection: { mode: "override", preferredModel: "gpt-5.6-sol" }
+    });
+  });
+
+  it("stores and restores the permission mode per session", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "codex-manage-metadata-permission-"));
+    const file = join(dir, "session-metadata.json");
+    const store = new SessionMetadataStore(file);
+
+    await store.updatePermissionMode("thread-1", "full_access");
+
+    await expect(store.get("thread-1")).resolves.toMatchObject({ permissionMode: "full_access" });
+    await expect(store.getAll()).resolves.toMatchObject({
+      "thread-1": { permissionMode: "full_access" }
     });
   });
 

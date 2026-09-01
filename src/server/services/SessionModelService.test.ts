@@ -75,11 +75,11 @@ function fixture(status: "history" | "waiting_input" | "running" | "failed" = "h
       })
     },
     {
-      get: async () => ({ remarkTitle: null, modelSelection: persisted }),
+      get: async () => ({ permissionMode: "default", remarkTitle: null, modelSelection: persisted }),
       updateModelSelection: async (_sessionId, selection) => {
         persisted = { ...selection } as typeof persisted;
         updateCalls.push(selection);
-        return { remarkTitle: null, modelSelection: persisted };
+        return { permissionMode: "default", remarkTitle: null, modelSelection: persisted };
       }
     },
     {

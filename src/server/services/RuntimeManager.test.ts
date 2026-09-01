@@ -73,6 +73,50 @@ describe("RuntimeManager", () => {
     });
   });
 
+  it("hydrates persisted permission mode before the first resume", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    const hydrated = manager.hydratePermissionMode("thread-1", "full_access");
+
+    expect(hydrated).toMatchObject({
+      threadId: "thread-1",
+      status: "history",
+      permissionMode: "full_access"
+    });
+    expect(appServer.requests).toEqual([]);
+
+    const resumed = await manager.resumeThread("thread-1");
+
+    expect(resumed.permissionMode).toBe("full_access");
+    expect(appServer.requests[0]).toEqual({
+      method: "thread/resume",
+      params: {
+        threadId: "thread-1",
+        sandbox: "danger-full-access",
+        approvalPolicy: "never"
+      }
+    });
+  });
+
+  it("applies explicit default permissions after resuming a history runtime", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    await manager.hydratePermissionMode("thread-1", "full_access");
+    await manager.resumeThread("thread-1", { permissionMode: "default" });
+
+    expect(appServer.requests.map((request) => request.method)).toEqual([
+      "thread/resume",
+      "thread/settings/update"
+    ]);
+    expect(appServer.requests[1].params).toEqual({
+      threadId: "thread-1",
+      approvalPolicy: "on-request",
+      permissions: ":workspace"
+    });
+  });
+
   it("rejects permission changes while a turn is running", async () => {
     const appServer = new FakeAppServer();
     const manager = new RuntimeManager(appServer as any);
@@ -97,6 +141,115 @@ describe("RuntimeManager", () => {
       threadId: "thread-1",
       input: [{ type: "text", text: "继续", text_elements: [] }]
     });
+  });
+
+  it("retries the original thread after another client's writer lock is released", async () => {
+    const appServer = new FakeAppServer();
+    let resumeAttempts = 0;
+    appServer.request = async (method: string, params?: unknown) => {
+      appServer.requests.push({ method, params });
+      if (method === "thread/resume" && (params as { threadId: string }).threadId === "thread-1") {
+        resumeAttempts += 1;
+        if (resumeAttempts === 1) throw new Error("thread already has an active writer");
+        return { thread: { id: "thread-1" } };
+      }
+      if (method === "turn/start") return { turn: { id: "turn-1" } };
+      return {};
+    };
+    const manager = new RuntimeManager(appServer as any, { writerLockRetryDelaysMs: [0] });
+
+    const runtime = await manager.sendInput("thread-1", { text: "从最新历史继续" });
+
+    expect(runtime).toMatchObject({
+      threadId: "thread-1",
+      status: "running",
+      activeTurnId: "turn-1"
+    });
+    expect(appServer.requests.map((request) => request.method)).toEqual([
+      "thread/resume",
+      "thread/resume",
+      "turn/start"
+    ]);
+    expect(appServer.requests[2].params).toMatchObject({
+      threadId: "thread-1",
+      input: [{ type: "text", text: "从最新历史继续", text_elements: [] }]
+    });
+  });
+
+  it("creates a full fork only when explicitly requested", async () => {
+    const appServer = new FakeAppServer();
+    appServer.request = async (method: string, params?: unknown) => {
+      appServer.requests.push({ method, params });
+      if (method === "thread/fork") return { thread: { id: "thread-2" } };
+      if (method === "thread/resume") return { thread: { id: "thread-2" } };
+      return {};
+    };
+    const manager = new RuntimeManager(appServer as any);
+
+    const result = await manager.branchThread("thread-1", "full_fork");
+
+    expect(result).toMatchObject({
+      threadId: "thread-2",
+      runtime: { threadId: "thread-2", status: "waiting_input" }
+    });
+    expect(appServer.requests).toEqual([
+      { method: "thread/fork", params: { threadId: "thread-1" } },
+      { method: "thread/resume", params: { threadId: "thread-2" } }
+    ]);
+  });
+
+  it("retries a fork after another client's writer lock is released", async () => {
+    const appServer = new FakeAppServer();
+    let forkAttempts = 0;
+    appServer.request = async (method: string, params?: unknown) => {
+      appServer.requests.push({ method, params });
+      if (method === "thread/fork") {
+        forkAttempts += 1;
+        if (forkAttempts === 1) throw new Error("thread already has an active writer");
+        return { thread: { id: "thread-2" } };
+      }
+      if (method === "thread/resume") return { thread: { id: "thread-2" } };
+      return {};
+    };
+    const manager = new RuntimeManager(appServer as any, { writerLockRetryDelaysMs: [0] });
+
+    const result = await manager.branchThread("thread-1", "full_fork");
+
+    expect(result.threadId).toBe("thread-2");
+    expect(appServer.requests.map((request) => request.method)).toEqual([
+      "thread/fork",
+      "thread/fork",
+      "thread/resume"
+    ]);
+  });
+
+  it("waits for thread/compacted when creating a compacted new topic", async () => {
+    const appServer = new FakeAppServer();
+    appServer.request = async (method: string, params?: unknown) => {
+      appServer.requests.push({ method, params });
+      if (method === "thread/fork") return { thread: { id: "thread-2" } };
+      if (method === "thread/resume") return { thread: { id: "thread-2" } };
+      if (method === "thread/compact/start") {
+        queueMicrotask(() => appServer.emit("notification", {
+          method: "thread/compacted",
+          params: { threadId: "thread-2", turnId: "turn-compact" }
+        }));
+      }
+      return {};
+    };
+    const manager = new RuntimeManager(appServer as any, { compactionTimeoutMs: 100 });
+
+    const result = await manager.branchThread("thread-1", "compact_new_topic");
+
+    expect(result).toMatchObject({
+      threadId: "thread-2",
+      runtime: { threadId: "thread-2", status: "waiting_input" }
+    });
+    expect(appServer.requests).toEqual([
+      { method: "thread/fork", params: { threadId: "thread-1" } },
+      { method: "thread/resume", params: { threadId: "thread-2" } },
+      { method: "thread/compact/start", params: { threadId: "thread-2" } }
+    ]);
   });
 
   it("steers the active turn when a second input arrives", async () => {

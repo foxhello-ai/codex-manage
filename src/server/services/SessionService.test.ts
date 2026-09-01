@@ -114,6 +114,22 @@ describe("SessionService", () => {
     ]);
   });
 
+  it("keeps forked threads with a shared sessionId as separate topics", async () => {
+    const service = new SessionService(
+      readyClient({
+        data: [
+          { id: "thread-1", sessionId: "session-1", preview: "同一话题", cwd: "/workspace/app", createdAt: 10, updatedAt: 20 },
+          { id: "thread-2", sessionId: "session-1", preview: "同一话题", cwd: "/workspace/app", createdAt: 10, updatedAt: 30 }
+        ]
+      })
+    );
+
+    await expect(service.listSessions()).resolves.toMatchObject([
+      { id: "thread-1", sessionId: "session-1" },
+      { id: "thread-2", sessionId: "session-1" }
+    ]);
+  });
+
   it("paginates app-server sessions and searches beyond the first page", async () => {
     const calls: Array<{ method: string; params?: unknown }> = [];
     const service = new SessionService({
@@ -193,6 +209,35 @@ describe("SessionService", () => {
       title: "备注标题",
       remarkTitle: "备注标题"
     });
+  });
+
+  it("stores and restores a session permission mode", async () => {
+    let permissionMode: "default" | "full_access" = "default";
+    const service = new SessionService(
+      readyClient({ data: [] }),
+      {
+        getAll: async () => ({}),
+        get: async () => ({
+          remarkTitle: null,
+          permissionMode,
+          modelSelection: {
+            mode: "follow_session" as const,
+            preferredModel: null,
+            preferredReasoningEffort: null,
+            updatedAt: null
+          }
+        }),
+        update: async () => ({ remarkTitle: null }),
+        updatePermissionMode: async (_sessionId, nextMode) => {
+          permissionMode = nextMode;
+          return { permissionMode };
+        }
+      }
+    );
+
+    await expect(service.getPermissionMode("thread-1")).resolves.toBe("default");
+    await service.updatePermissionMode("thread-1", "full_access");
+    await expect(service.getPermissionMode("thread-1")).resolves.toBe("full_access");
   });
 
 

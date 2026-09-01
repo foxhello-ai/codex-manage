@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, Collaborator, CollaboratorsResponse, CreateCollaboratorResponse, HealthStatus, InputResponse, LoginAccountsResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, Collaborator, CollaboratorsResponse, CreateCollaboratorResponse, HealthStatus, InputResponse, LoginAccountsResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionBranchMode, SessionBranchResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -139,17 +139,24 @@ export function getSessionRuntime(sessionId: string): Promise<RuntimeResponse> {
   return apiRequest<RuntimeResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/runtime`);
 }
 
-export function resumeSession(sessionId: string, permissionMode: SessionPermissionMode = "default"): Promise<RuntimeResponse> {
+export function resumeSession(sessionId: string, permissionMode?: SessionPermissionMode): Promise<RuntimeResponse> {
   return apiRequest<RuntimeResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/resume`, {
     method: "POST",
-    body: JSON.stringify({ permissionMode })
+    body: JSON.stringify(permissionMode ? { permissionMode } : {})
   });
 }
 
-export function sendSessionInput(sessionId: string, text: string, permissionMode: SessionPermissionMode = "default"): Promise<InputResponse> {
+export function sendSessionInput(sessionId: string, text: string, permissionMode?: SessionPermissionMode): Promise<InputResponse> {
   return apiRequest<InputResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/input`, {
     method: "POST",
-    body: JSON.stringify({ text, permissionMode })
+    body: JSON.stringify({ text, ...(permissionMode ? { permissionMode } : {}) })
+  });
+}
+
+export function branchSession(sessionId: string, mode: SessionBranchMode): Promise<SessionBranchResponse> {
+  return apiRequest<SessionBranchResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/branch`, {
+    method: "POST",
+    body: JSON.stringify({ mode })
   });
 }
 
