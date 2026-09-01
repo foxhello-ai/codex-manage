@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f1eb" />
+    <meta name="description" content="Codex Manage：把本机 Codex 会话带到浏览器里。支持历史会话、实时输出、审批、模型切换、H5 管理与受控协作。" />
+    <meta property="og:title" content="Codex Manage — 把 Codex 会话带到浏览器里" />
+    <meta property="og:description" content="一个 local-first 的 Codex Web/H5 管理台。主账号授权既有会话，子账号只继续被授权的工作。" />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/png" href="./assets/brand-icon.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>Codex Manage — 把 Codex 会话带到浏览器里</title>
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="Codex Manage 首页">
+          <span class="brand-mark"><span></span></span>
+          <span class="brand-wordmark">codex <b>manage</b></span>
+        </a>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+          <span></span><span></span>
+          <span class="sr-only">打开导航</span>
+        </button>
+        <nav class="site-nav" id="site-nav" aria-label="主导航">
+          <a href="#product">产品</a>
+          <a href="#features">功能</a>
+          <a href="#collaboration">协作</a>
+          <a href="#how-it-works">原理</a>
+          <a href="#deploy">部署</a>
+          <a href="#feedback">联系客服</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero section-wrap" id="top">
+          <div class="hero-copy">
+            <p class="kicker"><span class="live-dot"></span> 受控协作 · 子账号 · Web / H5</p>
+            <h1>让子账号，<em>只继续该继续的工作。</em></h1>
+            <p class="hero-lede">Codex Manage 的核心是受控协作：主账号授权既有 Codex 会话，子账号只看到被授权的会话，并在原始 workspace 内按默认审批继续工作。</p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#collaboration">了解子账号协作 <span>↓</span></a>
+              <a class="button button-quiet" href="#feedback" data-contact-focus-link>联系客服 <span>→</span></a>
+            </div>
+            <div class="hero-note">
+              <span class="note-line"></span>
+              <span>授权可以撤销，访问边界由服务端强制执行。</span>
+            </div>
+          </div>
+
+          <div class="hero-visual" aria-label="Codex Manage 工作区预览">
+            <div class="visual-orbit orbit-one"></div>
+            <div class="visual-orbit orbit-two"></div>
+            <div class="app-window hero-window">
+                <div class="window-topbar">
+                <div class="window-brand"><span class="mini-mark"></span> Codex <span class="window-chevron">⌄</span></div>
+                <div class="window-pills"><span class="window-pill">child access</span><span class="window-status"><i></i> Authorized</span></div>
+              </div>
+              <div class="window-body">
+                <aside class="window-sidebar">
+                  <div class="window-action">◉ <span>Authorized chats</span></div>
+                  <div class="window-search">⌕ <span>Search chats</span></div>
+                  <p class="window-label">AUTHORIZED</p>
+                  <div class="window-chat active"><strong>Refine conversation workflow</strong><small><i></i> Authorized · fixed workspace</small></div>
+                  <div class="window-chat"><strong>Review permission handling</strong><small>Yesterday</small></div>
+                  <div class="window-chat"><strong>Model switching notes</strong><small>Aug 24</small></div>
+                </aside>
+                <div class="window-content">
+                  <div class="window-context"><span class="context-title">Refine conversation workflow</span><span class="context-path">authorized workspace / current session</span></div>
+                  <div class="message-block user-message"><span class="message-label">You</span><p>Bring the workspace closer to the conversation flow.</p></div>
+                  <div class="message-block agent-message"><span class="message-label">Codex <b>· Working</b></span><p>I’m reviewing the current shell and session states…</p></div>
+                  <div class="command-card"><span>⌄</span><code>npm run test:client</code><small>Completed · 12s</small></div>
+                  <div class="change-card"><span>›</span><span>2 recorded file changes</span><small>This turn</small></div>
+                  <div class="window-composer"><span class="composer-placeholder">Continue this session</span><div><span>＋</span><span>Default approval⌄</span><span>Fixed workspace</span><span>5.6 Terra · High</span><button type="button" aria-label="停止运行">■</button></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="floating-card floating-card-top"><span class="floating-icon">↗</span><span><b>Live output</b><small>streaming now</small></span></div>
+            <div class="floating-card floating-card-bottom"><span class="approval-icon">✓</span><span><b>Approval ready</b><small>you stay in control</small></span></div>
+          </div>
+        </section>
+
+        <div class="signal-strip section-wrap" aria-label="产品特性摘要">
+          <div><span class="signal-number">01</span><span>主账号授权</span></div>
+          <div><span class="signal-number">02</span><span>子账号隔离</span></div>
+          <div><span class="signal-number">03</span><span>默认审批</span></div>
+          <div><span class="signal-number">04</span><span>即时撤销</span></div>
+        </div>
+
+        <section class="section-wrap product-section" id="product">
+          <div class="section-heading split-heading">
+            <div>
+              <p class="eyebrow">01 / Product</p>
+              <h2>不是另一个聊天框。<br /><em>是 Codex 的工作台。</em></h2>
+            </div>
+            <p>你已经在终端里积累了真实的工程上下文。Codex Manage 直接读取 Codex 原生会话，让你从一条历史任务继续，而不是重新解释背景。</p>
+          </div>
+          <div class="product-showcase">
+            <div class="showcase-frame">
+              <div class="showcase-bar"><span class="traffic red"></span><span class="traffic yellow"></span><span class="traffic green"></span><span class="showcase-title">workspace / session view</span><span class="showcase-live"><i></i> live</span></div>
+              <div class="showcase-demo" role="img" aria-label="Codex Manage 会话工作区示意图">
+                <aside class="demo-sidebar"><div class="demo-action">＋ <span>New chat</span></div><div class="demo-search">⌕ <span>Search chats</span></div><p class="demo-label">RECENT</p><div class="demo-chat active"><strong>Refine conversation</strong><small><i></i> Running · current</small></div><div class="demo-chat"><strong>Review permissions</strong><small>Yesterday</small></div><div class="demo-chat"><strong>Model notes</strong><small>Aug 24</small></div></aside>
+                <div class="demo-content"><div class="demo-context"><strong>Refine conversation workflow</strong><small>workspace / current session</small></div><div class="demo-message"><b>You</b><p>Bring the workspace closer to the conversation flow.</p></div><div class="demo-message"><b>Codex <em>· Working</em></b><p>I’m reviewing the current shell and session states…</p></div><div class="demo-command"><span>⌄</span><code>npm run test:client</code><small>Completed · 12s</small></div><div class="demo-change"><span>›</span><span>2 recorded file changes</span><small>This turn</small></div><div class="demo-composer"><span>Message Codex</span><div><small>Ask before actions</small><small>Follow session</small><small>5.6 Terra · High</small><b>■</b></div></div></div>
+              </div>
+            </div>
+            <div class="showcase-caption">
+              <div><span class="caption-index">A</span><strong>主账号分配，子账号继续</strong><p>主账号选择既有会话并授权，子账号登录后只看到自己的授权范围，历史、实时输出和继续操作仍在同一条工作流里。</p></div>
+              <div><span class="caption-index">B</span><strong>电脑与手机都能接上</strong><p>H5 收起列表、移动详情和审批面板已经纳入同一个交互模型，临时离开电脑也不会丢掉上下文。</p></div>
+              <a href="#deploy" class="text-link">部署到自己的机器 <span>↗</span></a>
+            </div>
+          </div>
+        </section>
+
+        <section class="dark-section" id="features">
+          <div class="section-wrap">
+            <div class="section-heading dark-heading">
+              <p class="eyebrow">02 / Capabilities</p>
+              <h2>让每一步都看得见，<br /><em>让每个决定都在你手里。</em></h2>
+            </div>
+            <div class="feature-grid">
+              <article class="feature-card feature-card-large">
+                <div class="feature-icon icon-signal">◌</div>
+                <p class="feature-index">01 — CONTEXT</p>
+                <h3>从历史会话继续</h3>
+                <p>读取当前运行用户的本地会话记录，按最近更新浏览、搜索和打开原生 Codex 会话，保留工程上下文。</p>
+                <div class="feature-visual session-mini"><span class="session-mini-dot"></span><span></span><span></span><b>project / session</b></div>
+              </article>
+              <article class="feature-card">
+                <div class="feature-icon">↯</div>
+                <p class="feature-index">02 — STREAM</p>
+                <h3>实时看到 Codex 在做什么</h3>
+                <p>文本回复、命令执行、输出、文件变化和进程状态，都沿着会话实时出现。</p>
+                <div class="wave-visual"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              </article>
+              <article class="feature-card">
+                <div class="feature-icon">✓</div>
+                <p class="feature-index">03 — CONTROL</p>
+                <h3>审批，而不是盲跑</h3>
+                <p>遇到需要确认的动作，明确展示 Allow、Deny 或 Cancel。默认策略可见，恢复路径可操作。</p>
+                <div class="approval-visual"><span>Approval needed</span><b>Allow once</b><span>Deny</span></div>
+              </article>
+              <article class="feature-card">
+                <div class="feature-icon">✦</div>
+                <p class="feature-index">04 — MODEL</p>
+                <h3>按会话切换模型</h3>
+                <p>只从当前 app-server 声明支持的模型中选择，不猜测、不偷偷降级，保留原会话 ID 和历史。</p>
+                <div class="model-visual"><span>5.6 Terra</span><i>High</i><b>⌄</b></div>
+              </article>
+              <article class="feature-card feature-card-wide">
+                <div class="feature-icon">⌘</div>
+                <div><p class="feature-index">05 — WORKSPACE</p><h3>工程上下文跟着会话走</h3><p>工作目录、命令、历史消息和运行状态都围绕具体会话组织，不把重要信息藏在另一个后台页面里。</p></div>
+                <div class="path-visual"><span>workspace</span><b>codex-manage</b><span>current session</span><i>·</i><span>running</span></div>
+              </article>
+              <article class="feature-card feature-card-wide">
+                <div class="feature-icon">⌁</div>
+                <div><p class="feature-index">06 — ACCESS</p><h3>登录保护，局域网可用</h3><p>管理台先登录再进入会话，适合开发机、本地服务器和局域网内的个人工作流。</p></div>
+                <div class="access-visual"><span class="access-avatar">CM</span><span>owner</span><b>authenticated</b></div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-wrap collaboration-section" id="collaboration">
+          <div class="section-heading split-heading">
+            <div><p class="eyebrow">03 / Controlled collaboration</p><h2>把协作交给子账号，<br /><em>把边界留在服务端。</em></h2></div>
+            <p>受控协作让主账号可以把一部分既有工作交给子账号继续处理，同时保持会话、workspace 和审批边界清晰可见。</p>
+          </div>
+          <div class="collaboration-grid">
+            <article class="collab-card owner-card">
+              <div class="collab-top"><span>OWNER</span><small>主账号</small></div>
+              <h3>授权既有会话</h3>
+              <p>主账号可新增或停用本地子账号，为指定子账号勾选一个或多个既有会话，也可以随时撤销授权。</p>
+              <div class="collab-flow"><span>选择子账号</span><i>→</i><span>勾选会话</span><i>→</i><span>即时生效</span></div>
+            </article>
+            <article class="collab-card child-card">
+              <div class="collab-top"><span>CHILD</span><small>受控子账号</small></div>
+              <h3>只继续被授权的工作</h3>
+              <p>子账号登录后只看到已授权会话，在该会话原始 workspace 内按默认审批规则继续工作。</p>
+              <div class="collab-permissions"><span>已授权会话</span><span>默认审批</span><span>固定 workspace</span></div>
+            </article>
+            <aside class="collab-boundary">
+              <p class="eyebrow">Server-enforced boundary</p>
+              <h3>前端隐藏不是安全边界。</h3>
+              <p>会话列表、详情、命令、运行态、继续、输入、模型、审批和 WebSocket 请求统一在服务端校验。未授权会话、workspace 外访问和完全权限请求都会被拒绝。</p>
+              <span class="collab-note">协作预览 · 独立发布中</span>
+            </aside>
+          </div>
+        </section>
+
+        <section class="section-wrap architecture-section" id="how-it-works">
+          <div class="section-heading split-heading">
+            <div><p class="eyebrow">04 / Architecture</p><h2>浏览器是入口，<br /><em>机器才是执行面。</em></h2></div>
+            <p>Codex Manage 的核心取舍很简单：把控制体验带到 Web，把会话数据和真实工具链留在你自己的运行环境里。</p>
+          </div>
+          <div class="architecture-layout">
+            <div class="architecture-flow">
+              <div class="flow-card flow-browser"><span class="flow-symbol">◒</span><div><b>Web / H5 浏览器</b><small>会话、审批、模型、设置</small></div><span class="flow-step">01</span></div>
+              <div class="flow-connector"><span></span><span></span><span></span></div>
+              <div class="flow-card flow-runtime"><span class="flow-symbol">▣</span><div><b>Linux Runtime</b><small>Fastify + React · 登录保护</small></div><span class="flow-step">02</span></div>
+              <div class="flow-connector"><span></span><span></span><span></span></div>
+              <div class="flow-card flow-codex"><span class="flow-symbol">⌘</span><div><b>Codex app-server</b><small>原生会话 · 命令 · 工程文件</small></div><span class="flow-step">03</span></div>
+            </div>
+            <div class="architecture-aside">
+              <div class="aside-rule"></div>
+              <p class="aside-label">数据边界</p>
+              <h3>你的会话，<br />留在你的机器上。</h3>
+              <p>云端并不是必需的中转层。主线 Web 版本只需要一台能运行 Codex 的 Linux 主机；官网与运行时可以独立发布。</p>
+              <div class="boundary-tags"><span>本机会话</span><span>本机工具链</span><span>可审计部署</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="deploy-section" id="deploy">
+          <div class="section-wrap">
+            <div class="section-heading deploy-heading"><p class="eyebrow">05 / Deploy</p><h2>先选运行方式，<br /><em>再开始部署。</em></h2><p>当前主线的 Runtime 一条命令安装只覆盖 Linux；Windows 和 macOS 可以作为浏览器访问端，桌面安装包与统一安装器仍需要完成独立发布验收。</p></div>
+            <div class="platform-matrix" aria-label="平台部署支持矩阵">
+              <article class="platform-card platform-current">
+                <div class="platform-card-top"><span>NOW / SERVER</span><small>当前可用</small></div>
+                <h3>Linux Runtime</h3>
+                <p>使用同一个已登录 Codex 的 Linux 用户安装，服务由 systemd 管理，适合服务器或常驻开发机。</p>
+                <code>sudo bash install-runtime.sh --user &lt;运行用户&gt; --package &lt;runtime-package&gt;</code>
+                <small class="platform-requirement">前置：Node.js、Codex CLI、sudo/systemd</small>
+              </article>
+              <article class="platform-card">
+                <div class="platform-card-top"><span>NOW / CLIENT</span><small>可访问</small></div>
+                <h3>Windows / macOS</h3>
+                <p>可通过浏览器访问已经部署好的 Linux Runtime；当前主线不提供 Windows/macOS 本机 Runtime 的统一安装命令。</p>
+                <div class="platform-tags"><span>Windows</span><span>macOS Intel</span><span>macOS Apple 芯片</span></div>
+                <small class="platform-requirement">桌面安装包属于独立发布线，需以已验收版本为准</small>
+              </article>
+              <article class="platform-card platform-planned">
+                <div class="platform-card-top"><span>PLAN / ONE COMMAND</span><small>待补齐</small></div>
+                <h3>三平台统一安装器</h3>
+                <p>要实现 Windows、macOS、Linux 都能一条命令部署，需要分别接入 Windows Service、launchd、systemd，以及签名、升级和回滚流程。</p>
+                <span class="platform-note">当前不对外承诺已完成</span>
+              </article>
+            </div>
+            <div class="deploy-grid">
+              <div class="deploy-steps">
+                <div class="deploy-step"><span>01</span><div><h3>Linux：准备运行用户</h3><p>创建专用用户，并用它完成 <code>codex login</code>。这样已有会话、SSH key、MCP 和工程权限保持一致。</p></div></div>
+                <div class="deploy-step"><span>02</span><div><h3>Linux：准备运行包</h3><p>将经过校验的 Runtime 运行包和安装脚本放到服务器；当前一条命令安装脚本只适用于 Bash、sudo 和 systemd。</p></div></div>
+                <div class="deploy-step"><span>03</span><div><h3>Linux：安装并访问管理台</h3><p>安装脚本创建并启动 systemd 服务。启动后通过服务器地址打开 Web/H5，先登录，再选择历史会话并继续任务。</p></div></div>
+                <a class="deploy-doc-link" href="#feedback" data-contact-focus-link>部署遇到问题？联系客服 <span>↗</span></a>
+              </div>
+              <div class="terminal-card">
+                <div class="terminal-bar"><span class="traffic red"></span><span class="traffic yellow"></span><span class="traffic green"></span><span>Linux / install-runtime.sh</span><button class="copy-button" type="button" data-copy="sudo bash install-runtime.sh --user &lt;运行用户&gt; --package &lt;runtime-package&gt;">复制</button></div>
+                <div class="terminal-content"><p><span class="terminal-comment"># 使用已完成 Codex 登录的运行用户</span></p><p><span class="terminal-prompt">$</span> sudo bash install-runtime.sh \</p><p class="terminal-indent">--user &lt;运行用户&gt; \</p><p class="terminal-indent">--package &lt;runtime-package&gt;</p><p class="terminal-success">✓ runtime service ready · access protected</p></div>
+                <div class="terminal-footer"><span>runtime install</span><span>sha256 verified</span><span>systemd</span></div>
+              </div>
+            </div>
+            <div class="deploy-note"><div class="deploy-note-icon">✓</div><div><strong>部署前确认三件事</strong><p>运行用户已经完成 Codex 登录；运行包来源和校验值已核对；生产环境已设置独立的访问密码，并通过防火墙或反向代理限制访问范围。</p></div></div>
+          </div>
+        </section>
+
+        <section class="section-wrap boundary-section">
+          <div class="boundary-card">
+            <div class="boundary-stamp">SCOPE<br /><b>NOW</b></div>
+            <div><p class="eyebrow">A clear boundary</p><h2>现在就能用的，<br /><em>和正在准备的。</em></h2></div>
+            <div class="boundary-copy"><p><strong>当前主线</strong>：Linux Runtime、Web/H5 会话管理、历史会话恢复、实时输出、审批、命令记录、会话级模型切换和登录保护。</p><p><strong>独立发布线</strong>：其他桌面、云端和商业化能力仍需各自的外部环境验收，官网只对当前主线做准确承诺。</p><a href="#feedback" class="text-link">反馈内容边界问题 <span>↗</span></a></div>
+          </div>
+        </section>
+
+        <section class="section-wrap faq-section" id="faq">
+          <div class="section-heading"><p class="eyebrow">06 / FAQ</p><h2>部署前，先把几个问题说清楚。</h2></div>
+          <div class="faq-list">
+            <details open><summary>静态官网能直接运行 Codex Manage 吗？<span>＋</span></summary><p>不能。Codex Manage Runtime 需要在能访问 Codex CLI、会话目录和工程文件的 Linux 主机上运行。官网只是产品介绍和部署入口，实际执行面仍然是你的运行主机。</p></details>
+            <details><summary>Windows 和 macOS 可以一条命令部署吗？<span>＋</span></summary><p>当前不能这样承诺。Windows 和 macOS 可以作为浏览器访问端连接 Linux Runtime；本机桌面安装包与三平台统一安装器属于独立发布线，仍需完成安装、签名、升级和实机验收。</p></details>
+            <details><summary>会话内容会上传到云端吗？<span>＋</span></summary><p>当前主线的会话读取和 Codex 执行发生在你的运行主机上，主线 Web 版本不要求把会话内容存进云端数据库。公开部署前仍应按自己的网络、登录密码和反向代理策略做安全审查。</p></details>
+            <details><summary>我已经有 Codex 会话了，可以直接继续吗？<span>＋</span></summary><p>可以。Runtime 会读取运行用户的本地会话记录，进入管理台后可以浏览历史会话、查看详情，并通过原生 resume 能力继续任务。</p></details>
+            <details><summary>子账号可以创建会话或切换 workspace 吗？<span>＋</span></summary><p>不可以。子账号只能看到主账号授权的既有会话，不能创建新会话、切换 workspace、管理用户或修改全局配置；授权会话会固定使用原始 workspace。</p></details>
+            <details><summary>撤销授权后，子账号还可以继续操作吗？<span>＋</span></summary><p>不可以。撤销会话授权或停用子账号后，后续列表、详情、继续、输入、审批和实时连接请求都会重新校验并失效。</p></details>
+            <details><summary>官网为什么不把其他平台能力作为现成功能宣传？<span>＋</span></summary><p>因为它们属于独立的发布线，仍需要签名、跨平台安装包和生产环境验收。官网优先对当前主线做准确承诺。</p></details>
+          </div>
+        </section>
+
+        <section class="feedback-section" id="feedback">
+          <div class="section-wrap feedback-layout">
+            <div class="feedback-intro"><p class="eyebrow">07 / Support desk</p><h2>遇到问题，<br /><em>把现场告诉我们。</em></h2><p>请尽量填写发生步骤、期望结果和实际结果。客服入口会把信息整理成可处理的反馈单，不自动采集会话内容、文件内容或本机路径。</p><div class="feedback-promise"><span>01</span><p>先填写问题单，补齐复现步骤、期望结果和实际结果。</p></div><div class="feedback-promise"><span>02</span><p>可以直接复制或下载反馈单；配置私有渠道后也能在线提交。</p></div><div class="contact-panel"><p class="support-kicker">客服入口 / SUPPORT DESK</p><h3>三步把问题交给客服。</h3><p>填写问题 → 生成反馈单 → 复制、下载或在线提交。</p><div class="support-actions"><button class="button button-primary" type="button" data-contact-focus>开始填写 <span>→</span></button><button class="button button-quiet" type="button" data-download-feedback>下载反馈单</button></div><p class="support-status" id="support-status" role="status">当前可直接生成反馈单；在线接收渠道由部署者配置。</p></div></div>
+            <form class="feedback-form" id="feedback-form">
+              <div class="feedback-fields"><label>反馈类型<select name="type"><option>功能问题</option><option>部署问题</option><option>体验建议</option><option>安全问题</option></select></label><label>联系方式（可选）<input name="contact" type="text" autocomplete="email" placeholder="邮箱或内部账号" /></label></div>
+              <label>问题标题<input name="title" type="text" required maxlength="120" placeholder="例如：恢复会话后无法继续发送任务" /></label>
+              <label>问题描述<textarea name="detail" required rows="7" placeholder="发生了什么？如何复现？期望结果和实际结果分别是什么？"></textarea></label>
+              <div class="feedback-actions"><button class="button button-primary" type="submit">生成并提交 <span>→</span></button><button class="button button-quiet" type="button" data-copy-feedback>复制内容</button></div>
+              <p class="feedback-status" id="feedback-status" role="status">提交后会生成反馈单；在线接收渠道由部署者配置。</p>
+            </form>
+          </div>
+        </section>
+
+        <section class="final-cta section-wrap">
+          <div><p class="eyebrow">Start with your next session</p><h2>把下一次继续任务，<br /><em>从浏览器开始。</em></h2></div>
+          <div class="final-cta-actions"><a class="button button-primary" href="#deploy">部署 Codex Manage <span>↗</span></a><a class="button button-quiet" href="#feedback" data-contact-focus-link>联系客服 <span>↗</span></a></div>
+        </section>
+      </main>
+
+      <footer class="site-footer section-wrap">
+        <div class="footer-main"><a class="brand" href="#top"><span class="brand-mark"><span></span></span><span class="brand-wordmark">codex <b>manage</b></span></a><p>Keep the context. Continue the work.</p></div>
+        <div class="footer-links"><a href="#product">产品</a><a href="#deploy">部署</a><a href="#feedback">联系客服</a><a href="#faq">FAQ</a></div>
+        <div class="footer-bottom"><span>© <span id="year"></span> Codex Manage</span><span>Built for local-first workflows.</span></div>
+      </footer>
+    </div>
+    <div class="copy-toast" role="status" aria-live="polite"></div>
+    <script src="./main.js"></script>
+  </body>
+</html>
