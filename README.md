@@ -478,7 +478,8 @@ systemd 方案直接以同一个 Linux 用户运行，能天然读取已有会�
 | `CODEX_WEB_PORT` | `4310` | Web 服务端口 |
 | `CODEX_WEB_PASSWORD` | `admin` | 登录密码，生产环境必须覆盖 |
 | `CODEX_WEB_SESSION_SECRET` | 随机值 | Cookie 签名密钥，生产环境必须固定 |
-| `CODEX_CLI_PATH` | `codex` | 宿主机 Codex CLI 路径 |
+| `CODEX_CLI_PATH` | macOS 优先使用 ChatGPT 内置 CLI，否则为 `codex` | 宿主机 Codex CLI 路径；显式设置后覆盖默认路径 |
+| `CODEX_EXPECTED_CLI_VERSION` | 未设置 | 启动或重载时校验 Codex CLI 版本，例如 `0.149.0` |
 | `CODEX_SESSIONS_DIR` | `~/.codex/sessions` | Codex 会话目录 |
 | `CODEX_MANAGE_METADATA_FILE` | `.codex-manage/session-metadata.json` | Codex Manage 会话元数据 |
 

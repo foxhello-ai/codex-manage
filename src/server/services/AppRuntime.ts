@@ -1,4 +1,4 @@
-import type { AppConfig } from "../config";
+import { validateCodexCliVersion, type AppConfig } from "../config";
 import { ModelDomainError } from "../modelErrors";
 import { CodexAppServerClient, type CodexAppServerSnapshot } from "./CodexAppServerClient";
 import { detectCodexVersion } from "./codexVersion";
@@ -116,7 +116,9 @@ export class AppRuntime {
 
   private async detectVersion() {
     try {
-      this.codexCliVersion = await detectCodexVersion(this.config.codexCliPath);
+      const version = await detectCodexVersion(this.config.codexCliPath);
+      validateCodexCliVersion(version, this.config.expectedCodexCliVersion);
+      this.codexCliVersion = version;
       this.codexVersionError = null;
     } catch (error) {
       this.codexCliVersion = null;
