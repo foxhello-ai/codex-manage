@@ -26,14 +26,3 @@ sudo bash ./scripts/install-runtime.sh \
 ```
 
 生产环境需要设置 `CODEX_WEB_PASSWORD`，并在反向代理、防火墙和访问控制层限制管理台暴露范围。
-
-## 反馈渠道配置
-
-官网问题反馈入口在 `website/main.js` 中配置：
-
-- `FEEDBACK_EMAIL`：使用私有邮箱接收反馈
-- `FEEDBACK_ENDPOINT`：使用内部 API 接收结构化 JSON
-
-当 `FEEDBACK_ENDPOINT` 有值时，按钮会直接提交结构化反馈；当 `FEEDBACK_EMAIL` 有值时，会打开预填好的客服邮件。
-
-两者都为空时，页面不会自动上传反馈，但仍可以将反馈内容整理成文本、下载并复制，便于通过已有客服渠道转交。官网页面不展示内部接收地址。
