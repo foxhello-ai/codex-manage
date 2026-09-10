@@ -1,9 +1,9 @@
-import { CSSProperties, FormEvent, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ApiRequestError, branchSession, createCollaborator, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel } from "../shared/api";
+import { CSSProperties, FormEvent, Fragment, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ApiRequestError, branchSession, continueSessionFromHistory, createCollaborator, createSession, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionBranchMode, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
 import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
-import { findRetryContextForTurn, findRetryContextFromFailedTurns, isTaskSendShortcut, type RetryContext } from "./sessionInteractions";
+import { findRetryContextForTurn, findRetryContextFromFailedTurns, isCommentaryPhase, isFinalAnswerPhase, isTaskSendShortcut, isUnmaterializedThreadHistoryError, type RetryContext } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 import { stripAmbientBrowserContext } from "../shared/messageText";
 import { clearBootstrapSession, readBootstrapSession, writeBootstrapSession } from "./bootstrapSession";
@@ -236,6 +236,8 @@ function Dashboard({
   const [search, setSearch] = useState("");
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [creatingSessionWorkspace, setCreatingSessionWorkspace] = useState<string | null>(null);
+  const [createSessionError, setCreateSessionError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null
   );
@@ -245,6 +247,7 @@ function Dashboard({
   const [historyLoadedSessionId, setHistoryLoadedSessionId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyNotice, setHistoryNotice] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DashboardView>(safeInitialRoute.kind === "list" ? "list" : safeInitialRoute.kind);
   const [routeError, setRouteError] = useState<string | null>(safeInitialRoute.kind === "invalid" ? safeInitialRoute.message : null);
   const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
@@ -259,6 +262,7 @@ function Dashboard({
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [branchingMode, setBranchingMode] = useState<SessionBranchMode | null>(null);
+  const [historyContinuationPending, setHistoryContinuationPending] = useState(false);
   const [modelCatalog, setModelCatalog] = useState<ModelCatalogResponse | null>(null);
   const [loadingModels, setLoadingModels] = useState(false);
   const [modelCatalogError, setModelCatalogError] = useState<string | null>(null);
@@ -406,6 +410,8 @@ function Dashboard({
   }, [search]);
 
   useEffect(() => {
+    if (!isStandalonePwa()) return;
+
     let wasHidden = document.visibilityState === "hidden";
 
     function refreshAfterResume() {
@@ -491,36 +497,47 @@ function Dashboard({
     loadSessions(search);
   }
 
-  async function loadSessionDetail(sessionId: string, options: { silent?: boolean; includeTurns?: boolean } = {}) {
+  async function loadSessionDetail(sessionId: string, options: { silent?: boolean; includeTurns?: boolean } = {}): Promise<SessionDetail | null> {
     const includeTurns = options.includeTurns ?? false;
-    if (includeTurns && historyLoadingSessionIdRef.current === sessionId) return;
+    if (includeTurns && historyLoadingSessionIdRef.current === sessionId) return null;
     if (includeTurns) historyLoadingSessionIdRef.current = sessionId;
     if (!options.silent) {
       if (includeTurns) setLoadingHistory(true);
       else setLoadingDetail(true);
     }
-    if (includeTurns) setHistoryError(null);
+    if (includeTurns) {
+      setHistoryError(null);
+      setHistoryNotice(null);
+    }
     else setDetailError(null);
 
     try {
       const response = await getSessionDetail(sessionId, includeTurns);
-      if (selectedSessionIdRef.current !== sessionId) return;
+      if (selectedSessionIdRef.current !== sessionId) return null;
       setSessionDetail(response.session);
       if (includeTurns) {
         historyLoadedSessionIdRef.current = sessionId;
         setHistoryLoadedSessionId(sessionId);
+        setHistoryNotice(null);
+        reconcileLiveMessagesWithHistory(response.session);
       } else if (historyLoadedSessionIdRef.current !== sessionId) {
         void loadSessionDetail(sessionId, { includeTurns: true, silent: options.silent });
       }
+      return response.session;
     } catch (caught) {
-      if (selectedSessionIdRef.current !== sessionId) return;
+      if (selectedSessionIdRef.current !== sessionId) return null;
       const message = caught instanceof Error ? caught.message : includeTurns ? "历史会话加载失败" : "会话详情加载失败";
       if (includeTurns) {
+        if (isUnmaterializedThreadHistoryError(message)) {
+          setHistoryNotice("新会话已创建，可以正常开始对话。发送第一条消息后，历史消息会显示在这里。");
+          return null;
+        }
         setHistoryError(message);
       } else {
         if (!options.silent) setSessionDetail(null);
         setDetailError(message);
       }
+      return null;
     } finally {
       if (includeTurns && historyLoadingSessionIdRef.current === sessionId) {
         historyLoadingSessionIdRef.current = null;
@@ -545,6 +562,30 @@ function Dashboard({
       .concat(liveTimelineRef.current.some((entry) => entry.kind === kind && entry.id === nextId) ? [] : [{ kind, id: nextId }]);
     liveTimelineRef.current = next;
     setLiveTimeline(next);
+  }
+
+  function reconcileLiveMessagesWithHistory(history: SessionDetail, dropUnmatchedAgentMessages = false) {
+    const historicalTurns = history.turns;
+    const historicalTurnIds = new Set(historicalTurns.map((turn) => turn.id));
+    const historicalItemIds = new Set(historicalTurns.flatMap((turn) => turn.items.map((item) => item.id)));
+    const removedMessageIds = new Set<string>();
+    const retainedMessages = liveMessagesRef.current.filter((message) => {
+      const belongsToHistory = Boolean(message.itemId && historicalItemIds.has(message.itemId))
+        || Boolean(message.turnId && historicalTurnIds.has(message.turnId))
+        || (message.role === "user" && Boolean(message.turnId) && historicalTurns.some((turn) => turn.id === message.turnId
+          && turn.items.some((item): item is Extract<SessionTurnItem, { type: "user_message" }> => item.type === "user_message"
+            && stripAmbientBrowserContext(item.text) === stripAmbientBrowserContext(message.text))));
+      const shouldRemove = belongsToHistory || (dropUnmatchedAgentMessages && message.role === "agent");
+      if (shouldRemove) removedMessageIds.add(message.id);
+      return !shouldRemove;
+    });
+    if (removedMessageIds.size === 0) return;
+
+    liveMessagesRef.current = retainedMessages;
+    setLiveMessages(retainedMessages);
+    const retainedTimeline = liveTimelineRef.current.filter((entry) => !(entry.kind === "message" && removedMessageIds.has(entry.id)));
+    liveTimelineRef.current = retainedTimeline;
+    setLiveTimeline(retainedTimeline);
   }
 
   function syncRuntimeSnapshot(nextRuntime: RuntimeSnapshot) {
@@ -601,9 +642,11 @@ function Dashboard({
         await delay(waitMs);
         if (selectedSessionIdRef.current !== sessionId) return;
         await Promise.all([
-          refreshCurrentSession(sessionId, { silent: true, includeTurns: true }),
+          loadSessionDetail(sessionId, { silent: true, includeTurns: true }),
           loadSessions(search)
-        ]);
+        ]).then(([history]) => {
+          if (history) reconcileLiveMessagesWithHistory(history, true);
+        });
       }
     } finally {
       completionRefreshInFlightRef.current.delete(sessionId);
@@ -919,6 +962,7 @@ function Dashboard({
     setHistoryLoadedSessionId(null);
     setLoadingHistory(false);
     setHistoryError(null);
+    setHistoryNotice(null);
     setRuntime(null);
     setPermissionMode("default");
     setPendingApprovals([]);
@@ -990,6 +1034,23 @@ function Dashboard({
     const path = buildSessionDetailPath(session.id);
     if (window.location.pathname !== path) window.history.pushState(null, "", path);
     applySessionRoute({ kind: "detail", sessionId: session.id });
+  }
+
+  async function handleCreateSession(workspace: string) {
+    if (user.role !== "owner" || creatingSessionWorkspace) return;
+    setCreatingSessionWorkspace(workspace);
+    setCreateSessionError(null);
+    try {
+      const response = await createSession(workspace);
+      await loadSessions("");
+      const path = buildSessionDetailPath(response.threadId);
+      if (window.location.pathname !== path) window.history.pushState(null, "", path);
+      applySessionRoute({ kind: "detail", sessionId: response.threadId });
+    } catch (caught) {
+      setCreateSessionError(caught instanceof Error ? caught.message : "新会话创建失败");
+    } finally {
+      setCreatingSessionWorkspace(null);
+    }
   }
 
   function handleMetadataSaved(updated: SessionSummary) {
@@ -1172,6 +1233,57 @@ function Dashboard({
     }
   }
 
+  async function handleHistoryContinuation(requestedRetryContext?: RetryContext | null) {
+    const sourceSession = selectedSession ?? sessionDetail;
+    const sourceSessionId = sourceSession?.id ?? selectedSessionIdRef.current;
+    const continuationContext = requestedRetryContext ?? retryContextRef.current;
+    if (!sourceSession || !sourceSessionId || !continuationContext || historyContinuationPending) return;
+
+    setHistoryContinuationPending(true);
+    setRuntimeError(null);
+    setSessionNotice(null);
+    try {
+      const response = await continueSessionFromHistory(sourceSessionId, {
+        cwd: sourceSession.workspace,
+        sourceTitle: sourceSession.title,
+        text: continuationContext.text,
+        permissionMode
+      });
+      if (selectedSessionIdRef.current !== sourceSessionId) return;
+
+      setSessions((current) => upsertSession(current, response.session));
+      void loadSessions(search);
+      const nextSessionId = response.session.id;
+      const path = buildSessionDetailPath(nextSessionId);
+      if (window.location.pathname !== path) window.history.pushState(null, "", path);
+      applySessionRoute({ kind: "detail", sessionId: nextSessionId });
+      syncRuntimeSnapshot(response.runtime);
+
+      const titleNotice = response.metadataError
+        ? "新会话已创建，但标题保存失败；会话仍可继续使用。"
+        : "已创建“历史续聊（新会话）”，正在读取原会话历史并继续处理。";
+      if (response.inputError) {
+        retryContextRef.current = continuationContext;
+        setRetryContext(continuationContext);
+        setRuntimeError(response.inputError);
+        setSessionNotice(`${titleNotice} 首次续聊请求失败，原输入仍保留，可重试。`);
+      } else {
+        retryContextRef.current = null;
+        setRetryContext(null);
+        setRetryDialogOpen(false);
+        setSessionNotice(titleNotice);
+      }
+    } catch (caught) {
+      if (selectedSessionIdRef.current === sourceSessionId) {
+        setRuntimeError(caught instanceof Error ? caught.message : "创建历史续聊会话失败");
+        retryContextRef.current = continuationContext;
+        setRetryContext(continuationContext);
+      }
+    } finally {
+      setHistoryContinuationPending(false);
+    }
+  }
+
   async function handlePermissionModeChange(nextMode: SessionPermissionMode) {
     if (!selectedSessionId) return;
     const status = runtime?.status ?? "history";
@@ -1258,6 +1370,9 @@ function Dashboard({
         onSearchSubmit={handleSearchSubmit}
         onSelect={handleSelectSession}
         onMetadataSaved={handleMetadataSaved}
+        onCreateSession={user.role === "owner" ? handleCreateSession : undefined}
+        creatingSessionWorkspace={creatingSessionWorkspace}
+        createSessionError={createSessionError}
       />
     );
   }
@@ -1313,6 +1428,9 @@ function Dashboard({
             onSearchSubmit={handleSearchSubmit}
             onSelect={handleSelectSession}
             onMetadataSaved={handleMetadataSaved}
+            onCreateSession={user.role === "owner" ? handleCreateSession : undefined}
+            creatingSessionWorkspace={creatingSessionWorkspace}
+            createSessionError={createSessionError}
           />
 
           <div className="mobileDashboardHome">
@@ -1407,6 +1525,7 @@ function Dashboard({
                   historyLoaded={historyLoadedSessionId === selectedSession.id}
                   loadingHistory={loadingHistory}
                   historyError={historyError}
+                  historyNotice={historyNotice}
                   runtime={runtime}
                   permissionMode={permissionMode}
                   runtimeError={runtimeError}
@@ -1435,6 +1554,8 @@ function Dashboard({
                   }}
                   branchingMode={branchingMode}
                   onBranchSession={handleBranchSession}
+                  historyContinuationPending={historyContinuationPending}
+                  onContinueFromHistory={(context) => void handleHistoryContinuation(context)}
                   onLoadHistory={handleLoadHistory}
                   onSubmitApproval={handleSubmitApproval}
                 />
@@ -1512,6 +1633,9 @@ function Dashboard({
               onSearchSubmit={handleSearchSubmit}
               onSelect={handleSelectSession}
               onMetadataSaved={handleMetadataSaved}
+              onCreateSession={user.role === "owner" ? handleCreateSession : undefined}
+              creatingSessionWorkspace={creatingSessionWorkspace}
+              createSessionError={createSessionError}
             />
           </aside>
         </div>
@@ -1978,6 +2102,7 @@ function SessionDetailPanel({
   historyLoaded,
   loadingHistory,
   historyError,
+  historyNotice,
   runtime,
   permissionMode,
   runtimeError,
@@ -1991,11 +2116,13 @@ function SessionDetailPanel({
   updatingModel,
   isChild,
   branchingMode,
+  historyContinuationPending,
   onPermissionModeChange,
   onOpenModelPicker,
   onSendInput,
   onOpenRetry,
   onBranchSession,
+  onContinueFromHistory,
   onLoadHistory,
   onSubmitApproval
 }: {
@@ -2006,6 +2133,7 @@ function SessionDetailPanel({
   historyLoaded: boolean;
   loadingHistory: boolean;
   historyError: string | null;
+  historyNotice: string | null;
   runtime: RuntimeSnapshot | null;
   permissionMode: SessionPermissionMode;
   runtimeError: string | null;
@@ -2019,11 +2147,13 @@ function SessionDetailPanel({
   updatingModel: boolean;
   isChild: boolean;
   branchingMode: SessionBranchMode | null;
+  historyContinuationPending: boolean;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
   onOpenModelPicker: (retryContext?: RetryContext | null) => void;
   onSendInput: (text: string) => Promise<void>;
   onOpenRetry: (context: RetryContext) => void;
   onBranchSession: (mode: SessionBranchMode, retryContext?: RetryContext | null) => Promise<void>;
+  onContinueFromHistory: (retryContext?: RetryContext | null) => void;
   onLoadHistory: () => Promise<void>;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
@@ -2153,14 +2283,21 @@ function SessionDetailPanel({
           {error ? <div className="errorBanner">{error}</div> : null}
           {historyError ? <div className="errorBanner">{historyError}</div> : null}
           {detail && !historyLoaded ? (
-            <div className="emptyState">
-              <p>{loadingHistory ? "正在加载最新历史消息..." : "历史消息暂未加载。"}</p>
-              {!loadingHistory ? (
-                <button className="ghostButton" type="button" onClick={() => void onLoadHistory()}>
-                  重新加载历史消息
-                </button>
-              ) : null}
-            </div>
+            historyNotice ? (
+              <div className="historyNotice" role="status">
+                <strong>新会话</strong>
+                <span>{historyNotice}</span>
+              </div>
+            ) : (
+              <div className="emptyState">
+                <p>{loadingHistory ? "正在加载最新历史消息..." : "历史消息暂未加载。"}</p>
+                {!loadingHistory ? (
+                  <button className="ghostButton" type="button" onClick={() => void onLoadHistory()}>
+                    重新加载历史消息
+                  </button>
+                ) : null}
+              </div>
+            )
           ) : null}
           {historyLoaded && detail && !hasVisibleHistory && visibleLiveTimeline.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
           {historyLoaded && detail && hasVisibleHistory ? (
@@ -2186,6 +2323,8 @@ function SessionDetailPanel({
               onRetry={onOpenRetry}
               branchingMode={branchingMode}
               onBranchSession={onBranchSession}
+              historyContinuationPending={historyContinuationPending}
+              onContinueFromHistory={onContinueFromHistory}
             />
           ) : visibleLiveTimeline.length > 0 ? (
             <SessionTimeline
@@ -2201,6 +2340,8 @@ function SessionDetailPanel({
               onRetry={onOpenRetry}
               branchingMode={branchingMode}
               onBranchSession={onBranchSession}
+              historyContinuationPending={historyContinuationPending}
+              onContinueFromHistory={onContinueFromHistory}
             />
           ) : null}
           </div>
@@ -2657,14 +2798,14 @@ function LiveErrorCard({
   notice,
   onChooseModel,
   onRetry,
-  branchingMode,
-  onBranchSession
+  historyContinuationPending,
+  onContinueFromHistory
 }: {
   notice: LiveErrorNotice;
   onChooseModel: (retryContext: RetryContext | null) => void;
   onRetry: (context: RetryContext) => void;
-  branchingMode: SessionBranchMode | null;
-  onBranchSession: (mode: SessionBranchMode, retryContext?: RetryContext | null) => Promise<void>;
+  historyContinuationPending: boolean;
+  onContinueFromHistory: (retryContext?: RetryContext | null) => void;
 }) {
   const activeWriter = notice.code === "SESSION_ACTIVE_WRITER";
   return (
@@ -2679,19 +2820,12 @@ function LiveErrorCard({
       {activeWriter ? (
         <div className="liveErrorActions">
           <button
-            className="ghostButton"
+            className="primaryButton"
             type="button"
-            onClick={() => void onBranchSession("compact_new_topic", notice.retryContext)}
-            disabled={branchingMode !== null}
+            onClick={() => onContinueFromHistory(notice.retryContext)}
+            disabled={historyContinuationPending || !notice.retryContext}
           >
-            {branchingMode === "compact_new_topic" ? "压缩中…" : "压缩后进入新话题"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void onBranchSession("full_fork", notice.retryContext)}
-            disabled={branchingMode !== null}
-          >
-            {branchingMode === "full_fork" ? "Fork 中…" : "直接 Fork（保留全部历史）"}
+            {historyContinuationPending ? "创建新会话中…" : "新建会话并读取历史后继续"}
           </button>
         </div>
       ) : !notice.willRetry ? (
@@ -2804,7 +2938,9 @@ function SessionTimeline({
   onChooseModel,
   onRetry,
   branchingMode,
-  onBranchSession
+  onBranchSession,
+  historyContinuationPending,
+  onContinueFromHistory
 }: {
   detail: Pick<SessionDetail, "turns">;
   visibleTurnCount: number;
@@ -2818,6 +2954,8 @@ function SessionTimeline({
   onRetry: (context: RetryContext) => void;
   branchingMode: SessionBranchMode | null;
   onBranchSession: (mode: SessionBranchMode, retryContext?: RetryContext | null) => Promise<void>;
+  historyContinuationPending: boolean;
+  onContinueFromHistory: (retryContext?: RetryContext | null) => void;
 }) {
   const turns = detail.turns
     .map((turn) => ({ ...turn, items: turn.items.filter((item) => item.type !== "unknown" && item.type !== "file_change") }))
@@ -2831,6 +2969,25 @@ function SessionTimeline({
   const historicalItemIds = new Set(turns.flatMap((turn) => turn.items.map((item) => item.id)));
 
   function renderTurn(turn: SessionDetail["turns"][number], absoluteIndex: number) {
+    const finalAnswerExists = turn.items.some((item) => item.type === "agent_message" && isFinalAnswerPhase(item.phase));
+    const commentaryItems = finalAnswerExists
+      ? turn.items.filter((item) => item.type === "agent_message" && isCommentaryPhase(item.phase))
+      : [];
+    const visibleItems = finalAnswerExists
+      ? turn.items.filter((item) => !(item.type === "agent_message" && isCommentaryPhase(item.phase)))
+      : turn.items;
+
+    const commentaryDetails = commentaryItems.length > 0 ? (
+      <details className="commentaryDetails" key={`${turn.id}-commentary`}>
+        <summary>查看 {commentaryItems.length} 条过程消息</summary>
+        <div className="commentaryItems">
+          {commentaryItems.map((item) => (
+            <TurnItemView item={item} key={item.id} onOpenMessage={onOpenMessage} />
+          ))}
+        </div>
+      </details>
+    ) : null;
+
     return (
       <section className="turnBlock" key={turn.id}>
         <div className="turnHeader">
@@ -2839,8 +2996,11 @@ function SessionTimeline({
           <span>{formatDateTime(turn.startedAt)}</span>
         </div>
         <div className="turnItems">
-          {turn.items.map((item) => (
-            <TurnItemView item={item} key={item.id} onOpenMessage={onOpenMessage} />
+          {visibleItems.map((item) => (
+            <Fragment key={item.id}>
+              {item.type === "agent_message" && isFinalAnswerPhase(item.phase) ? commentaryDetails : null}
+              <TurnItemView item={item} onOpenMessage={onOpenMessage} />
+            </Fragment>
           ))}
         </div>
       </section>
@@ -2883,8 +3043,8 @@ function SessionTimeline({
         notice={notice}
         onChooseModel={onChooseModel}
         onRetry={onRetry}
-        branchingMode={branchingMode}
-        onBranchSession={onBranchSession}
+        historyContinuationPending={historyContinuationPending}
+        onContinueFromHistory={onContinueFromHistory}
         key={`live-error-${notice.id}`}
       />
     ) : null;
@@ -3096,7 +3256,10 @@ function DesktopWorkspaceHome({
   onSearchChange,
   onSearchSubmit,
   onSelect,
-  onMetadataSaved
+  onMetadataSaved,
+  onCreateSession,
+  creatingSessionWorkspace,
+  createSessionError
 }: {
   sessions: SessionSummary[];
   search: string;
@@ -3107,6 +3270,9 @@ function DesktopWorkspaceHome({
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSelect: (session: SessionSummary) => void;
   onMetadataSaved: (session: SessionSummary) => void;
+  onCreateSession?: (workspace: string) => Promise<void>;
+  creatingSessionWorkspace?: string | null;
+  createSessionError?: string | null;
 }) {
   return (
     <ResizableWorkspaceLayout
@@ -3128,6 +3294,9 @@ function DesktopWorkspaceHome({
             onSearchSubmit={onSearchSubmit}
             onSelect={onSelect}
             onMetadataSaved={onMetadataSaved}
+            onCreateSession={onCreateSession}
+            creatingSessionWorkspace={creatingSessionWorkspace}
+            createSessionError={createSessionError}
           />
         </>
       )}
@@ -3241,7 +3410,10 @@ function SessionBrowser({
   onSearchChange,
   onSearchSubmit,
   onSelect,
-  onMetadataSaved
+  onMetadataSaved,
+  onCreateSession,
+  creatingSessionWorkspace,
+  createSessionError
 }: {
   sessions: SessionSummary[];
   search: string;
@@ -3253,6 +3425,9 @@ function SessionBrowser({
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSelect: (session: SessionSummary) => void;
   onMetadataSaved: (session: SessionSummary) => void;
+  onCreateSession?: (workspace: string) => Promise<void>;
+  creatingSessionWorkspace?: string | null;
+  createSessionError?: string | null;
 }) {
   const workspaceFilterId = `session-workspace-filter-${showHeading ? "mobile" : "desktop"}`;
   const [mode, setMode] = useState<SessionListMode>("workspace");
@@ -3301,6 +3476,7 @@ function SessionBrowser({
       </div>
 
       {sessionError ? <div className="errorBanner">{sessionError}</div> : null}
+      {createSessionError ? <div className="errorBanner">{createSessionError}</div> : null}
       {loadingSessions ? <div className="emptyState">正在加载会话...</div> : null}
       {!loadingSessions && sessions.length === 0 ? <div className="emptyState">没有匹配的会话</div> : null}
       {!loadingSessions && sessions.length > 0 ? (
@@ -3311,6 +3487,8 @@ function SessionBrowser({
           mode={mode}
           onSelect={onSelect}
           onMetadataSaved={onMetadataSaved}
+          onCreateSession={onCreateSession}
+          creatingSessionWorkspace={creatingSessionWorkspace}
         />
       ) : null}
     </>
@@ -3331,7 +3509,10 @@ function MobileSessionDrawer({
   onSearchChange,
   onSearchSubmit,
   onSelect,
-  onMetadataSaved
+  onMetadataSaved,
+  onCreateSession,
+  creatingSessionWorkspace,
+  createSessionError
 }: {
   isOwner: boolean;
   sessions: SessionSummary[];
@@ -3347,6 +3528,9 @@ function MobileSessionDrawer({
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSelect: (session: SessionSummary) => void;
   onMetadataSaved: (session: SessionSummary) => void;
+  onCreateSession?: (workspace: string) => Promise<void>;
+  creatingSessionWorkspace?: string | null;
+  createSessionError?: string | null;
 }) {
   return (
     <div className="mobileSessionDrawerContent">
@@ -3382,6 +3566,9 @@ function MobileSessionDrawer({
           onSearchSubmit={onSearchSubmit}
           onSelect={onSelect}
           onMetadataSaved={onMetadataSaved}
+          onCreateSession={onCreateSession}
+          creatingSessionWorkspace={creatingSessionWorkspace}
+          createSessionError={createSessionError}
         />
       </div>
 
@@ -3401,6 +3588,13 @@ function MobileSessionDrawer({
 function workspaceDisplayName(workspace: string): string {
   const parts = workspace.split(/[\\/]/).filter(Boolean);
   return parts.at(-1) || workspace || "Codex Manage";
+}
+
+function isStandalonePwa(): boolean {
+  const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const displayModeStandalone = typeof window.matchMedia === "function"
+    && window.matchMedia("(display-mode: standalone)").matches;
+  return iosStandalone || displayModeStandalone;
 }
 
 function sessionUpdatedTimestamp(session: SessionSummary): number {
@@ -3435,7 +3629,9 @@ function SessionList({
   workspaceFilterId,
   mode,
   onSelect,
-  onMetadataSaved
+  onMetadataSaved,
+  onCreateSession,
+  creatingSessionWorkspace
 }: {
   sessions: SessionSummary[];
   selectedSessionId: string | null;
@@ -3443,6 +3639,8 @@ function SessionList({
   mode: SessionListMode;
   onSelect: (session: SessionSummary) => void;
   onMetadataSaved: (session: SessionSummary) => void;
+  onCreateSession?: (workspace: string) => Promise<void>;
+  creatingSessionWorkspace?: string | null;
 }) {
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(() => new Set());
   const [copiedWorkspace, setCopiedWorkspace] = useState<string | null>(null);
@@ -3515,6 +3713,18 @@ function SessionList({
             >
               <span aria-hidden="true">{copiedWorkspace === activeGroup.workspace ? "✓" : "⧉"}</span>
             </button>
+            {onCreateSession ? (
+              <button
+                className="copyPathButton newSessionPathButton"
+                type="button"
+                title={creatingSessionWorkspace === activeGroup.workspace ? "正在创建会话" : "在此目录新增会话"}
+                aria-label={`在 ${activeGroup.workspace} 新增会话`}
+                onClick={() => void onCreateSession(activeGroup.workspace)}
+                disabled={Boolean(creatingSessionWorkspace)}
+              >
+                <span aria-hidden="true">{creatingSessionWorkspace === activeGroup.workspace ? "…" : "+"}</span>
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

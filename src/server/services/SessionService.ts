@@ -181,6 +181,13 @@ export class SessionService {
     return session;
   }
 
+  async setRemarkTitle(sessionId: string, remarkTitle: string | null): Promise<void> {
+    if (!this.metadataStore) {
+      throw new Error("Session metadata store is not configured");
+    }
+    await this.metadataStore.update(sessionId, { remarkTitle });
+  }
+
   async getPermissionMode(sessionId: string): Promise<SessionPermissionMode> {
     return (await this.metadataStore?.get?.(sessionId))?.permissionMode ?? "default";
   }

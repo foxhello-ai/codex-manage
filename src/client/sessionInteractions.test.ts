@@ -1,13 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { findRetryContextForTurn, findRetryContextFromFailedTurns, isTaskSendShortcut } from "./sessionInteractions";
+import { findRetryContextForTurn, findRetryContextFromFailedTurns, isCommentaryPhase, isFinalAnswerPhase, isTaskSendShortcut, isUnmaterializedThreadHistoryError } from "./sessionInteractions";
 
 describe("session interactions", () => {
+  it("recognizes the expected pre-message history response", () => {
+    expect(isUnmaterializedThreadHistoryError(
+      "thread thread-1 is not materialized yet; includeTurns is unavailable before first user message"
+    )).toBe(true);
+    expect(isUnmaterializedThreadHistoryError("历史消息加载失败")).toBe(false);
+  });
+
   it("recognizes Ctrl+Enter and Meta+Enter without accepting repeats", () => {
     expect(isTaskSendShortcut({ key: "Enter", ctrlKey: true, metaKey: false, repeat: false })).toBe(true);
     expect(isTaskSendShortcut({ key: "Enter", ctrlKey: false, metaKey: true, repeat: false })).toBe(true);
     expect(isTaskSendShortcut({ key: "Enter", ctrlKey: false, metaKey: false, repeat: false })).toBe(false);
     expect(isTaskSendShortcut({ key: "Enter", ctrlKey: true, metaKey: false, repeat: true })).toBe(false);
     expect(isTaskSendShortcut({ key: "a", ctrlKey: true, metaKey: false, repeat: false })).toBe(false);
+  });
+
+  it("recognizes final answers and commentary phases", () => {
+    expect(isFinalAnswerPhase("final_answer")).toBe(true);
+    expect(isFinalAnswerPhase("final")).toBe(true);
+    expect(isFinalAnswerPhase("commentary")).toBe(false);
+    expect(isCommentaryPhase("commentary")).toBe(true);
+    expect(isCommentaryPhase("final_answer")).toBe(false);
   });
 
   it("keeps retry tied to the matching live turn when text repeats", () => {

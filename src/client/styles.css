@@ -674,6 +674,25 @@ h2 {
   width: min(88%, 860px);
 }
 
+.commentaryDetails {
+  width: min(88%, 860px);
+  justify-self: start;
+  color: #5f6f7a;
+}
+
+.commentaryDetails summary {
+  width: fit-content;
+  cursor: pointer;
+  color: #52616b;
+  font-size: 0.84rem;
+}
+
+.commentaryItems {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .messageHeader {
   display: flex;
   align-items: center;
@@ -927,6 +946,20 @@ h2 {
   background: #eaf7f0;
 }
 
+.historyNotice {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #c9d9e8;
+  border-radius: 8px;
+  padding: 16px;
+  color: #405466;
+  background: #f4f8fb;
+}
+
+.historyNotice strong {
+  color: #1f405c;
+}
+
 .routeErrorState {
   display: grid;
   justify-items: start;
@@ -1124,7 +1157,7 @@ h2 {
 .workspaceSelectControl {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
 }
@@ -1210,6 +1243,22 @@ h2 {
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1;
+}
+
+.copyPathButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.newSessionPathButton {
+  border-color: #2d8a52;
+  color: #a7edbb;
+}
+
+.newSessionPathButton:hover:not(:disabled) {
+  border-color: #30d158;
+  color: #ffffff;
+  background: #245f39;
 }
 
 .workspaceGroupList {
@@ -4293,6 +4342,16 @@ textarea::placeholder {
   border-color: #30d158;
   color: #d9ffe1;
   background: #173d27;
+}
+
+.historyNotice {
+  border-color: #49494d;
+  color: #d1d1d6;
+  background: #2a2a2c;
+}
+
+.historyNotice strong {
+  color: #f5f5f7;
 }
 
 .modalBackdrop,

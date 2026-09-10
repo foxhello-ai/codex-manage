@@ -109,6 +109,14 @@ export type SessionBranchResponse = {
   mode: SessionBranchMode;
 };
 
+export type SessionHistoryContinuationResponse = {
+  session: SessionSummary;
+  runtime: RuntimeSnapshot;
+  sourceSessionId: string;
+  inputError: string | null;
+  metadataError: string | null;
+};
+
 export type SessionsResponse = {
   sessions: SessionSummary[];
 };

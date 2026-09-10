@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, Collaborator, CollaboratorsResponse, CreateCollaboratorResponse, HealthStatus, InputResponse, LoginAccountsResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionBranchMode, SessionBranchResponse, SessionCommandsResponse, SessionDetailResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, Collaborator, CollaboratorsResponse, CreateCollaboratorResponse, HealthStatus, InputResponse, LoginAccountsResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionBranchMode, SessionBranchResponse, SessionCommandsResponse, SessionDetailResponse, SessionHistoryContinuationResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -74,6 +74,13 @@ export function getSessions(search?: string): Promise<SessionsResponse> {
   const params = new URLSearchParams();
   if (search?.trim()) params.set("search", search.trim());
   return apiRequest<SessionsResponse>(`/api/sessions${params.size ? `?${params.toString()}` : ""}`);
+}
+
+export function createSession(cwd: string): Promise<{ threadId: string }> {
+  return apiRequest<{ threadId: string }>("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({ cwd })
+  });
 }
 
 export function getCollaborators(): Promise<CollaboratorsResponse> {
@@ -158,6 +165,19 @@ export function branchSession(sessionId: string, mode: SessionBranchMode): Promi
     method: "POST",
     body: JSON.stringify({ mode })
   });
+}
+
+export function continueSessionFromHistory(
+  sourceSessionId: string,
+  input: { cwd: string; sourceTitle: string; text: string; permissionMode?: SessionPermissionMode }
+): Promise<SessionHistoryContinuationResponse> {
+  return apiRequest<SessionHistoryContinuationResponse>(
+    `/api/sessions/${encodeURIComponent(sourceSessionId)}/continue-from-history`,
+    {
+      method: "POST",
+      body: JSON.stringify(input)
+    }
+  );
 }
 
 export function submitApproval(

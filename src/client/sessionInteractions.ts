@@ -25,6 +25,22 @@ export function isTaskSendShortcut(event: SendShortcutInput): boolean {
   return event.key === "Enter" && !event.repeat && (event.ctrlKey || event.metaKey);
 }
 
+export function isFinalAnswerPhase(phase: string | null | undefined): boolean {
+  const normalized = phase?.trim().toLowerCase();
+  return normalized === "final_answer" || normalized === "final";
+}
+
+export function isCommentaryPhase(phase: string | null | undefined): boolean {
+  return phase?.trim().toLowerCase() === "commentary";
+}
+
+/** A newly started thread has no history until its first user message. */
+export function isUnmaterializedThreadHistoryError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return normalized.includes("not materialized yet")
+    && normalized.includes("includeturns is unavailable before first user message");
+}
+
 /**
  * Returns the user message that belongs to one exact runtime turn.  A terminal
  * error must never borrow a message from another attempt simply because it was

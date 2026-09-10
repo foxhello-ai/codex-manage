@@ -7,12 +7,16 @@ import type { JsonlSessionParser } from "../services/JsonlSessionParser";
 import type { RuntimeManager } from "../services/RuntimeManager";
 import type { SessionModelService } from "../services/SessionModelService";
 import { ownerIdentity, resolveAuthUser } from "../auth/session";
-import type { SessionBranchMode, SessionPermissionMode, UserIdentity } from "../../shared/models";
+import type { RuntimeSnapshot, SessionBranchMode, SessionPermissionMode, SessionSummary, UserIdentity } from "../../shared/models";
 import type { CollaborationStore } from "../services/CollaborationStore";
 
 const ListQuery = z.object({
   search: z.string().optional(),
   limit: z.coerce.number().int().positive().max(200).optional()
+});
+
+const CreateSessionBody = z.object({
+  cwd: z.string().trim().min(1).max(4096)
 });
 
 const SessionParams = z.object({
@@ -42,6 +46,13 @@ const InputBody = z.object({
 
 const BranchBody = z.object({
   mode: z.enum(["compact_new_topic", "full_fork"] satisfies [SessionBranchMode, SessionBranchMode])
+});
+
+const HistoryContinuationBody = z.object({
+  cwd: z.string().trim().min(1).max(4096),
+  sourceTitle: z.string().trim().max(120),
+  text: z.string().trim().min(1).max(20000),
+  permissionMode: PermissionMode.optional()
 });
 
 const UpdateModelBody = z.discriminatedUnion("mode", [
@@ -75,6 +86,28 @@ export function registerSessionRoutes(
   sessionModelService?: SessionModelService,
   collaborationStore?: CollaborationStore
 ) {
+  app.post("/api/sessions", async (request, reply) => {
+    const body = CreateSessionBody.safeParse(request.body);
+    if (!body.success) {
+      return sendError(reply, 400, "INVALID_SESSION_CREATE", "新会话工作目录不正确");
+    }
+
+    if (!runtimeManager) {
+      return sendError(reply, 503, "RUNTIME_UNAVAILABLE", "运行态管理器不可用");
+    }
+
+    const user = await resolveRouteUser(request, collaborationStore);
+    if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
+    if (user.role === "child") return sendError(reply, 403, "OWNER_REQUIRED", "子用户不能创建新会话");
+
+    try {
+      const result = await runtimeManager.startThread(body.data.cwd);
+      return reply.status(201).send({ threadId: result.threadId, runtime: result.runtime });
+    } catch (error) {
+      return sendError(reply, 503, "SESSION_CREATE_FAILED", sanitizeModelError(error));
+    }
+  });
+
   app.get("/api/sessions", async (request, reply) => {
     const parsed = ListQuery.safeParse(request.query);
     if (!parsed.success) {
@@ -306,6 +339,60 @@ export function registerSessionRoutes(
         return sendActiveWriterError(reply, error);
       }
       return sendError(reply, 409, "SESSION_BRANCH_FAILED", sanitizeModelError(error));
+    }
+  });
+
+  app.post("/api/sessions/:id/continue-from-history", async (request, reply) => {
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
+    }
+
+    const body = HistoryContinuationBody.safeParse(request.body);
+    if (!body.success) {
+      return sendError(reply, 400, "INVALID_HISTORY_CONTINUATION", "历史续聊参数不正确");
+    }
+
+    if (!runtimeManager) {
+      return sendError(reply, 503, "RUNTIME_UNAVAILABLE", "运行态管理器不可用");
+    }
+
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore);
+    if (!user) return;
+    if (user.role === "child") return sendError(reply, 403, "OWNER_REQUIRED", "子用户不能创建历史续聊会话");
+
+    const sourcePermissionMode = await readStoredPermissionMode(sessionService, params.data.id);
+    const permissionMode = body.data.permissionMode ?? sourcePermissionMode ?? "default";
+
+    try {
+      const modelOverride = sessionModelService
+        ? await sessionModelService.resolveForTurn(params.data.id).catch(() => undefined)
+        : undefined;
+      const result = await runtimeManager.startHistoryContinuation(
+        body.data.cwd,
+        params.data.id,
+        body.data.text,
+        { permissionMode, modelOverride }
+      );
+      const title = makeHistoryContinuationTitle(body.data.sourceTitle);
+      let metadataError: string | null = null;
+      try {
+        await sessionService.setRemarkTitle(result.threadId, title);
+        await persistPermissionMode(sessionService, result.threadId, result.runtime.permissionMode);
+      } catch (error) {
+        metadataError = sanitizeModelError(error);
+      }
+
+      const session = makeHistoryContinuationSession(result.threadId, title, body.data.cwd, result.runtime);
+      return reply.status(201).send({
+        session,
+        runtime: result.runtime,
+        sourceSessionId: params.data.id,
+        inputError: result.inputError,
+        metadataError
+      });
+    } catch (error) {
+      return sendError(reply, 409, "SESSION_HISTORY_CONTINUATION_FAILED", sanitizeModelError(error));
     }
   });
 
@@ -592,4 +679,33 @@ function makeBranchTitle(sourceTitle: string, mode: SessionBranchMode): string {
   const title = sourceTitle.trim() || "未命名会话";
   const maxSourceLength = Math.max(1, 120 - suffix.length);
   return `${Array.from(title).slice(0, maxSourceLength).join("")}${suffix}`;
+}
+
+function makeHistoryContinuationTitle(sourceTitle: string): string {
+  const suffix = " · 历史续聊（新会话）";
+  const title = sourceTitle.trim() || "未命名会话";
+  const maxSourceLength = Math.max(1, 120 - suffix.length);
+  return `${Array.from(title).slice(0, maxSourceLength).join("")}${suffix}`;
+}
+
+function makeHistoryContinuationSession(
+  threadId: string,
+  title: string,
+  cwd: string,
+  runtime: RuntimeSnapshot
+): SessionSummary {
+  return {
+    id: threadId,
+    sessionId: threadId,
+    title,
+    defaultTitle: threadId,
+    remarkTitle: title,
+    summary: "从原会话历史继续处理",
+    workspace: cwd,
+    createdAt: runtime.startedAt,
+    updatedAt: runtime.updatedAt,
+    status: runtime.status,
+    cliVersion: null,
+    source: "codex_manage_history_continuation"
+  };
 }

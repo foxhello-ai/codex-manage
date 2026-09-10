@@ -9,6 +9,7 @@ class FakeAppServer extends EventEmitter {
   async request(method: string, params?: unknown): Promise<unknown> {
     this.requests.push({ method, params });
     if (method === "turn/start") return { turn: { id: "turn-1" } };
+    if (method === "thread/start") return { thread: { id: "thread-new", cwd: (params as { cwd: string }).cwd } };
     if (method === "thread/resume") return { thread: { id: (params as { threadId: string }).threadId } };
     return {};
   }
@@ -19,6 +20,68 @@ class FakeAppServer extends EventEmitter {
 }
 
 describe("RuntimeManager", () => {
+  it("starts a new thread in the requested workspace", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+
+    const result = await manager.startThread(" /workspace/app ");
+
+    expect(result.threadId).toBe("thread-new");
+    expect(result.runtime).toMatchObject({ threadId: "thread-new", status: "waiting_input" });
+    expect(appServer.requests[0]).toEqual({
+      method: "thread/start",
+      params: { cwd: "/workspace/app" }
+    });
+  });
+
+  it("continues a locked source thread through an independent history prompt", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any, { historyDirectory: "/home/test/.codex/sessions" });
+
+    const result = await manager.startHistoryContinuation(
+      "/workspace/app",
+      "thread-locked",
+      "请继续处理失败的任务",
+      { permissionMode: "full_access" }
+    );
+
+    expect(result).toMatchObject({
+      threadId: "thread-new",
+      inputError: null,
+      runtime: { status: "running", permissionMode: "full_access" }
+    });
+    expect(appServer.requests.map((request) => request.method)).toEqual(["thread/start", "thread/settings/update", "turn/start"]);
+    expect(appServer.requests[2].params).toMatchObject({
+      threadId: "thread-new",
+      input: [{
+        type: "text",
+        text: expect.stringContaining("原会话 ID：thread-locked")
+      }]
+    });
+    expect((appServer.requests[2].params as { input: Array<{ text: string }> }).input[0].text)
+      .toContain("请继续处理失败的任务");
+  });
+
+  it("keeps the independent thread id when its first continuation request fails", async () => {
+    const appServer = new FakeAppServer();
+    appServer.request = async (method: string, params?: unknown) => {
+      appServer.requests.push({ method, params });
+      if (method === "thread/start") return { thread: { id: "thread-new" } };
+      if (method === "turn/start") throw new Error("模型请求失败");
+      return {};
+    };
+    const manager = new RuntimeManager(appServer as any, { historyDirectory: "/history" });
+
+    const result = await manager.startHistoryContinuation("/workspace/app", "thread-locked", "重新处理");
+
+    expect(result).toMatchObject({
+      threadId: "thread-new",
+      inputError: "模型请求失败",
+      runtime: { threadId: "thread-new", status: "failed", lastError: "模型请求失败" }
+    });
+    expect(appServer.requests.map((request) => request.method)).toEqual(["thread/start", "turn/start"]);
+  });
+
   it("does not resume the same active thread twice", async () => {
     const appServer = new FakeAppServer();
     const manager = new RuntimeManager(appServer as any);

@@ -57,7 +57,7 @@ function buildApp(
     & Partial<Pick<SessionService, "getPermissionMode" | "updatePermissionMode">>,
   parser?: Pick<JsonlSessionParser, "listCommands">,
   runtime?: Pick<RuntimeManager, "getRuntime" | "resumeThread" | "sendInput" | "submitApproval" | "eventHub" | "approvalService">
-    & Partial<Pick<RuntimeManager, "branchThread" | "hydratePermissionMode">>,
+    & Partial<Pick<RuntimeManager, "branchThread" | "hydratePermissionMode" | "startThread" | "startHistoryContinuation">>,
   modelService?: Pick<SessionModelService, "updateSelection" | "resolveForResume" | "resolveForTurn">
 ) {
   const app = Fastify();
@@ -72,6 +72,34 @@ function buildApp(
 }
 
 describe("session routes", () => {
+  it("creates a new session with the requested workspace", async () => {
+    let requestedCwd: string | undefined;
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        getSessionDetail: async () => { throw new Error("not used"); }
+      },
+      undefined,
+      {
+        startThread: async (cwd: string) => {
+          requestedCwd = cwd;
+          return { threadId: "thread-new", runtime: runtimeSnapshot("thread-new", { status: "waiting_input" }) };
+        }
+      } as unknown as RuntimeManager
+    );
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { cwd: " /workspace/app " }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(requestedCwd).toBe("/workspace/app");
+    expect(response.json()).toMatchObject({ threadId: "thread-new", runtime: { threadId: "thread-new" } });
+  });
+
   it("rejects unauthenticated model changes and WebSocket upgrades", async () => {
     const app = Fastify();
     await app.register(cookie, { secret: "test-secret-at-least-thirty-two-characters" });
@@ -663,6 +691,78 @@ describe("session routes", () => {
     });
     expect(updatedMetadata).toEqual({ sessionId: "thread-2", remarkTitle: expectedTitle });
     expect(persistedPermissionMode).toBe("default");
+  });
+
+  it("creates an independent history continuation and keeps the failed input in the response", async () => {
+    let started: { cwd: string; sourceThreadId: string; text: string; permissionMode?: string } | null = null;
+    let titled: { sessionId: string; title: string | null } | null = null;
+    const app = buildApp(
+      {
+        listSessions: async () => [],
+        updateMetadata: async () => { throw new Error("not used"); },
+        setRemarkTitle: async (sessionId: string, title: string | null) => {
+          titled = { sessionId, title };
+        },
+        getSessionDetail: async () => { throw new Error("source thread must not be read"); }
+      } as unknown as SessionService,
+      undefined,
+      {
+        getRuntime: () => runtimeSnapshot("thread-1"),
+        startHistoryContinuation: async (
+          cwd: string,
+          sourceThreadId: string,
+          text: string,
+          options: { permissionMode?: "default" | "full_access" }
+        ) => {
+          started = { cwd, sourceThreadId, text, permissionMode: options.permissionMode };
+          return {
+            threadId: "thread-history-new",
+            runtime: runtimeSnapshot("thread-history-new", {
+              status: "failed",
+              permissionMode: "full_access",
+              lastError: "模型请求失败"
+            }),
+            inputError: "模型请求失败"
+          };
+        },
+        resumeThread: (() => { throw new Error("not used"); }) as any,
+        sendInput: (() => { throw new Error("not used"); }) as any,
+        submitApproval: (() => { throw new Error("not used"); }) as any,
+        eventHub: {} as any,
+        approvalService: {} as any
+      } as unknown as RuntimeManager
+    );
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions/thread-locked/continue-from-history",
+      payload: {
+        cwd: "/workspace/app",
+        sourceTitle: "原会话",
+        text: "重新处理失败输入",
+        permissionMode: "full_access"
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(started).toEqual({
+      cwd: "/workspace/app",
+      sourceThreadId: "thread-locked",
+      text: "重新处理失败输入",
+      permissionMode: "full_access"
+    });
+    expect(titled).toEqual({ sessionId: "thread-history-new", title: "原会话 · 历史续聊（新会话）" });
+    expect(response.json()).toMatchObject({
+      sourceSessionId: "thread-locked",
+      inputError: "模型请求失败",
+      metadataError: null,
+      session: {
+        id: "thread-history-new",
+        title: "原会话 · 历史续聊（新会话）",
+        workspace: "/workspace/app"
+      },
+      runtime: { threadId: "thread-history-new", permissionMode: "full_access" }
+    });
   });
 
   it("submits one approval decision through the API", async () => {

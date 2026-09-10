@@ -47,7 +47,9 @@ export class AppRuntime {
     this.appServer = new CodexAppServerClient({
       codexCliPath: config.codexCliPath
     });
-    this.runtimeManager = new RuntimeManager(this.appServer);
+    this.runtimeManager = new RuntimeManager(this.appServer, {
+      historyDirectory: config.sessionsDir
+    });
     this.appServer.on("error", () => {
       // Snapshot state carries the error for diagnostics; avoid an unhandled EventEmitter error.
     });
