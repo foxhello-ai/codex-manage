@@ -41,6 +41,7 @@ export type SendInputParams = {
   text: string;
   permissionMode?: SessionPermissionMode;
   modelOverride?: ResolvedModelOverride;
+  attachmentPaths?: string[];
 };
 
 export type StartThreadResult = {
@@ -424,7 +425,10 @@ export class RuntimeManager {
         throw new Error("当前会话正在等待审批，请先处理审批");
       }
 
-      const input = [{ type: "text", text, text_elements: [] }];
+    const attachmentNotice = params.attachmentPaths?.length
+      ? `\n\n附件已保存到当前 workspace，请读取以下文件并将其作为本次输入上下文：\n${params.attachmentPaths.map((path) => `- ${path}`).join("\n")}`
+      : "";
+    const input = [{ type: "text", text: `${text}${attachmentNotice}`, text_elements: [] }];
       if (latest?.status === "running" && !latest.activeTurnId) {
         throw new Error("当前会话正在运行，尚未同步活动任务标识，请稍后再试");
       }

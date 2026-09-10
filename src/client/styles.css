@@ -1634,6 +1634,33 @@ h2 {
   background: #f4f9fd;
 }
 
+.taskInputPlus {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+.taskInputPlus:hover { color: var(--ink); border-color: var(--ink); }
+.taskInputPlus::after { content: "上传附件"; position: absolute; bottom: calc(100% + 8px); left: 0; display: none; padding: 5px 7px; border-radius: 4px; color: var(--paper); background: var(--ink); white-space: nowrap; font-size: 11px; pointer-events: none; }
+.taskInputPlus:hover::after, .taskInputPlus:focus-within::after { display: block; }
+.taskInputAttachments { display: flex; flex-wrap: wrap; gap: 5px; max-width: 42%; }
+.taskAttachmentChip { border: 1px solid var(--line); border-radius: 4px; padding: 4px 7px; color: var(--ink); background: var(--paper); cursor: pointer; font: inherit; font-size: 11px; }
+.taskAttachmentChip:hover { border-color: var(--acid-deep); }
+.taskAttachmentError { color: var(--danger, #b44); font-size: 11px; }
+.markdownImage { display: block; max-width: min(100%, 720px); max-height: 520px; margin: 10px 0; border: 1px solid var(--line); border-radius: 6px; object-fit: contain; background: var(--paper); }
+.taskInput { position: relative; }
+.taskInputAttachments { position: absolute; right: 56px; bottom: calc(100% + 8px); max-width: calc(100% - 100px); padding: 5px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+.taskInput .taskAttachmentChip { width: auto; min-width: 0; min-height: 0; align-self: auto; padding: 4px 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--paper); font-size: 11px; }
+.taskInput .taskAttachmentError { position: absolute; right: 56px; bottom: calc(100% + 8px); }
+
 /* Final visual polish: compact, layered dark UI with deliberate control states. */
 :root {
   --ui-bg: #18181a;
@@ -3414,7 +3441,8 @@ textarea {
 .taskInput {
   position: static;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
   gap: 10px;
   border: 1px solid #d9e0e7;
   border-radius: 8px;
@@ -3423,7 +3451,7 @@ textarea {
   box-shadow: 0 -8px 24px rgb(20 35 50 / 8%);
 }
 
-.taskInput button {
+.taskInput > .sendButton {
   align-self: stretch;
   padding: 0 18px;
 }
@@ -5290,8 +5318,7 @@ textarea::placeholder {
 .mobileConversationProject,
 .mobileRuntimeStatus,
 .mobileTaskContext,
-.mobileSessionDrawerContent,
-.taskInputPlus {
+.mobileSessionDrawerContent {
   display: none;
 }
 

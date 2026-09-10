@@ -9,6 +9,10 @@ import type { SessionModelService } from "../services/SessionModelService";
 import { ownerIdentity, resolveAuthUser } from "../auth/session";
 import type { RuntimeSnapshot, SessionBranchMode, SessionPermissionMode, SessionSummary, UserIdentity } from "../../shared/models";
 import type { CollaborationStore } from "../services/CollaborationStore";
+import { performance } from "node:perf_hooks";
+import { mkdir, writeFile } from "node:fs/promises";
+import { basename, join, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 
 const ListQuery = z.object({
   search: z.string().optional(),
@@ -41,7 +45,15 @@ const ResumeBody = z.object({
 
 const InputBody = z.object({
   text: z.string().trim().min(1).max(20000),
-  permissionMode: PermissionMode.optional()
+  permissionMode: PermissionMode.optional(),
+  attachmentPaths: z.array(z.string().trim().min(1).max(4096)).max(10).optional()
+});
+
+const AttachmentBody = z.object({
+  name: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().max(200).default("application/octet-stream"),
+  size: z.number().int().nonnegative().max(20 * 1024 * 1024),
+  data: z.string().min(1).max(28 * 1024 * 1024)
 });
 
 const BranchBody = z.object({
@@ -298,6 +310,30 @@ export function registerSessionRoutes(
     }
   });
 
+  app.post("/api/sessions/:id/attachments", async (request, reply) => {
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
+    const body = AttachmentBody.safeParse(request.body);
+    if (!body.success) return sendError(reply, 400, "INVALID_ATTACHMENT", "附件格式或大小不正确");
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore);
+    if (!user) return;
+    try {
+      const session = await sessionService.getSessionDetail(params.data.id, { includeTurns: false });
+      const decoded = Buffer.from(body.data.data, "base64");
+      if (decoded.length !== body.data.size || decoded.length > 20 * 1024 * 1024) {
+        return sendError(reply, 413, "ATTACHMENT_TOO_LARGE", "附件大小不正确");
+      }
+      const safeName = basename(body.data.name).replace(/[^a-zA-Z0-9._-]/g, "_") || "attachment";
+      const directory = resolve(session.workspace, ".codex-manage", "attachments", params.data.id);
+      await mkdir(directory, { recursive: true });
+      const path = join(directory, `${randomUUID()}-${safeName}`);
+      await writeFile(path, decoded, { flag: "wx" });
+      return reply.status(201).send({ attachment: { name: body.data.name, mimeType: body.data.mimeType, size: decoded.length, path } });
+    } catch (error) {
+      return sendError(reply, 503, "ATTACHMENT_UPLOAD_FAILED", sanitizeModelError(error));
+    }
+  });
+
   app.post("/api/sessions/:id/branch", async (request, reply) => {
     const params = SessionParams.safeParse(request.params);
     if (!params.success) {
@@ -534,10 +570,14 @@ export function registerSessionRoutes(
     const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore);
     if (!user) return;
 
+    const startedAt = performance.now();
     try {
       const session = await sessionService.getSessionDetail(params.data.id, {
         includeTurns: query.data.turns !== false && query.data.turns !== "false"
       });
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      reply.header("server-timing", `session-detail;dur=${elapsedMs}`);
+      if (elapsedMs >= 250) request.log.info({ sessionId: params.data.id, elapsedMs }, "slow session detail");
       return reply.send({ session });
     } catch (error) {
       if (error instanceof Error && error.message === "Session not found") {

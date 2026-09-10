@@ -22,7 +22,8 @@ import { CollaborationStore } from "./services/CollaborationStore";
 const config = loadConfig();
 
 const app = Fastify({
-  logger: true
+  logger: true,
+  bodyLimit: 30 * 1024 * 1024
 });
 const runtime = new AppRuntime(config);
 const metadataStore = new SessionMetadataStore(config.metadataFile);

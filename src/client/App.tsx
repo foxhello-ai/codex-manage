@@ -1,5 +1,5 @@
-import { CSSProperties, FormEvent, Fragment, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ApiRequestError, branchSession, continueSessionFromHistory, createCollaborator, createSession, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel } from "../shared/api";
+import { CSSProperties, ChangeEvent, FormEvent, Fragment, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ApiRequestError, branchSession, continueSessionFromHistory, createCollaborator, createSession, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel, uploadSessionAttachment, type UploadedSessionAttachment } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionBranchMode, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
 import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
@@ -287,6 +287,7 @@ function Dashboard({
   const drawerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const compactViewport = useCompactViewport();
   const completionRefreshInFlightRef = useRef(new Set<string>());
+  const sessionDetailRequestsRef = useRef(new Map<string, Promise<{ session: SessionDetail }>>());
   const searchRef = useRef("");
 
   const selectedSession = sessions.find((session) => isSameSession(session, selectedSessionId))
@@ -512,7 +513,22 @@ function Dashboard({
     else setDetailError(null);
 
     try {
-      const response = await getSessionDetail(sessionId, includeTurns);
+      const requestKey = `${sessionId}:${includeTurns ? "turns" : "summary"}`;
+      let request = sessionDetailRequestsRef.current.get(requestKey);
+      if (!request) {
+        request = getSessionDetail(sessionId, includeTurns);
+        sessionDetailRequestsRef.current.set(requestKey, request);
+        void request.then(() => {
+          if (sessionDetailRequestsRef.current.get(requestKey) === request) {
+            sessionDetailRequestsRef.current.delete(requestKey);
+          }
+        }, () => {
+          if (sessionDetailRequestsRef.current.get(requestKey) === request) {
+            sessionDetailRequestsRef.current.delete(requestKey);
+          }
+        });
+      }
+      const response = await request;
       if (selectedSessionIdRef.current !== sessionId) return null;
       setSessionDetail(response.session);
       if (includeTurns) {
@@ -520,8 +536,6 @@ function Dashboard({
         setHistoryLoadedSessionId(sessionId);
         setHistoryNotice(null);
         reconcileLiveMessagesWithHistory(response.session);
-      } else if (historyLoadedSessionIdRef.current !== sessionId) {
-        void loadSessionDetail(sessionId, { includeTurns: true, silent: options.silent });
       }
       return response.session;
     } catch (caught) {
@@ -543,7 +557,10 @@ function Dashboard({
         historyLoadingSessionIdRef.current = null;
       }
       if (!options.silent && selectedSessionIdRef.current === sessionId) {
-        if (includeTurns) setLoadingHistory(false);
+        if (includeTurns) {
+          setLoadingHistory(false);
+          setLoadingDetail(false);
+        }
         else setLoadingDetail(false);
       }
     }
@@ -622,7 +639,7 @@ function Dashboard({
   }
 
   async function refreshCurrentSession(sessionId: string, options: { silent?: boolean; includeTurns?: boolean } = {}) {
-    const includeTurns = options.includeTurns ?? historyLoadedSessionIdRef.current === sessionId;
+    const includeTurns = options.includeTurns ?? true;
     await Promise.all([
       loadSessionDetail(sessionId, {
         ...options,
@@ -2382,7 +2399,7 @@ function SessionDetailPanel({
           pendingCount={pendingApprovalCount}
           onSubmitApproval={onSubmitApproval}
         />
-        <TaskInput key={session.id} runtime={runtime} onSend={handleSendInput} />
+        <TaskInput key={session.id} sessionId={session.id} runtime={runtime} onSend={handleSendInput} />
         <ComposerRuntimeBar
           runtime={runtime}
           modelState={modelState}
@@ -2873,13 +2890,32 @@ function tailText(text: string, maxChars: number): string {
   return `已隐藏前 ${hiddenChars} 字符，仅展示最新输出\n\n${text.slice(-maxChars)}`;
 }
 
-function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void> }) {
+function TaskInput({ sessionId, runtime, onSend }: { sessionId: string; runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void> }) {
   const [text, setText] = useState("");
+  const [attachments, setAttachments] = useState<UploadedSessionAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const waitingApproval = runtime?.status === "waiting_approval";
   const waitingTurnId = runtime?.status === "running" && !runtime.activeTurnId;
-  const disabled = submitting || waitingApproval || waitingTurnId || runtime?.status === "starting";
+  const disabled = submitting || uploading || waitingApproval || waitingTurnId || runtime?.status === "starting";
+
+  async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = [...(event.target.files ?? [])];
+    event.target.value = "";
+    if (files.length === 0) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const uploaded = await Promise.all(files.map((file) => uploadSessionAttachment(sessionId, file)));
+      setAttachments((current) => [...current, ...uploaded.map((item) => item.attachment)]);
+    } catch (caught) {
+      setUploadError(caught instanceof Error ? caught.message : "附件上传失败");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2888,8 +2924,12 @@ function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSen
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      await onSend(nextText);
+      const attachmentText = attachments.length
+        ? `\n\n请读取以下附件作为本次输入上下文：\n${attachments.map((attachment) => `- ${attachment.path}`).join("\n")}`
+        : "";
+      await onSend(`${nextText}${attachmentText}`);
       setText("");
+      setAttachments([]);
     } catch {
       return;
     } finally {
@@ -2907,16 +2947,29 @@ function TaskInput({ runtime, onSend }: { runtime: RuntimeSnapshot | null; onSen
 
   return (
     <form className="taskInput" onSubmit={handleSubmit}>
-      <span className="taskInputPlus" aria-hidden="true">+</span>
+      <label className="taskInputPlus" title="上传附件" aria-label="上传附件">
+        <span aria-hidden="true">+</span>
+        <input className="srOnly" type="file" multiple onChange={(event) => void handleFiles(event)} disabled={disabled} />
+      </label>
+      {attachments.length > 0 ? (
+        <div className="taskInputAttachments" aria-label="已添加附件">
+          {attachments.map((attachment) => (
+            <button key={attachment.path} type="button" className="taskAttachmentChip" title={attachment.path} onClick={() => setAttachments((current) => current.filter((item) => item.path !== attachment.path))}>
+              {attachment.name} ×
+            </button>
+          ))}
+        </div>
+      ) : null}
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={waitingApproval ? "请先处理审批" : waitingTurnId ? "正在同步任务状态" : "Message Codex"}
+        placeholder={uploading ? "正在上传附件" : waitingApproval ? "请先处理审批" : waitingTurnId ? "正在同步任务状态" : "Message Codex"}
         disabled={disabled}
         aria-keyshortcuts="Control+Enter Meta+Enter"
         rows={1}
       />
+      {uploadError ? <span className="taskAttachmentError" role="alert">{uploadError}</span> : null}
       <button className="sendButton" type="submit" aria-label={submitting ? "发送中" : "发送消息"} title={submitting ? "发送中" : "发送消息"} disabled={disabled || text.trim().length === 0}>
         <svg className="sendIcon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4.4 4.8 19.8 12 4.4 19.2l2.2-6.1 7.1-1.1-7.1-1.1-2.2-6.1Z" />
@@ -4058,7 +4111,7 @@ function renderMarkdownBlock(block: MarkdownBlock, index: number) {
 
 function renderInlineMarkdown(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
-  const pattern = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
+  const pattern = /(!?\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
   let cursor = 0;
   let match: RegExpExecArray | null;
 
@@ -4079,12 +4132,19 @@ function renderLineBreaks(text: string, startIndex: number): ReactNode[] {
 }
 
 function renderInlineToken(token: string, key: number): ReactNode {
+  const image = token.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+  if (image) {
+    const src = image[2];
+    const safeSrc = /^https?:\/\//.test(src) || src.startsWith("/") || src.startsWith("data:image/") ? src : undefined;
+    return safeSrc ? <img className="markdownImage" src={safeSrc} alt={image[1]} key={key} /> : <span key={key}>{image[1]}</span>;
+  }
+
   const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
   if (link) {
     const href = link[2];
-    const safeHref = /^https?:\/\//.test(href) ? href : undefined;
+    const safeHref = /^https?:\/\//.test(href) || href.startsWith("/") ? href : undefined;
     return safeHref ? (
-      <a href={safeHref} key={key} target="_blank" rel="noreferrer">
+      <a href={safeHref} key={key} target="_blank" rel="noreferrer" download={href.startsWith("/") ? true : undefined}>
         {link[1]}
       </a>
     ) : (

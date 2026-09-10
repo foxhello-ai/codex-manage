@@ -6,6 +6,7 @@ import type { ModelCatalogService } from "./ModelCatalogService";
 import type { RuntimeManager } from "./RuntimeManager";
 import { sanitizeModelError } from "../modelErrors";
 import { stripAmbientBrowserContext } from "../../shared/messageText";
+import { performance } from "node:perf_hooks";
 
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
 
@@ -93,6 +94,8 @@ const DEFAULT_SESSION_SCAN_LIMIT = 1000;
 const SESSION_PAGE_SIZE = 100;
 
 export class SessionService {
+  private readonly detailRequests = new Map<string, Promise<SessionDetail>>();
+
   constructor(
     private readonly appServer: Pick<CodexAppServerClient, "request" | "getSnapshot">,
     private readonly metadataStore?: MetadataStore,
@@ -140,14 +143,32 @@ export class SessionService {
   }
 
   async getSessionDetail(sessionId: string, params: GetSessionDetailParams = {}): Promise<SessionDetail> {
+    const includeTurns = params.includeTurns ?? true;
+    const requestKey = `${sessionId}:${includeTurns ? "turns" : "summary"}`;
+    const existing = this.detailRequests.get(requestKey);
+    if (existing) return existing;
+
+    const request = this.readSessionDetail(sessionId, includeTurns);
+    this.detailRequests.set(requestKey, request);
+    void request.then(() => {
+      if (this.detailRequests.get(requestKey) === request) this.detailRequests.delete(requestKey);
+    }, () => {
+      if (this.detailRequests.get(requestKey) === request) this.detailRequests.delete(requestKey);
+    });
+    return request;
+  }
+
+  private async readSessionDetail(sessionId: string, includeTurns: boolean): Promise<SessionDetail> {
     this.assertReady();
 
-    const response = await this.appServer.request<ThreadReadResponse>("thread/read", {
-      threadId: sessionId,
-      includeTurns: params.includeTurns ?? true
-    });
-
-    const metadata = await this.readMetadata();
+    const startedAt = performance.now();
+    const [response, metadata] = await Promise.all([
+      this.appServer.request<ThreadReadResponse>("thread/read", {
+        threadId: sessionId,
+        includeTurns
+      }),
+      this.readMetadata()
+    ]);
     const summary = this.toSummary(response.thread, metadata);
     if (!summary || (summary.id !== sessionId && summary.sessionId !== sessionId)) {
       throw new Error("Session not found");
@@ -155,6 +176,10 @@ export class SessionService {
 
     const thread = response.thread && typeof response.thread === "object" ? (response.thread as Record<string, unknown>) : {};
     const modelState = await this.buildModelState(sessionId, readString(thread.modelProvider));
+    const elapsedMs = Math.round(performance.now() - startedAt);
+    if (elapsedMs >= 250) {
+      console.info("[session-detail] slow read", { sessionId, includeTurns, elapsedMs });
+    }
 
     return {
       ...summary,

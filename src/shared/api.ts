@@ -160,6 +160,18 @@ export function sendSessionInput(sessionId: string, text: string, permissionMode
   });
 }
 
+export type UploadedSessionAttachment = { name: string; mimeType: string; size: number; path: string };
+
+export async function uploadSessionAttachment(sessionId: string, file: File): Promise<{ attachment: UploadedSessionAttachment }> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return apiRequest<{ attachment: UploadedSessionAttachment }>(`/api/sessions/${encodeURIComponent(sessionId)}/attachments`, {
+    method: "POST",
+    body: JSON.stringify({ name: file.name, mimeType: file.type || "application/octet-stream", size: file.size, data: btoa(binary) })
+  });
+}
+
 export function branchSession(sessionId: string, mode: SessionBranchMode): Promise<SessionBranchResponse> {
   return apiRequest<SessionBranchResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/branch`, {
     method: "POST",
