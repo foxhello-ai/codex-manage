@@ -117,6 +117,12 @@ export type SessionHistoryContinuationResponse = {
   metadataError: string | null;
 };
 
+export type CreateSessionResponse = {
+  threadId: string;
+  runtime: RuntimeSnapshot;
+  session: SessionSummary;
+};
+
 export type SessionsResponse = {
   sessions: SessionSummary[];
 };

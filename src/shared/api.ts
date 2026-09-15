@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, Collaborator, CollaboratorsResponse, CreateCollaboratorResponse, HealthStatus, InputResponse, LoginAccountsResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionBranchMode, SessionBranchResponse, SessionCommandsResponse, SessionDetailResponse, SessionHistoryContinuationResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, Collaborator, CollaboratorsResponse, CreateCollaboratorResponse, CreateSessionResponse, HealthStatus, InputResponse, LoginAccountsResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionBranchMode, SessionBranchResponse, SessionCommandsResponse, SessionDetailResponse, SessionHistoryContinuationResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -76,8 +76,8 @@ export function getSessions(search?: string): Promise<SessionsResponse> {
   return apiRequest<SessionsResponse>(`/api/sessions${params.size ? `?${params.toString()}` : ""}`);
 }
 
-export function createSession(cwd: string): Promise<{ threadId: string }> {
-  return apiRequest<{ threadId: string }>("/api/sessions", {
+export function createSession(cwd: string): Promise<CreateSessionResponse> {
+  return apiRequest<CreateSessionResponse>("/api/sessions", {
     method: "POST",
     body: JSON.stringify({ cwd })
   });
@@ -162,13 +162,13 @@ export function sendSessionInput(sessionId: string, text: string, permissionMode
 
 export type UploadedSessionAttachment = { name: string; mimeType: string; size: number; path: string };
 
-export async function uploadSessionAttachment(sessionId: string, file: File): Promise<{ attachment: UploadedSessionAttachment }> {
+export async function uploadSessionAttachment(sessionId: string, cwd: string, file: File): Promise<{ attachment: UploadedSessionAttachment }> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return apiRequest<{ attachment: UploadedSessionAttachment }>(`/api/sessions/${encodeURIComponent(sessionId)}/attachments`, {
     method: "POST",
-    body: JSON.stringify({ name: file.name, mimeType: file.type || "application/octet-stream", size: file.size, data: btoa(binary) })
+    body: JSON.stringify({ cwd, name: file.name, mimeType: file.type || "application/octet-stream", size: file.size, data: btoa(binary) })
   });
 }
 

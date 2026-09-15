@@ -1,4 +1,4 @@
-import { CSSProperties, ChangeEvent, FormEvent, Fragment, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, ChangeEvent, ClipboardEvent, FormEvent, Fragment, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ApiRequestError, branchSession, continueSessionFromHistory, createCollaborator, createSession, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel, uploadSessionAttachment, type UploadedSessionAttachment } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionBranchMode, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
@@ -1059,7 +1059,10 @@ function Dashboard({
     setCreateSessionError(null);
     try {
       const response = await createSession(workspace);
+      setSessions((current) => upsertSession(current, response.session));
+      syncRuntimeSnapshot(response.runtime);
       await loadSessions("");
+      setSessions((current) => upsertSession(current, response.session));
       const path = buildSessionDetailPath(response.threadId);
       if (window.location.pathname !== path) window.history.pushState(null, "", path);
       applySessionRoute({ kind: "detail", sessionId: response.threadId });
@@ -2399,7 +2402,7 @@ function SessionDetailPanel({
           pendingCount={pendingApprovalCount}
           onSubmitApproval={onSubmitApproval}
         />
-        <TaskInput key={session.id} sessionId={session.id} runtime={runtime} onSend={handleSendInput} />
+        <TaskInput key={session.id} sessionId={session.id} workspace={session.workspace} runtime={runtime} onSend={handleSendInput} />
         <ComposerRuntimeBar
           runtime={runtime}
           modelState={modelState}
@@ -2890,7 +2893,7 @@ function tailText(text: string, maxChars: number): string {
   return `已隐藏前 ${hiddenChars} 字符，仅展示最新输出\n\n${text.slice(-maxChars)}`;
 }
 
-function TaskInput({ sessionId, runtime, onSend }: { sessionId: string; runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void> }) {
+function TaskInput({ sessionId, workspace, runtime, onSend }: { sessionId: string; workspace: string; runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void> }) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<UploadedSessionAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -2901,20 +2904,34 @@ function TaskInput({ sessionId, runtime, onSend }: { sessionId: string; runtime:
   const waitingTurnId = runtime?.status === "running" && !runtime.activeTurnId;
   const disabled = submitting || uploading || waitingApproval || waitingTurnId || runtime?.status === "starting";
 
-  async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
-    const files = [...(event.target.files ?? [])];
-    event.target.value = "";
+  async function uploadFiles(files: File[]) {
     if (files.length === 0) return;
     setUploading(true);
     setUploadError(null);
     try {
-      const uploaded = await Promise.all(files.map((file) => uploadSessionAttachment(sessionId, file)));
+      const uploaded = await Promise.all(files.map((file) => uploadSessionAttachment(sessionId, workspace, file)));
       setAttachments((current) => [...current, ...uploaded.map((item) => item.attachment)]);
     } catch (caught) {
       setUploadError(caught instanceof Error ? caught.message : "附件上传失败");
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = [...(event.target.files ?? [])];
+    event.target.value = "";
+    await uploadFiles(files);
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const imageFiles = [...event.clipboardData.items]
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+    if (imageFiles.length === 0) return;
+    event.preventDefault();
+    void uploadFiles(imageFiles);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -2964,6 +2981,7 @@ function TaskInput({ sessionId, runtime, onSend }: { sessionId: string; runtime:
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         placeholder={uploading ? "正在上传附件" : waitingApproval ? "请先处理审批" : waitingTurnId ? "正在同步任务状态" : "Message Codex"}
         disabled={disabled}
         aria-keyshortcuts="Control+Enter Meta+Enter"

@@ -50,6 +50,7 @@ const InputBody = z.object({
 });
 
 const AttachmentBody = z.object({
+  cwd: z.string().trim().min(1).max(4096),
   name: z.string().trim().min(1).max(255),
   mimeType: z.string().trim().max(200).default("application/octet-stream"),
   size: z.number().int().nonnegative().max(20 * 1024 * 1024),
@@ -114,7 +115,11 @@ export function registerSessionRoutes(
 
     try {
       const result = await runtimeManager.startThread(body.data.cwd);
-      return reply.status(201).send({ threadId: result.threadId, runtime: result.runtime });
+      return reply.status(201).send({
+        threadId: result.threadId,
+        runtime: result.runtime,
+        session: makeCreatedSession(result.threadId, body.data.cwd, result.runtime)
+      });
     } catch (error) {
       return sendError(reply, 503, "SESSION_CREATE_FAILED", sanitizeModelError(error));
     }
@@ -318,13 +323,18 @@ export function registerSessionRoutes(
     const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore);
     if (!user) return;
     try {
-      const session = await sessionService.getSessionDetail(params.data.id, { includeTurns: false });
+      let workspace = body.data.cwd;
+      try {
+        workspace = (await sessionService.getSessionDetail(params.data.id, { includeTurns: false })).workspace;
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "Session not found") throw error;
+      }
       const decoded = Buffer.from(body.data.data, "base64");
       if (decoded.length !== body.data.size || decoded.length > 20 * 1024 * 1024) {
         return sendError(reply, 413, "ATTACHMENT_TOO_LARGE", "附件大小不正确");
       }
       const safeName = basename(body.data.name).replace(/[^a-zA-Z0-9._-]/g, "_") || "attachment";
-      const directory = resolve(session.workspace, ".codex-manage", "attachments", params.data.id);
+      const directory = resolve(workspace, ".codex-manage", "attachments", params.data.id);
       await mkdir(directory, { recursive: true });
       const path = join(directory, `${randomUUID()}-${safeName}`);
       await writeFile(path, decoded, { flag: "wx" });
@@ -747,5 +757,22 @@ function makeHistoryContinuationSession(
     status: runtime.status,
     cliVersion: null,
     source: "codex_manage_history_continuation"
+  };
+}
+
+function makeCreatedSession(threadId: string, cwd: string, runtime: RuntimeSnapshot): SessionSummary {
+  return {
+    id: threadId,
+    sessionId: threadId,
+    title: "新会话",
+    defaultTitle: "新会话",
+    remarkTitle: null,
+    summary: "新建会话，可以开始输入任务",
+    workspace: cwd,
+    createdAt: runtime.startedAt,
+    updatedAt: runtime.updatedAt,
+    status: runtime.status,
+    cliVersion: null,
+    source: "codex_manage_created"
   };
 }
