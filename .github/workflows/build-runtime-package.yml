@@ -1,15 +1,9 @@
-name: Build Runtime Package
+name: Release Runtime and Website
 
 on:
   push:
     branches:
-      - main
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Runtime package version
-        required: true
-        default: "1.0.1"
+      - "release/v*"
 
 permissions:
   contents: write
@@ -20,6 +14,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate release branch
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$GITHUB_REF_NAME" =~ ^release/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "Expected branch name release/vX.Y.Z, got: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+
+          version="${BASH_REMATCH[1]}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Validate website files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f website/index.html
+          test -f website/main.js
+          test -f website/styles.css
+          test -f website/_headers
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -37,12 +55,11 @@ jobs:
         id: package
         shell: bash
         env:
-          INPUT_VERSION: ${{ github.event.inputs.version || '1.0.1' }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
 
-          version="${INPUT_VERSION:-1.0.1}"
-          version="${version#v}"
+          version="$VERSION"
           short_sha="${GITHUB_SHA::12}"
           package_name="codex-manage-runtime.tgz"
           checksum_name="${package_name}.sha256"
@@ -101,12 +118,19 @@ jobs:
             ${{ steps.package.outputs.checksum_path }}
           if-no-files-found: error
 
+      - name: Deploy website to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4"
+          command: pages deploy website --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT }}
+
       - name: Publish GitHub Release
-        if: github.event_name == 'workflow_dispatch'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.package.outputs.release_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
           RELEASE_TITLE: Codex Manage Runtime ${{ steps.package.outputs.version }}
           RELEASE_NOTES: ${{ steps.package.outputs.release_notes }}
           PACKAGE_PATH: ${{ steps.package.outputs.package_path }}
