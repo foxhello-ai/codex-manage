@@ -1,7 +1,7 @@
 import cookie from "@fastify/cookie";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -245,6 +245,75 @@ describe("session routes", () => {
       const denied = await app.inject({ method: "GET", url: "/api/sessions/session-b", headers: { cookie: sessionCookie } });
       expect(denied.statusCode).toBe(403);
       expect(denied.json()).toMatchObject({ error: { code: "SESSION_ACCESS_DENIED" } });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("downloads workspace files with their original bytes and blocks paths outside the workspace", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "codex-manage-file-download-"));
+    const workspace = join(directory, "workspace");
+    const filePath = join(workspace, "sample.exe");
+    const outsidePath = join(directory, "outside.exe");
+    const bytes = Buffer.from([0, 1, 2, 255, 254, 253]);
+    try {
+      await mkdir(workspace, { recursive: true });
+      await writeFile(filePath, bytes, { encoding: null });
+      await writeFile(outsidePath, bytes, { encoding: null });
+      const app = Fastify();
+      const config = {
+        host: "0.0.0.0",
+        port: 3000,
+        password: "admin",
+        defaultPassword: false,
+        ownerName: "Jamie Chen",
+        ownerEmail: "jamie@local",
+        sessionSecret: "test-secret-at-least-thirty-two-characters",
+        codexCliPath: "codex",
+        sessionsDir: "/tmp/sessions",
+        metadataFile: "/tmp/session-metadata.json",
+        clientDir: "/tmp/client"
+      };
+      await app.register(cookie, { secret: config.sessionSecret });
+      registerAuthHook(app);
+      registerAuthRoutes(app, config);
+      registerSessionRoutes(
+        app,
+        {
+          listSessions: async () => [],
+          getSessionDetail: async () => ({ workspace }) as never,
+          updateMetadata: async () => { throw new Error("not used"); }
+        } as unknown as SessionService
+      );
+      await app.ready();
+
+      const unauthenticated = await app.inject({
+        method: "GET",
+        url: `/api/sessions/session-a/files?path=${encodeURIComponent(filePath)}`
+      });
+      expect(unauthenticated.statusCode).toBe(401);
+
+      const login = await app.inject({ method: "POST", url: "/api/login", payload: { password: "admin" } });
+      const cookieHeader = login.headers["set-cookie"];
+      const sessionCookie = Array.isArray(cookieHeader) ? cookieHeader[0] : cookieHeader;
+      const downloaded = await app.inject({
+        method: "GET",
+        url: `/api/sessions/session-a/files?path=${encodeURIComponent(filePath)}`,
+        headers: { cookie: sessionCookie }
+      });
+      expect(downloaded.statusCode).toBe(200);
+      expect(downloaded.headers["content-type"]).toContain("application/vnd.microsoft.portable-executable");
+      expect(downloaded.headers["content-length"]).toBe(String(bytes.length));
+      expect(downloaded.headers["content-disposition"]).toContain("sample.exe");
+      expect(downloaded.rawPayload).toEqual(bytes);
+
+      const outside = await app.inject({
+        method: "GET",
+        url: `/api/sessions/session-a/files?path=${encodeURIComponent(outsidePath)}`,
+        headers: { cookie: sessionCookie }
+      });
+      expect(outside.statusCode).toBe(403);
+      expect(outside.json()).toMatchObject({ error: { code: "FILE_OUTSIDE_WORKSPACE" } });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

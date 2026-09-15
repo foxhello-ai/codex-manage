@@ -187,7 +187,7 @@ export class SessionService {
       modelProvider: readString(thread.modelProvider),
       historyMode: readString(thread.historyMode),
       modelState,
-      turns: readArray(thread.turns).map((turn, index) => toTurn(turn, index))
+      turns: readArray(thread.turns).map((turn, index) => toTurn(turn, index, sessionId))
     };
   }
 
@@ -309,7 +309,7 @@ export class SessionService {
   }
 }
 
-function toTurn(value: unknown, index: number): SessionTurn {
+function toTurn(value: unknown, index: number, sessionId: string): SessionTurn {
   const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   return {
     id: readString(source.id) ?? `turn-${index + 1}`,
@@ -318,11 +318,11 @@ function toTurn(value: unknown, index: number): SessionTurn {
     startedAt: readUnixSeconds(source.startedAt),
     completedAt: readNullableUnixSeconds(source.completedAt),
     durationMs: readNumber(source.durationMs),
-    items: readArray(source.items).map((item, itemIndex) => toTurnItem(item, itemIndex))
+    items: readArray(source.items).map((item, itemIndex) => toTurnItem(item, itemIndex, sessionId))
   };
 }
 
-function toTurnItem(value: unknown, index: number): SessionTurnItem {
+function toTurnItem(value: unknown, index: number, sessionId: string): SessionTurnItem {
   const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const rawType = readString(source.type);
   const id = readString(source.id) ?? `item-${index + 1}`;
@@ -332,13 +332,13 @@ function toTurnItem(value: unknown, index: number): SessionTurnItem {
       return {
         id,
         type: "user_message",
-        text: stripAmbientBrowserContext(readTextContent(source.content))
+        text: rewriteLocalAssetLinks(stripAmbientBrowserContext(readTextContent(source.content)), sessionId)
       };
     case "agentMessage":
       return {
         id,
         type: "agent_message",
-        text: readString(source.text) ?? "",
+        text: rewriteLocalAssetLinks(readString(source.text) ?? "", sessionId),
         phase: readString(source.phase)
       };
     case "fileChange":
@@ -363,6 +363,27 @@ function toFileChange(value: unknown): SessionFileChange {
     kind,
     diff: readString(source.diff)
   };
+}
+
+function rewriteLocalAssetLinks(text: string, sessionId: string): string {
+  return text.replace(/(!?\[[^\]]*\])\(([^)]+)\)/g, (match, label: string, href: string) => {
+    const trimmedHref = href.trim();
+    if (/^(https?:|data:|\/api\/)/i.test(trimmedHref)) return match;
+
+    let localPath: string | null = null;
+    if (trimmedHref.startsWith("file://")) {
+      try {
+        localPath = decodeURIComponent(new URL(trimmedHref).pathname);
+      } catch {
+        localPath = trimmedHref.slice("file://".length);
+      }
+    } else if (trimmedHref.startsWith("/") || trimmedHref.startsWith("sandbox:")) {
+      localPath = trimmedHref.startsWith("sandbox:") ? trimmedHref.slice("sandbox:".length) : trimmedHref;
+    }
+    if (!localPath) return match;
+    const downloadUrl = `/api/sessions/${encodeURIComponent(sessionId)}/files?path=${encodeURIComponent(localPath)}`;
+    return `${label}(${downloadUrl})`;
+  });
 }
 
 function readTextContent(value: unknown): string {

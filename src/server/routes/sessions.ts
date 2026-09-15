@@ -10,8 +10,9 @@ import { ownerIdentity, resolveAuthUser } from "../auth/session";
 import type { RuntimeSnapshot, SessionBranchMode, SessionPermissionMode, SessionSummary, UserIdentity } from "../../shared/models";
 import type { CollaborationStore } from "../services/CollaborationStore";
 import { performance } from "node:perf_hooks";
-import { mkdir, writeFile } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import { createReadStream } from "node:fs";
+import { mkdir, realpath, stat, writeFile } from "node:fs/promises";
+import { basename, extname, join, relative, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 
 const ListQuery = z.object({
@@ -55,6 +56,10 @@ const AttachmentBody = z.object({
   mimeType: z.string().trim().max(200).default("application/octet-stream"),
   size: z.number().int().nonnegative().max(20 * 1024 * 1024),
   data: z.string().min(1).max(28 * 1024 * 1024)
+});
+
+const FileQuery = z.object({
+  path: z.string().trim().min(1).max(8192)
 });
 
 const BranchBody = z.object({
@@ -341,6 +346,38 @@ export function registerSessionRoutes(
       return reply.status(201).send({ attachment: { name: body.data.name, mimeType: body.data.mimeType, size: decoded.length, path } });
     } catch (error) {
       return sendError(reply, 503, "ATTACHMENT_UPLOAD_FAILED", sanitizeModelError(error));
+    }
+  });
+
+  app.get("/api/sessions/:id/files", async (request, reply) => {
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
+    const query = FileQuery.safeParse(request.query ?? {});
+    if (!query.success) return sendError(reply, 400, "INVALID_FILE_QUERY", "文件路径不正确");
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore);
+    if (!user) return;
+
+    try {
+      const session = await sessionService.getSessionDetail(params.data.id, { includeTurns: false });
+      const workspace = await realpath(session.workspace);
+      const candidate = resolve(query.data.path);
+      const filePath = await realpath(candidate);
+      const fileRelative = relative(workspace, filePath);
+      if (!fileRelative || fileRelative === ".." || fileRelative.startsWith(`..${sep}`) || fileRelative.startsWith(sep)) {
+        return sendError(reply, 403, "FILE_OUTSIDE_WORKSPACE", "文件不在当前会话工作目录内");
+      }
+      const info = await stat(filePath);
+      if (!info.isFile()) return sendError(reply, 404, "FILE_NOT_FOUND", "文件不存在");
+      const fileName = basename(filePath);
+      reply.header("content-type", mimeTypeFor(fileName));
+      reply.header("content-length", String(info.size));
+      reply.header("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+      return reply.send(createReadStream(filePath));
+    } catch (error) {
+      if (error instanceof Error && ["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) {
+        return sendError(reply, 404, "FILE_NOT_FOUND", "文件不存在");
+      }
+      return sendError(reply, 503, "FILE_DOWNLOAD_FAILED", sanitizeModelError(error));
     }
   });
 
@@ -775,4 +812,21 @@ function makeCreatedSession(threadId: string, cwd: string, runtime: RuntimeSnaps
     cliVersion: null,
     source: "codex_manage_created"
   };
+}
+
+function mimeTypeFor(fileName: string): string {
+  switch (extname(fileName).toLowerCase()) {
+    case ".png": return "image/png";
+    case ".jpg":
+    case ".jpeg": return "image/jpeg";
+    case ".gif": return "image/gif";
+    case ".webp": return "image/webp";
+    case ".pdf": return "application/pdf";
+    case ".json": return "application/json; charset=utf-8";
+    case ".txt":
+    case ".md": return "text/plain; charset=utf-8";
+    case ".zip": return "application/zip";
+    case ".exe": return "application/vnd.microsoft.portable-executable";
+    default: return "application/octet-stream";
+  }
 }
