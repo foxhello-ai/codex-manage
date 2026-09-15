@@ -2909,8 +2909,11 @@ function TaskInput({ sessionId, workspace, runtime, onSend }: { sessionId: strin
     setUploading(true);
     setUploadError(null);
     try {
-      const uploaded = await Promise.all(files.map((file) => uploadSessionAttachment(sessionId, workspace, file)));
-      setAttachments((current) => [...current, ...uploaded.map((item) => item.attachment)]);
+      const results = await Promise.allSettled(files.map((file) => uploadSessionAttachment(sessionId, workspace, file)));
+      const uploaded = results.flatMap((result) => result.status === "fulfilled" ? [result.value.attachment] : []);
+      const failed = results.filter((result) => result.status === "rejected").length;
+      setAttachments((current) => [...current, ...uploaded]);
+      if (failed > 0) setUploadError(`${failed} 个附件上传失败，其余附件已保留`);
     } catch (caught) {
       setUploadError(caught instanceof Error ? caught.message : "附件上传失败");
     } finally {
@@ -2966,7 +2969,7 @@ function TaskInput({ sessionId, workspace, runtime, onSend }: { sessionId: strin
     <form className="taskInput" onSubmit={handleSubmit}>
       <label className="taskInputPlus" title="上传附件" aria-label="上传附件">
         <span aria-hidden="true">+</span>
-        <input className="srOnly" type="file" multiple onChange={(event) => void handleFiles(event)} disabled={disabled} />
+        <input className="srOnly" type="file" accept="image/*,.pdf,.txt,.md,.json,.zip,.exe" multiple onChange={(event) => void handleFiles(event)} disabled={disabled} />
       </label>
       {attachments.length > 0 ? (
         <div className="taskInputAttachments" aria-label="已添加附件">
