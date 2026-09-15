@@ -12,6 +12,22 @@
 
 也可以使用 Cloudflare Pages 的 Direct Upload，将整个 `website/` 目录作为上传目录。该托管配置仅用于官网，不承载 Codex Manage Runtime。
 
+### GitHub Actions 自动发布
+
+`.github/workflows/build-runtime-package.yml` 只监听符合 `release/vX.Y.Z` 的分支。例如推送 `release/v1.0.7` 后，workflow 会：
+
+1. 校验版本分支格式并检查官网入口文件。
+2. 构建 Runtime 生产包，并将 `codex-manage-runtime.tgz` 及其 SHA-256 校验文件上传到 GitHub Release `v1.0.7`。
+3. 使用 Cloudflare Pages Direct Upload 部署 `website/` 官网。
+
+仓库需要配置以下 GitHub Actions Secrets：
+
+- `CLOUDFLARE_API_TOKEN`：具有目标 Pages 项目部署权限的 API Token。
+- `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 账户 ID。
+- `CLOUDFLARE_PAGES_PROJECT`：Cloudflare Pages 项目名。
+
+同一个版本的 Release 已存在时，workflow 会停止并不会覆盖已有发布物。官网和 Runtime 使用同一个版本号和同一次提交，便于回溯。
+
 ## Codex Manage Runtime 部署
 
 当前主线的 Runtime 一条命令安装只支持 Linux：安装脚本依赖 Bash、root/sudo、systemd、Node.js 和已登录 Codex 的 Linux 用户。
