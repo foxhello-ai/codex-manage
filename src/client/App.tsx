@@ -1,6 +1,6 @@
 import { CSSProperties, ChangeEvent, ClipboardEvent, FormEvent, Fragment, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ApiRequestError, branchSession, continueSessionFromHistory, createCollaborator, createSession, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel, uploadSessionAttachment, type UploadedSessionAttachment } from "../shared/api";
-import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionBranchMode, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
+import { ApiRequestError, attachSessionToTask, branchSession, continueSessionFromHistory, createCollaborator, createSession, createTask, createTaskSession, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, getTask, getTasks, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel, updateTask, uploadSessionAttachment, type UploadedSessionAttachment } from "../shared/api";
+import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionBranchMode, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, TaskDetail, TaskSummary, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
 import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
 import { findRetryContextForTurn, findRetryContextFromFailedTurns, isCommentaryPhase, isFinalAnswerPhase, isTaskSendShortcut, isUnmaterializedThreadHistoryError, type RetryContext } from "./sessionInteractions";
@@ -238,6 +238,8 @@ function Dashboard({
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [creatingSessionWorkspace, setCreatingSessionWorkspace] = useState<string | null>(null);
   const [createSessionError, setCreateSessionError] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<TaskSummary[]>([]);
+  const [taskError, setTaskError] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null
   );
@@ -307,6 +309,16 @@ function Dashboard({
       setSessionError(caught instanceof Error ? caught.message : "会话列表加载失败");
     } finally {
       setLoadingSessions(false);
+    }
+  }
+
+  async function loadTasks() {
+    try {
+      const response = await getTasks();
+      setTasks(response.tasks);
+      setTaskError(null);
+    } catch (caught) {
+      setTaskError(caught instanceof Error ? caught.message : "任务加载失败");
     }
   }
 
@@ -385,6 +397,7 @@ function Dashboard({
 
   useEffect(() => {
     void loadSessions("");
+    if (user.role === "owner") void loadTasks();
     if (safeInitialRoute.kind === "detail") {
       void refreshCurrentSession(safeInitialRoute.sessionId);
     }
@@ -1073,6 +1086,50 @@ function Dashboard({
     }
   }
 
+  async function handleCreateTask() {
+    const name = window.prompt("任务名称");
+    if (!name?.trim()) return;
+    try {
+      const response = await createTask(name);
+      setTasks((current) => [response.task, ...current]);
+    } catch (caught) {
+      setTaskError(caught instanceof Error ? caught.message : "任务创建失败");
+    }
+  }
+
+  async function handleToggleTask(task: TaskSummary) {
+    try {
+      const response = await updateTask(task.id, { pinned: !task.pinned });
+      setTasks((current) => current.map((item) => item.id === task.id ? response.task : item));
+    } catch (caught) {
+      setTaskError(caught instanceof Error ? caught.message : "任务更新失败");
+    }
+  }
+
+  async function handleAttachSession(task: TaskSummary) {
+    const selected = selectedSessionIdRef.current;
+    if (!selected) return;
+    try {
+      const response = await attachSessionToTask(task.id, selected);
+      setTasks((current) => current.map((item) => item.id === task.id ? response.task : item));
+    } catch (caught) {
+      setTaskError(caught instanceof Error ? caught.message : "会话归属任务失败");
+    }
+  }
+
+  async function handleCreateTaskSession(task: TaskSummary) {
+    const workspace = sessions.find((session) => session.id === task.recentSessionId)?.workspace ?? sessions[0]?.workspace;
+    if (!workspace) return;
+    try {
+      const response = await createTaskSession(task.id, workspace);
+      setTasks((current) => current.map((item) => item.id === task.id ? response.task : item));
+      setSessions((current) => upsertSession(current, response.session));
+      handleSelectSession(response.session);
+    } catch (caught) {
+      setTaskError(caught instanceof Error ? caught.message : "任务会话创建失败");
+    }
+  }
+
   function handleMetadataSaved(updated: SessionSummary) {
     setSessions((current) => current.map((session) => (isSameSession(session, updated.id) ? updated : session)));
     setSessionDetail((current) => (current && isSameSession(current, updated.id) ? { ...current, ...updated } : current));
@@ -1438,6 +1495,7 @@ function Dashboard({
         <ChildAccessPage sessions={sessions} loading={loadingSessions} error={sessionError} onSelect={handleSelectSession} />
       ) : viewMode === "list" ? (
         <>
+          <TaskPanel tasks={tasks} sessions={sessions} error={taskError} onCreate={handleCreateTask} onTogglePin={handleToggleTask} onAttachSession={handleAttachSession} onCreateSession={handleCreateTaskSession} onSelectSession={handleSelectSession} />
           <DesktopWorkspaceHome
             sessions={sessions}
             search={search}
@@ -3317,6 +3375,63 @@ function ResizableWorkspaceLayout({
         onDoubleClick={() => setSidebarWidth(DEFAULT_WORKSPACE_SIDEBAR_WIDTH)}
       />
       {main}
+    </section>
+  );
+}
+
+function TaskPanel({
+  tasks,
+  sessions,
+  error,
+  onCreate,
+  onTogglePin,
+  onAttachSession,
+  onCreateSession,
+  onSelectSession
+}: {
+  tasks: TaskSummary[];
+  sessions: SessionSummary[];
+  error: string | null;
+  onCreate: () => Promise<void>;
+  onTogglePin: (task: TaskSummary) => Promise<void>;
+  onAttachSession: (task: TaskSummary) => Promise<void>;
+  onCreateSession: (task: TaskSummary) => Promise<void>;
+  onSelectSession: (session: SessionSummary) => void;
+}) {
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
+  const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
+  const sessionMap = new Map(sessions.map((session) => [session.id, session]));
+  async function toggleTask(task: TaskSummary) {
+    if (expandedTaskId === task.id) { setExpandedTaskId(null); return; }
+    setExpandedTaskId(task.id);
+    setLoadingTaskId(task.id);
+    try { setTaskDetail((await getTask(task.id)).task); } finally { setLoadingTaskId(null); }
+  }
+  return (
+    <section className="taskPanel" aria-labelledby="task-panel-title">
+      <div className="taskPanelHeader">
+        <div><p className="workspaceWelcomeEyebrow">TASKS</p><h2 id="task-panel-title">任务</h2></div>
+        <button className="primaryButton" type="button" onClick={() => void onCreate()}>新建任务</button>
+      </div>
+      {error ? <div className="errorBanner">{error}</div> : null}
+      {tasks.length === 0 ? <p className="muted">创建任务后，可聚合多个相关会话并共享上下文。</p> : (
+        <div className="taskGrid">
+          {tasks.map((task) => {
+            const recent = task.recentSessionId ? sessionMap.get(task.recentSessionId) : null;
+            return <article className={`taskCard${task.pinned ? " pinned" : ""}`} key={task.id}>
+              <div className="taskCardTitle"><button className="taskNameButton" type="button" onClick={() => void toggleTask(task)}><strong>{task.name}</strong></button><button className="iconButton" type="button" title={task.pinned ? "取消置顶" : "置顶任务"} aria-label={task.pinned ? "取消置顶" : "置顶任务"} onClick={() => void onTogglePin(task)}>{task.pinned ? "★" : "☆"}</button></div>
+              <small>{task.sessionCount} 个会话{recent ? ` · 最近：${recent.title}` : ""}</small>
+              {expandedTaskId === task.id ? <div className="taskSessionDetails">{loadingTaskId === task.id ? <span className="muted">正在加载任务会话…</span> : taskDetail?.sessions.map((session) => <button className="taskSessionLink" type="button" key={session.id} onClick={() => onSelectSession(session)}>{session.title}<small>{session.updatedAt}</small></button>)}</div> : null}
+              <div className="taskCardActions">
+                {recent ? <button className="ghostButton" type="button" onClick={() => onSelectSession(recent)}>打开最近会话</button> : null}
+                <button className="ghostButton" type="button" onClick={() => void onAttachSession(task)} disabled={!sessions.length}>归入当前会话</button>
+                <button className="ghostButton" type="button" onClick={() => void onCreateSession(task)} disabled={!sessions.length}>新建任务会话</button>
+              </div>
+            </article>;
+          })}
+        </div>
+      )}
     </section>
   );
 }

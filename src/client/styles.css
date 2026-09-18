@@ -8634,3 +8634,27 @@ textarea::placeholder {
     margin-bottom: 7px;
   }
 }
+.taskPanel {
+  margin: 1rem 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border, #d9dee7);
+  background: var(--surface, #fff);
+}
+
+.taskPanelHeader, .taskCardTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.taskPanelHeader h2 { margin: .15rem 0 0; }
+.taskGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .75rem; margin-top: .75rem; }
+.taskCard { border: 1px solid var(--border, #d9dee7); padding: .8rem; background: var(--surface-subtle, #f8fafc); }
+.taskCard.pinned { border-color: #d69e2e; }
+.taskCard small { display: block; color: var(--muted, #64748b); margin: .45rem 0 .7rem; }
+.taskCardActions { display: flex; flex-wrap: wrap; gap: .45rem; }
+.taskNameButton { min-height: auto; padding: 0; color: inherit; background: transparent; text-align: left; }
+.taskSessionDetails { display: grid; gap: .35rem; margin: .4rem 0 .7rem; }
+.taskSessionLink { min-height: auto; padding: .45rem; color: #1769aa; background: #eef6fd; text-align: left; }
+.taskSessionLink small { margin: .15rem 0 0; }

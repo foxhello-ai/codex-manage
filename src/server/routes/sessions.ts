@@ -9,6 +9,7 @@ import type { SessionModelService } from "../services/SessionModelService";
 import { ownerIdentity, resolveAuthUser } from "../auth/session";
 import type { RuntimeSnapshot, SessionBranchMode, SessionPermissionMode, SessionSummary, UserIdentity } from "../../shared/models";
 import type { CollaborationStore } from "../services/CollaborationStore";
+import type { TaskStore } from "../services/TaskStore";
 import { performance } from "node:perf_hooks";
 import { createReadStream } from "node:fs";
 import { mkdir, realpath, stat, writeFile } from "node:fs/promises";
@@ -23,6 +24,10 @@ const ListQuery = z.object({
 const CreateSessionBody = z.object({
   cwd: z.string().trim().min(1).max(4096)
 });
+
+const CreateTaskBody = z.object({ name: z.string().trim().min(1).max(120) });
+const UpdateTaskBody = z.object({ name: z.string().trim().min(1).max(120).optional(), pinned: z.boolean().optional() }).refine((body) => body.name !== undefined || body.pinned !== undefined);
+const TaskSessionBody = z.object({ cwd: z.string().trim().min(1).max(4096) });
 
 const SessionParams = z.object({
   id: z.string().min(1)
@@ -102,8 +107,117 @@ export function registerSessionRoutes(
   jsonlSessionParser?: JsonlSessionParser,
   runtimeManager?: RuntimeManager,
   sessionModelService?: SessionModelService,
-  collaborationStore?: CollaborationStore
+  collaborationStore?: CollaborationStore,
+  taskStore?: TaskStore
 ) {
+  app.get("/api/tasks", async (request, reply) => {
+    const user = await resolveRouteUser(request, collaborationStore);
+    if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
+    if (!taskStore) return sendError(reply, 503, "TASK_SERVICE_UNAVAILABLE", "任务服务不可用");
+    try {
+      const sessions = await sessionService.listSessions({ limit: 1000 });
+      const visible = collaborationStore ? await collaborationStore.filterSessions(user.id, sessions) : sessions;
+      return reply.send({ tasks: await taskStore.list(visible) });
+    } catch (error) {
+      return sendError(reply, 503, "TASK_LIST_FAILED", sanitizeModelError(error));
+    }
+  });
+
+  app.post("/api/tasks", async (request, reply) => {
+    const user = await resolveRouteUser(request, collaborationStore);
+    if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
+    if (user.role === "child") return sendError(reply, 403, "OWNER_REQUIRED", "子用户不能创建任务");
+    if (!taskStore) return sendError(reply, 503, "TASK_SERVICE_UNAVAILABLE", "任务服务不可用");
+    const body = CreateTaskBody.safeParse(request.body);
+    if (!body.success) return sendError(reply, 400, "INVALID_TASK", "任务名称不正确");
+    try {
+      const task = await taskStore.create(body.data.name);
+      const sessions = await sessionService.listSessions({ limit: 1000 });
+      return reply.status(201).send({ task: (await taskStore.get(task.id, sessions))! });
+    } catch (error) {
+      return sendError(reply, 400, "TASK_CREATE_FAILED", sanitizeModelError(error));
+    }
+  });
+
+  app.get("/api/tasks/:id", async (request, reply) => {
+    const user = await resolveRouteUser(request, collaborationStore);
+    if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
+    if (!taskStore) return sendError(reply, 503, "TASK_SERVICE_UNAVAILABLE", "任务服务不可用");
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) return sendError(reply, 400, "INVALID_TASK_PARAMS", "任务参数不正确");
+    try {
+      const sessions = await sessionService.listSessions({ limit: 1000 });
+      const visible = collaborationStore ? await collaborationStore.filterSessions(user.id, sessions) : sessions;
+      const task = await taskStore.get(params.data.id, visible);
+      if (!task) return sendError(reply, 404, "TASK_NOT_FOUND", "任务不存在");
+      return reply.send({ task });
+    } catch (error) {
+      return sendError(reply, 503, "TASK_DETAIL_FAILED", sanitizeModelError(error));
+    }
+  });
+
+  app.patch("/api/tasks/:id", async (request, reply) => {
+    const user = await resolveRouteUser(request, collaborationStore);
+    if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
+    if (user.role === "child") return sendError(reply, 403, "OWNER_REQUIRED", "子用户不能编辑任务");
+    if (!taskStore) return sendError(reply, 503, "TASK_SERVICE_UNAVAILABLE", "任务服务不可用");
+    const params = SessionParams.safeParse(request.params);
+    const body = UpdateTaskBody.safeParse(request.body);
+    if (!params.success || !body.success) return sendError(reply, 400, "INVALID_TASK", "任务参数不正确");
+    try {
+      const task = await taskStore.update(params.data.id, body.data);
+      const sessions = await sessionService.listSessions({ limit: 1000 });
+      return reply.send({ task: (await taskStore.get(task.id, sessions))! });
+    } catch (error) {
+      return sendError(reply, 400, "TASK_UPDATE_FAILED", sanitizeModelError(error));
+    }
+  });
+
+  app.post("/api/tasks/:id/sessions", async (request, reply) => {
+    const user = await resolveRouteUser(request, collaborationStore);
+    if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
+    if (user.role === "child") return sendError(reply, 403, "OWNER_REQUIRED", "子用户不能创建新会话");
+    if (!taskStore || !runtimeManager) return sendError(reply, 503, "TASK_SERVICE_UNAVAILABLE", "任务服务不可用");
+    const params = SessionParams.safeParse(request.params);
+    const body = TaskSessionBody.safeParse(request.body);
+    if (!params.success || !body.success) return sendError(reply, 400, "INVALID_TASK_SESSION", "任务会话参数不正确");
+    try {
+      const sessions = await sessionService.listSessions({ limit: 1000 });
+      const task = await taskStore.get(params.data.id, sessions);
+      if (!task) return sendError(reply, 404, "TASK_NOT_FOUND", "任务不存在");
+      const contextPrompt = buildTaskContextPrompt(task.name, task.sessions);
+      const result = await runtimeManager.startThread(body.data.cwd);
+      const runtime = await runtimeManager.sendInput(result.threadId, { text: contextPrompt });
+      await taskStore.addSession(task.id, result.threadId);
+      const nextSessions = await sessionService.listSessions({ limit: 1000 });
+      return reply.status(201).send({
+        threadId: result.threadId,
+        runtime,
+        session: makeCreatedSession(result.threadId, body.data.cwd, runtime),
+        task: (await taskStore.get(task.id, nextSessions))!,
+        contextPrompt
+      });
+    } catch (error) {
+      return sendError(reply, 503, "TASK_SESSION_CREATE_FAILED", sanitizeModelError(error));
+    }
+  });
+
+  app.post("/api/tasks/:id/sessions/:sessionId", async (request, reply) => {
+    const user = await resolveRouteUser(request, collaborationStore);
+    if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
+    if (user.role === "child") return sendError(reply, 403, "OWNER_REQUIRED", "子用户不能归属会话");
+    if (!taskStore) return sendError(reply, 503, "TASK_SERVICE_UNAVAILABLE", "任务服务不可用");
+    const params = z.object({ id: z.string().min(1), sessionId: z.string().min(1) }).safeParse(request.params);
+    if (!params.success) return sendError(reply, 400, "INVALID_TASK_SESSION", "任务会话参数不正确");
+    try {
+      await taskStore.addSession(params.data.id, params.data.sessionId);
+      const sessions = await sessionService.listSessions({ limit: 1000 });
+      return reply.send({ task: (await taskStore.get(params.data.id, sessions))! });
+    } catch (error) {
+      return sendError(reply, 400, "TASK_SESSION_ATTACH_FAILED", sanitizeModelError(error));
+    }
+  });
+
   app.post("/api/sessions", async (request, reply) => {
     const body = CreateSessionBody.safeParse(request.body);
     if (!body.success) {
@@ -673,6 +787,13 @@ export function registerSessionRoutes(
       );
     }
   });
+}
+
+function buildTaskContextPrompt(taskName: string, sessions: SessionSummary[]): string {
+  const history = sessions.length === 0
+    ? "（暂无历史会话）"
+    : sessions.map((session, index) => `${index + 1}. 名称：${session.title}\n   时间：${session.updatedAt}\n   访问标识：${session.id}\n   摘要：${session.summary}`).join("\n");
+  return `你正在继续任务「${taskName}」。请先读取该任务下的所有历史会话，了解已有背景、讨论过程、结论和未完成事项，并将它们作为当前任务的共享上下文。优先继承已确认内容，同时明确区分已确认内容和待确认内容，避免重复询问已经明确的信息。\n\n任务历史会话：\n${history}\n\n请基于以上上下文继续处理本次任务。`;
 }
 
 async function resolveRouteUser(request: Parameters<typeof resolveAuthUser>[0], collaborationStore?: CollaborationStore): Promise<UserIdentity | null> {

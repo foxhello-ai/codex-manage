@@ -127,6 +127,37 @@ export type SessionsResponse = {
   sessions: SessionSummary[];
 };
 
+export type TaskSummary = {
+  id: string;
+  name: string;
+  pinned: boolean;
+  sessionCount: number;
+  recentSessionId: string | null;
+  recentSessionTitle: string | null;
+  updatedAt: string;
+};
+
+export type TaskDetail = TaskSummary & {
+  sessions: SessionSummary[];
+};
+
+export type TasksResponse = {
+  tasks: TaskSummary[];
+};
+
+export type TaskDetailResponse = {
+  task: TaskDetail;
+};
+
+export type CreateTaskResponse = {
+  task: TaskSummary;
+};
+
+export type CreateTaskSessionResponse = CreateSessionResponse & {
+  task: TaskSummary;
+  contextPrompt: string;
+};
+
 export type SessionMetadataResponse = {
   session: SessionSummary;
 };

@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, Collaborator, CollaboratorsResponse, CreateCollaboratorResponse, CreateSessionResponse, HealthStatus, InputResponse, LoginAccountsResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionBranchMode, SessionBranchResponse, SessionCommandsResponse, SessionDetailResponse, SessionHistoryContinuationResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, UpdateModelSelectionInput, UserSession } from "./models";
+import type { ApiErrorBody, ApprovalDecision, ApprovalResponse, Collaborator, CollaboratorsResponse, CreateCollaboratorResponse, CreateSessionResponse, CreateTaskResponse, CreateTaskSessionResponse, HealthStatus, InputResponse, LoginAccountsResponse, ModelCatalogResponse, ModelSelectionResponse, PublicConfig, RuntimeReloadResponse, RuntimeResponse, SessionBranchMode, SessionBranchResponse, SessionCommandsResponse, SessionDetailResponse, SessionHistoryContinuationResponse, SessionMetadataResponse, SessionPermissionMode, SessionsResponse, TaskDetailResponse, TasksResponse, UpdateModelSelectionInput, UserSession } from "./models";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -81,6 +81,30 @@ export function createSession(cwd: string): Promise<CreateSessionResponse> {
     method: "POST",
     body: JSON.stringify({ cwd })
   });
+}
+
+export function getTasks(): Promise<TasksResponse> {
+  return apiRequest<TasksResponse>("/api/tasks");
+}
+
+export function createTask(name: string): Promise<CreateTaskResponse> {
+  return apiRequest<CreateTaskResponse>("/api/tasks", { method: "POST", body: JSON.stringify({ name }) });
+}
+
+export function getTask(taskId: string): Promise<TaskDetailResponse> {
+  return apiRequest<TaskDetailResponse>(`/api/tasks/${encodeURIComponent(taskId)}`);
+}
+
+export function updateTask(taskId: string, input: { name?: string; pinned?: boolean }): Promise<TaskDetailResponse> {
+  return apiRequest<TaskDetailResponse>(`/api/tasks/${encodeURIComponent(taskId)}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function attachSessionToTask(taskId: string, sessionId: string): Promise<TaskDetailResponse> {
+  return apiRequest<TaskDetailResponse>(`/api/tasks/${encodeURIComponent(taskId)}/sessions/${encodeURIComponent(sessionId)}`, { method: "POST", body: JSON.stringify({}) });
+}
+
+export function createTaskSession(taskId: string, cwd: string): Promise<CreateTaskSessionResponse> {
+  return apiRequest<CreateTaskSessionResponse>(`/api/tasks/${encodeURIComponent(taskId)}/sessions`, { method: "POST", body: JSON.stringify({ cwd }) });
 }
 
 export function getCollaborators(): Promise<CollaboratorsResponse> {

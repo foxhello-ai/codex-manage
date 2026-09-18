@@ -18,6 +18,7 @@ import { ModelCatalogService } from "./services/ModelCatalogService";
 import { SessionModelService } from "./services/SessionModelService";
 import { registerStaticClient } from "./staticClient";
 import { CollaborationStore } from "./services/CollaborationStore";
+import { TaskStore } from "./services/TaskStore";
 
 const config = loadConfig();
 
@@ -31,6 +32,7 @@ const collaborationStore = new CollaborationStore(
   config.collaborationFile ?? ".codex-manage/collaboration.json",
   { displayName: config.ownerName, localEmail: config.ownerEmail }
 );
+const taskStore = new TaskStore(`${config.metadataFile}.tasks.json`);
 const modelCatalog = new ModelCatalogService(runtime.appServer);
 let runtimeReloadRetryAttempt = 0;
 let runtimeReloadRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -64,7 +66,7 @@ registerCollaborationRoutes(app, collaborationStore);
 registerConfigRoutes(app, config, () => runtime.getSnapshot());
 registerModelRoutes(app, modelCatalog);
 registerRuntimeRoutes(app, runtime, modelCatalog);
-registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager, sessionModelService, collaborationStore);
+registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager, sessionModelService, collaborationStore, taskStore);
 
 if (process.env.NODE_ENV === "production") {
   await registerStaticClient(app, config.clientDir);
