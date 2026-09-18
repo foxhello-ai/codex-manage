@@ -115,6 +115,7 @@ function summarizeTask(task: StoredTask, sessions: SessionSummary[]): TaskSummar
     id: task.id,
     name: task.name,
     pinned: task.pinned,
+    sessionIds: [...task.sessionIds],
     sessionCount: task.sessionIds.length,
     recentSessionId: recent?.id ?? null,
     recentSessionTitle: recent?.title ?? null,

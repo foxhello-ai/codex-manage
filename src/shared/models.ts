@@ -131,6 +131,7 @@ export type TaskSummary = {
   id: string;
   name: string;
   pinned: boolean;
+  sessionIds: string[];
   sessionCount: number;
   recentSessionId: string | null;
   recentSessionTitle: string | null;

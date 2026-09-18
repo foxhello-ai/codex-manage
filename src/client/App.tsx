@@ -11,7 +11,7 @@ import { clearBootstrapSession, readBootstrapSession, writeBootstrapSession } fr
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
 type DashboardView = "list" | "settings" | "members" | "detail" | "invalid";
-type SessionListMode = "workspace" | "recent";
+type SessionListMode = "workspace" | "task" | "recent";
 
 type LiveCommand = {
   id: string;
@@ -245,6 +245,7 @@ function Dashboard({
   const [createTaskSessionTask, setCreateTaskSessionTask] = useState<TaskSummary | null>(null);
   const [createTaskSessionHistory, setCreateTaskSessionHistory] = useState<SessionSummary[]>([]);
   const [loadingCreateTaskSession, setLoadingCreateTaskSession] = useState(false);
+  const [sessionListMode, setSessionListMode] = useState<SessionListMode>("workspace");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null
   );
@@ -1071,6 +1072,11 @@ function Dashboard({
     applySessionRoute({ kind: "detail", sessionId: session.id });
   }
 
+  function handleSelectTaskSession(session: SessionSummary) {
+    setSessionListMode("task");
+    handleSelectSession(session);
+  }
+
   async function handleCreateSession(workspace: string) {
     if (user.role !== "owner" || creatingSessionWorkspace) return;
     setCreatingSessionWorkspace(workspace);
@@ -1446,6 +1452,7 @@ function Dashboard({
     return (
       <SessionBrowser
         sessions={sessions}
+        tasks={tasks}
         search={search}
         loadingSessions={loadingSessions}
         sessionError={sessionError}
@@ -1454,6 +1461,8 @@ function Dashboard({
         onSearchChange={setSearch}
         onSearchSubmit={handleSearchSubmit}
         onSelect={handleSelectSession}
+        mode={sessionListMode}
+        onModeChange={setSessionListMode}
         onMetadataSaved={handleMetadataSaved}
         onCreateSession={user.role === "owner" ? handleCreateSession : undefined}
         creatingSessionWorkspace={creatingSessionWorkspace}
@@ -1522,10 +1531,11 @@ function Dashboard({
                 setLoadingCreateTaskSession(false);
               }
             }}
-            onSelectSession={handleSelectSession}
+            onSelectSession={handleSelectTaskSession}
           />
           <DesktopWorkspaceHome
             sessions={sessions}
+            tasks={tasks}
             search={search}
             loadingSessions={loadingSessions}
             sessionError={sessionError}
@@ -1533,6 +1543,8 @@ function Dashboard({
             onSearchChange={setSearch}
             onSearchSubmit={handleSearchSubmit}
             onSelect={handleSelectSession}
+            mode={sessionListMode}
+            onModeChange={setSessionListMode}
             onMetadataSaved={handleMetadataSaved}
             onCreateSession={user.role === "owner" ? handleCreateSession : undefined}
             creatingSessionWorkspace={creatingSessionWorkspace}
@@ -1727,6 +1739,7 @@ function Dashboard({
             <MobileSessionDrawer
               isOwner={user.role === "owner"}
               sessions={sessions}
+              tasks={tasks}
               selectedSessionId={selectedSessionId}
               search={search}
               loading={loadingSessions}
@@ -1738,6 +1751,8 @@ function Dashboard({
               onSearchChange={setSearch}
               onSearchSubmit={handleSearchSubmit}
               onSelect={handleSelectSession}
+              mode={sessionListMode}
+              onModeChange={setSessionListMode}
               onMetadataSaved={handleMetadataSaved}
               onCreateSession={user.role === "owner" ? handleCreateSession : undefined}
               creatingSessionWorkspace={creatingSessionWorkspace}
@@ -3736,6 +3751,7 @@ function CreateTaskSessionDialog({
 
 function DesktopWorkspaceHome({
   sessions,
+  tasks,
   search,
   loadingSessions,
   sessionError,
@@ -3743,12 +3759,15 @@ function DesktopWorkspaceHome({
   onSearchChange,
   onSearchSubmit,
   onSelect,
+  mode,
+  onModeChange,
   onMetadataSaved,
   onCreateSession,
   creatingSessionWorkspace,
   createSessionError
 }: {
   sessions: SessionSummary[];
+  tasks: TaskSummary[];
   search: string;
   loadingSessions: boolean;
   sessionError: string | null;
@@ -3756,6 +3775,8 @@ function DesktopWorkspaceHome({
   onSearchChange: (value: string) => void;
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSelect: (session: SessionSummary) => void;
+  mode: SessionListMode;
+  onModeChange: (mode: SessionListMode) => void;
   onMetadataSaved: (session: SessionSummary) => void;
   onCreateSession?: (workspace: string) => Promise<void>;
   creatingSessionWorkspace?: string | null;
@@ -3772,6 +3793,7 @@ function DesktopWorkspaceHome({
           </div>
           <SessionBrowser
             sessions={sessions}
+            tasks={tasks}
             search={search}
             loadingSessions={loadingSessions}
             sessionError={sessionError}
@@ -3780,6 +3802,8 @@ function DesktopWorkspaceHome({
             onSearchChange={onSearchChange}
             onSearchSubmit={onSearchSubmit}
             onSelect={onSelect}
+            mode={mode}
+            onModeChange={onModeChange}
             onMetadataSaved={onMetadataSaved}
             onCreateSession={onCreateSession}
             creatingSessionWorkspace={creatingSessionWorkspace}
@@ -3889,6 +3913,7 @@ function RecentSessions({
 
 function SessionBrowser({
   sessions,
+  tasks,
   search,
   loadingSessions,
   sessionError,
@@ -3897,12 +3922,15 @@ function SessionBrowser({
   onSearchChange,
   onSearchSubmit,
   onSelect,
+  mode,
+  onModeChange,
   onMetadataSaved,
   onCreateSession,
   creatingSessionWorkspace,
   createSessionError
 }: {
   sessions: SessionSummary[];
+  tasks: TaskSummary[];
   search: string;
   loadingSessions: boolean;
   sessionError: string | null;
@@ -3911,13 +3939,25 @@ function SessionBrowser({
   onSearchChange: (value: string) => void;
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSelect: (session: SessionSummary) => void;
+  mode: SessionListMode;
+  onModeChange: (mode: SessionListMode) => void;
   onMetadataSaved: (session: SessionSummary) => void;
   onCreateSession?: (workspace: string) => Promise<void>;
   creatingSessionWorkspace?: string | null;
   createSessionError?: string | null;
 }) {
   const workspaceFilterId = `session-workspace-filter-${showHeading ? "mobile" : "desktop"}`;
-  const [mode, setMode] = useState<SessionListMode>("workspace");
+
+  const workspaceTab = (
+    <button className={mode === "workspace" ? "active" : ""} type="button" role="tab" aria-selected={mode === "workspace"} onClick={() => onModeChange("workspace")}>
+      按项目目录
+    </button>
+  );
+  const taskTab = (
+    <button className={mode === "task" ? "active" : ""} type="button" role="tab" aria-selected={mode === "task"} onClick={() => onModeChange("task")}>
+      按任务
+    </button>
+  );
 
   return (
     <>
@@ -3942,21 +3982,14 @@ function SessionBrowser({
       </div>
 
       <div className="sessionViewTabs" role="tablist" aria-label="会话列表视图">
-        <button
-          className={mode === "workspace" ? "active" : ""}
-          type="button"
-          role="tab"
-          aria-selected={mode === "workspace"}
-          onClick={() => setMode("workspace")}
-        >
-          按项目目录
-        </button>
+        {mode === "task" ? taskTab : workspaceTab}
+        {mode === "task" ? workspaceTab : taskTab}
         <button
           className={mode === "recent" ? "active" : ""}
           type="button"
           role="tab"
           aria-selected={mode === "recent"}
-          onClick={() => setMode("recent")}
+          onClick={() => onModeChange("recent")}
         >
           最近 10 个
         </button>
@@ -3972,6 +4005,7 @@ function SessionBrowser({
           selectedSessionId={selectedSessionId}
           workspaceFilterId={workspaceFilterId}
           mode={mode}
+          tasks={tasks}
           onSelect={onSelect}
           onMetadataSaved={onMetadataSaved}
           onCreateSession={onCreateSession}
@@ -3985,6 +4019,7 @@ function SessionBrowser({
 function MobileSessionDrawer({
   isOwner,
   sessions,
+  tasks,
   selectedSessionId,
   search,
   loading,
@@ -3996,6 +4031,8 @@ function MobileSessionDrawer({
   onSearchChange,
   onSearchSubmit,
   onSelect,
+  mode,
+  onModeChange,
   onMetadataSaved,
   onCreateSession,
   creatingSessionWorkspace,
@@ -4003,6 +4040,7 @@ function MobileSessionDrawer({
 }: {
   isOwner: boolean;
   sessions: SessionSummary[];
+  tasks: TaskSummary[];
   selectedSessionId: string | null;
   search: string;
   loading: boolean;
@@ -4014,6 +4052,8 @@ function MobileSessionDrawer({
   onSearchChange: (value: string) => void;
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSelect: (session: SessionSummary) => void;
+  mode: SessionListMode;
+  onModeChange: (mode: SessionListMode) => void;
   onMetadataSaved: (session: SessionSummary) => void;
   onCreateSession?: (workspace: string) => Promise<void>;
   creatingSessionWorkspace?: string | null;
@@ -4044,6 +4084,7 @@ function MobileSessionDrawer({
       <div className="mobileDrawerSessionBrowser">
         <SessionBrowser
           sessions={sessions}
+          tasks={tasks}
           search={search}
           loadingSessions={loading}
           sessionError={error}
@@ -4052,6 +4093,8 @@ function MobileSessionDrawer({
           onSearchChange={onSearchChange}
           onSearchSubmit={onSearchSubmit}
           onSelect={onSelect}
+          mode={mode}
+          onModeChange={onModeChange}
           onMetadataSaved={onMetadataSaved}
           onCreateSession={onCreateSession}
           creatingSessionWorkspace={creatingSessionWorkspace}
@@ -4112,6 +4155,7 @@ function sortSessionsByWorkspace(sessions: SessionSummary[]): SessionSummary[] {
 
 function SessionList({
   sessions,
+  tasks,
   selectedSessionId,
   workspaceFilterId,
   mode,
@@ -4121,6 +4165,7 @@ function SessionList({
   creatingSessionWorkspace
 }: {
   sessions: SessionSummary[];
+  tasks: TaskSummary[];
   selectedSessionId: string | null;
   workspaceFilterId: string;
   mode: SessionListMode;
@@ -4135,6 +4180,19 @@ function SessionList({
   const orderedSessions = useMemo(() => sortSessionsByWorkspace(sessions), [sessions]);
   const groups = useMemo(() => groupSessionsByWorkspace(orderedSessions), [orderedSessions]);
   const recentSessions = useMemo(() => sortSessionsByUpdatedAt(sessions).slice(0, 10), [sessions]);
+  const taskGroups = useMemo(() => {
+    const sessionMap = new Map(sessions.map((session) => [session.id, session]));
+    const assigned = new Set<string>();
+    const groups = tasks.map((task) => {
+      const taskSessions = task.sessionIds
+        .map((sessionId) => sessionMap.get(sessionId))
+        .filter((session): session is SessionSummary => Boolean(session));
+      taskSessions.forEach((session) => assigned.add(session.id));
+      return { task, sessions: sortSessionsByUpdatedAt(taskSessions) };
+    }).filter((group) => group.sessions.length > 0);
+    const unassigned = sortSessionsByUpdatedAt(sessions.filter((session) => !assigned.has(session.id)));
+    return { groups, unassigned };
+  }, [sessions, tasks]);
   const activeWorkspace = groups.some((group) => group.workspace === selectedWorkspace)
     ? selectedWorkspace
     : groups[0]?.workspace ?? "";
@@ -4266,6 +4324,35 @@ function SessionList({
               />
             ))}
           </div>
+        </section>
+      ) : null}
+
+      {mode === "task" ? (
+        <section className="taskSessionGroups" aria-label="按任务查看会话">
+          {taskGroups.groups.map(({ task, sessions: taskSessions }) => (
+            <section className="sessionWorkspaceGroup" key={task.id} aria-label={`${task.name} 的会话`}>
+              <div className="workspaceGroupHeader taskGroupHeader">
+                <h3>{task.name}</h3>
+                <span className="muted">{taskSessions.length} 个会话</span>
+              </div>
+              <div className="workspaceGroupList">
+                {taskSessions.map((session) => (
+                  <SessionItem key={session.id} session={session} selected={isSameSession(session, selectedSessionId)} onSelect={onSelect} onMetadataSaved={onMetadataSaved} />
+                ))}
+              </div>
+            </section>
+          ))}
+          {taskGroups.unassigned.length > 0 ? (
+            <section className="sessionWorkspaceGroup" aria-label="未归类会话">
+              <div className="workspaceGroupHeader taskGroupHeader"><h3>未归类会话</h3><span className="muted">{taskGroups.unassigned.length} 个会话</span></div>
+              <div className="workspaceGroupList">
+                {taskGroups.unassigned.map((session) => (
+                  <SessionItem key={session.id} session={session} selected={isSameSession(session, selectedSessionId)} onSelect={onSelect} onMetadataSaved={onMetadataSaved} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+          {taskGroups.groups.length === 0 && taskGroups.unassigned.length === 0 ? <div className="emptyState">暂无任务会话</div> : null}
         </section>
       ) : null}
     </div>
