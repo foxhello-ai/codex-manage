@@ -240,6 +240,8 @@ function Dashboard({
   const [createSessionError, setCreateSessionError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [taskError, setTaskError] = useState<string | null>(null);
+  const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null
   );
@@ -1087,13 +1089,20 @@ function Dashboard({
   }
 
   async function handleCreateTask() {
-    const name = window.prompt("任务名称");
-    if (!name?.trim()) return;
+    setCreateTaskDialogOpen(true);
+  }
+
+  async function handleSubmitCreateTask(name: string) {
+    if (!name.trim() || creatingTask) return;
+    setCreatingTask(true);
     try {
       const response = await createTask(name);
       setTasks((current) => [response.task, ...current]);
+      setCreateTaskDialogOpen(false);
     } catch (caught) {
       setTaskError(caught instanceof Error ? caught.message : "任务创建失败");
+    } finally {
+      setCreatingTask(false);
     }
   }
 
@@ -1717,6 +1726,14 @@ function Dashboard({
             />
           </aside>
         </div>
+      ) : null}
+
+      {createTaskDialogOpen ? (
+        <CreateTaskDialog
+          submitting={creatingTask}
+          onCancel={() => { if (!creatingTask) setCreateTaskDialogOpen(false); }}
+          onSubmit={handleSubmitCreateTask}
+        />
       ) : null}
 
       {viewMode === "detail" && selectedSession ? (
@@ -3258,6 +3275,55 @@ function MessageDetailDialog({ message, onClose }: { message: { title: string; t
         <div className="dialogBody">
           <MarkdownContent text={message.text || "无内容"} />
         </div>
+      </section>
+    </div>
+  );
+}
+
+function CreateTaskDialog({
+  submitting,
+  onCancel,
+  onSubmit
+}: {
+  submitting: boolean;
+  onCancel: () => void;
+  onSubmit: (name: string) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape" && !submitting) onCancel();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel, submitting]);
+
+  return (
+    <div className="modalBackdrop taskDialogBackdrop" role="presentation" onMouseDown={(event) => {
+      if (event.currentTarget === event.target) onCancel();
+    }}>
+      <section className="taskCreateDialog" role="dialog" aria-modal="true" aria-labelledby="create-task-title">
+        <div className="dialogHeader">
+          <div>
+            <p className="dialogEyebrow">TASKS</p>
+            <h2 id="create-task-title">新建任务</h2>
+          </div>
+          <button className="iconButton" type="button" aria-label="关闭新建任务弹框" title="关闭" onClick={onCancel} disabled={submitting}>×</button>
+        </div>
+        <form onSubmit={(event) => { event.preventDefault(); void onSubmit(name); }}>
+          <label className="taskDialogLabel" htmlFor="create-task-name">任务名称</label>
+          <input ref={inputRef} id="create-task-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="例如：实现文件上传能力" autoComplete="off" />
+          <div className="dialogActions">
+            <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
+            <button className="primaryButton" type="submit" disabled={submitting || !name.trim()}>{submitting ? "创建中…" : "创建任务"}</button>
+          </div>
+        </form>
       </section>
     </div>
   );

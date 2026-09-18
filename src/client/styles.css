@@ -8637,8 +8637,11 @@ textarea::placeholder {
 .taskPanel {
   margin: 1rem 1.25rem 0;
   padding: 1rem;
-  border: 1px solid var(--border, #d9dee7);
-  background: var(--surface, #fff);
+  border: 1px solid #3d3d42;
+  border-radius: 14px;
+  color: #f5f5f7;
+  background: #232325;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 14%);
 }
 
 .taskPanelHeader, .taskCardTitle {
@@ -8648,13 +8651,36 @@ textarea::placeholder {
   gap: .75rem;
 }
 
-.taskPanelHeader h2 { margin: .15rem 0 0; }
+.taskPanelHeader h2 { margin: .15rem 0 0; color: #f5f5f7; }
 .taskGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .75rem; margin-top: .75rem; }
-.taskCard { border: 1px solid var(--border, #d9dee7); padding: .8rem; background: var(--surface-subtle, #f8fafc); }
+.taskCard { border: 1px solid #3d3d42; border-radius: 10px; padding: .8rem; background: #2a2a2d; }
 .taskCard.pinned { border-color: #d69e2e; }
-.taskCard small { display: block; color: var(--muted, #64748b); margin: .45rem 0 .7rem; }
+.taskCard small { display: block; color: #a1a1a8; margin: .45rem 0 .7rem; }
 .taskCardActions { display: flex; flex-wrap: wrap; gap: .45rem; }
 .taskNameButton { min-height: auto; padding: 0; color: inherit; background: transparent; text-align: left; }
 .taskSessionDetails { display: grid; gap: .35rem; margin: .4rem 0 .7rem; }
-.taskSessionLink { min-height: auto; padding: .45rem; color: #1769aa; background: #eef6fd; text-align: left; }
+.taskSessionLink { min-height: auto; padding: .45rem; border: 1px solid #505057; color: #f5f5f7; background: #303034; text-align: left; }
 .taskSessionLink small { margin: .15rem 0 0; }
+
+.taskDialogBackdrop { z-index: 30; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+.taskCreateDialog { width: min(100%, 440px); border: 1px solid #505057; border-radius: 16px; padding: 20px; color: #f5f5f7; background: #232325; box-shadow: 0 24px 70px rgb(0 0 0 / 42%); }
+.taskCreateDialog .dialogHeader { margin: -20px -20px 18px; padding: 16px 20px; border-bottom: 1px solid #3d3d42; }
+.taskCreateDialog h2 { margin: 4px 0 0; color: #f5f5f7; font-size: 1.1rem; }
+.dialogEyebrow { margin: 0; color: #32d158; font-size: .7rem; font-weight: 800; letter-spacing: .12em; }
+.taskDialogLabel { display: block; margin-bottom: 7px; color: #d1d1d6; font-size: .82rem; font-weight: 700; }
+.taskCreateDialog input { min-height: 46px; border: 1px solid #66666d; border-radius: 9px; padding: 0 12px; color: #f5f5f7; background: #18181a; outline: none; }
+.taskCreateDialog input:focus { border-color: #0a84ff; box-shadow: 0 0 0 3px rgb(10 132 255 / 24%); }
+.taskCreateDialog input::placeholder { color: #77777f; }
+.taskCreateDialog .dialogActions { justify-content: flex-end; margin-top: 18px; }
+
+@media (max-width: 767px) {
+  .taskPanel { margin: .75rem 0 0; padding: .85rem; border-radius: 12px; }
+  .taskPanelHeader { align-items: flex-start; }
+  .taskGrid { grid-template-columns: 1fr; }
+  .taskCardActions { display: grid; grid-template-columns: 1fr; }
+  .taskCardActions button { width: 100%; }
+  .taskCreateDialog { width: min(100%, 420px); padding: 16px; border-radius: 14px; }
+  .taskCreateDialog .dialogHeader { margin: -16px -16px 16px; padding: 14px 16px; }
+  .taskCreateDialog .dialogActions { display: grid; grid-template-columns: 1fr 1fr; }
+  .taskCreateDialog .dialogActions button { width: 100%; }
+}
