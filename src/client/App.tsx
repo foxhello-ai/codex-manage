@@ -3467,12 +3467,29 @@ function TaskPanel({
   const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
   const [attachTask, setAttachTask] = useState<TaskSummary | null>(null);
   const [attachSessionId, setAttachSessionId] = useState("");
+  const [openTask, setOpenTask] = useState<TaskSummary | null>(null);
+  const [openTaskSessions, setOpenTaskSessions] = useState<SessionSummary[]>([]);
+  const [loadingOpenTask, setLoadingOpenTask] = useState(false);
   const sessionMap = new Map(sessions.map((session) => [session.id, session]));
   async function toggleTask(task: TaskSummary) {
     if (expandedTaskId === task.id) { setExpandedTaskId(null); return; }
     setExpandedTaskId(task.id);
     setLoadingTaskId(task.id);
     try { setTaskDetail((await getTask(task.id)).task); } finally { setLoadingTaskId(null); }
+  }
+
+  async function openTaskSession(task: TaskSummary, recent: SessionSummary | null) {
+    if (task.sessionCount <= 1 && recent) {
+      onSelectSession(recent);
+      return;
+    }
+    setOpenTask(task);
+    setLoadingOpenTask(true);
+    try {
+      setOpenTaskSessions((await getTask(task.id)).task.sessions);
+    } finally {
+      setLoadingOpenTask(false);
+    }
   }
   return (
     <>
@@ -3491,7 +3508,7 @@ function TaskPanel({
               <small>{task.sessionCount} 个会话{recent ? ` · 最近：${recent.title}` : ""}</small>
               {expandedTaskId === task.id ? <div className="taskSessionDetails">{loadingTaskId === task.id ? <span className="muted">正在加载任务会话…</span> : taskDetail?.sessions.map((session) => <button className="taskSessionLink" type="button" key={session.id} onClick={() => onSelectSession(session)}>{session.title}<small>{session.updatedAt}</small></button>)}</div> : null}
               <div className="taskCardActions">
-                {recent ? <button className="taskRecentButton" type="button" onClick={() => onSelectSession(recent)}><span>打开最近会话</span><small>{recent.title}</small></button> : null}
+                {recent ? <button className="taskRecentButton" type="button" onClick={() => void openTaskSession(task, recent)}><span>{task.sessionCount > 1 ? "选择会话打开" : "打开会话"}</span><small>{task.sessionCount > 1 ? `共 ${task.sessionCount} 个会话` : recent.title}</small></button> : null}
                 <button className="ghostButton" type="button" onClick={() => { setAttachTask(task); setAttachSessionId(""); }} disabled={!sessions.length}>选择会话归入</button>
                 <button className="ghostButton" type="button" onClick={() => void onCreateSession(task)} disabled={!sessions.length}>新建任务会话</button>
               </div>
@@ -3513,6 +3530,15 @@ function TaskPanel({
           await onAttachSession(attachTask, selected);
           setAttachTask(null);
         }}
+      />
+    ) : null}
+    {openTask ? (
+      <SessionOpenDialog
+        task={openTask}
+        sessions={openTaskSessions}
+        loading={loadingOpenTask}
+        onCancel={() => setOpenTask(null)}
+        onOpen={(session) => { setOpenTask(null); onSelectSession(session); }}
       />
     ) : null}
     </>
@@ -3555,6 +3581,51 @@ function SessionAttachDialog({
         <div className="dialogActions">
           <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
           <button className="primaryButton" type="button" disabled={!selectedSessionId || submitting} onClick={async () => { setSubmitting(true); try { await onSubmit(); } finally { setSubmitting(false); } }}>{submitting ? "归入中…" : "归入任务"}</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SessionOpenDialog({
+  task,
+  sessions,
+  loading,
+  onCancel,
+  onOpen
+}: {
+  task: TaskSummary;
+  sessions: SessionSummary[];
+  loading: boolean;
+  onCancel: () => void;
+  onOpen: (session: SessionSummary) => void;
+}) {
+  const [selectedSessionId, setSelectedSessionId] = useState("");
+  const selected = sessions.find((session) => session.id === selectedSessionId);
+  return (
+    <div className="modalBackdrop taskDialogBackdrop" role="presentation" onMouseDown={(event) => {
+      if (event.currentTarget === event.target) onCancel();
+    }}>
+      <section className="taskCreateDialog sessionAttachDialog" role="dialog" aria-modal="true" aria-labelledby="open-session-title">
+        <div className="dialogHeader">
+          <div>
+            <p className="dialogEyebrow">{task.name}</p>
+            <h2 id="open-session-title">选择要打开的会话</h2>
+          </div>
+          <button className="iconButton" type="button" aria-label="关闭会话选择弹框" title="关闭" onClick={onCancel}>×</button>
+        </div>
+        {loading ? <p className="muted">正在加载任务会话…</p> : (
+          <>
+            <label className="taskDialogLabel" htmlFor="open-task-session-select">会话</label>
+            <select id="open-task-session-select" value={selectedSessionId} onChange={(event) => setSelectedSessionId(event.target.value)} autoFocus>
+              <option value="">请选择一个会话</option>
+              {sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.workspace}</option>)}
+            </select>
+          </>
+        )}
+        <div className="dialogActions">
+          <button className="ghostButton" type="button" onClick={onCancel}>取消</button>
+          <button className="primaryButton" type="button" disabled={!selected} onClick={() => { if (selected) onOpen(selected); }}>打开会话</button>
         </div>
       </section>
     </div>
