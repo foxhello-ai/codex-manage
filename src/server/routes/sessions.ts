@@ -186,6 +186,7 @@ export function registerSessionRoutes(
       const task = await taskStore.get(params.data.id, sessions);
       if (!task) return sendError(reply, 404, "TASK_NOT_FOUND", "任务不存在");
       const contextPrompt = buildTaskContextPrompt(task.name, task.sessions);
+      await mkdir(body.data.cwd, { recursive: true });
       const result = await runtimeManager.startThread(body.data.cwd);
       const runtime = await runtimeManager.sendInput(result.threadId, { text: contextPrompt });
       await taskStore.addSession(task.id, result.threadId);

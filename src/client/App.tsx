@@ -242,6 +242,9 @@ function Dashboard({
   const [taskError, setTaskError] = useState<string | null>(null);
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [createTaskSessionTask, setCreateTaskSessionTask] = useState<TaskSummary | null>(null);
+  const [createTaskSessionHistory, setCreateTaskSessionHistory] = useState<SessionSummary[]>([]);
+  const [loadingCreateTaskSession, setLoadingCreateTaskSession] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null
   );
@@ -1124,9 +1127,7 @@ function Dashboard({
     }
   }
 
-  async function handleCreateTaskSession(task: TaskSummary) {
-    const workspace = sessions.find((session) => session.id === task.recentSessionId)?.workspace ?? sessions[0]?.workspace;
-    if (!workspace) return;
+  async function handleCreateTaskSession(task: TaskSummary, workspace: string) {
     try {
       const response = await createTaskSession(task.id, workspace);
       setTasks((current) => current.map((item) => item.id === task.id ? response.task : item));
@@ -1502,7 +1503,27 @@ function Dashboard({
         <ChildAccessPage sessions={sessions} loading={loadingSessions} error={sessionError} onSelect={handleSelectSession} />
       ) : viewMode === "list" ? (
         <>
-          <TaskPanel tasks={tasks} sessions={sessions} error={taskError} onCreate={handleCreateTask} onTogglePin={handleToggleTask} onAttachSession={handleAttachSession} onCreateSession={handleCreateTaskSession} onSelectSession={handleSelectSession} />
+          <TaskPanel
+            tasks={tasks}
+            sessions={sessions}
+            error={taskError}
+            onCreate={handleCreateTask}
+            onTogglePin={handleToggleTask}
+            onAttachSession={handleAttachSession}
+            onCreateSession={async (task) => {
+              setCreateTaskSessionTask(task);
+              setLoadingCreateTaskSession(true);
+              try {
+                setCreateTaskSessionHistory((await getTask(task.id)).task.sessions);
+              } catch (caught) {
+                setTaskError(caught instanceof Error ? caught.message : "任务项目目录加载失败");
+                setCreateTaskSessionTask(null);
+              } finally {
+                setLoadingCreateTaskSession(false);
+              }
+            }}
+            onSelectSession={handleSelectSession}
+          />
           <DesktopWorkspaceHome
             sessions={sessions}
             search={search}
@@ -1731,6 +1752,19 @@ function Dashboard({
           submitting={creatingTask}
           onCancel={() => { if (!creatingTask) setCreateTaskDialogOpen(false); }}
           onSubmit={handleSubmitCreateTask}
+        />
+      ) : null}
+
+      {createTaskSessionTask ? (
+        <CreateTaskSessionDialog
+          task={createTaskSessionTask}
+          history={createTaskSessionHistory}
+          loading={loadingCreateTaskSession}
+          onCancel={() => setCreateTaskSessionTask(null)}
+          onSubmit={async (workspace) => {
+            await handleCreateTaskSession(createTaskSessionTask, workspace);
+            setCreateTaskSessionTask(null);
+          }}
         />
       ) : null}
 
@@ -3510,7 +3544,7 @@ function TaskPanel({
               <div className="taskCardActions">
                 {recent ? <button className="taskRecentButton" type="button" onClick={() => void openTaskSession(task, recent)}><span>{task.sessionCount > 1 ? "选择会话打开" : "打开会话"}</span><small>{task.sessionCount > 1 ? `共 ${task.sessionCount} 个会话` : recent.title}</small></button> : null}
                 <button className="ghostButton" type="button" onClick={() => { setAttachTask(task); setAttachSessionId(""); }} disabled={!sessions.length}>选择会话归入</button>
-                <button className="ghostButton" type="button" onClick={() => void onCreateSession(task)} disabled={!sessions.length}>新建任务会话</button>
+                <button className="ghostButton" type="button" onClick={() => void onCreateSession(task)}>新建任务会话</button>
               </div>
             </article>;
           })}
@@ -3626,6 +3660,74 @@ function SessionOpenDialog({
         <div className="dialogActions">
           <button className="ghostButton" type="button" onClick={onCancel}>取消</button>
           <button className="primaryButton" type="button" disabled={!selected} onClick={() => { if (selected) onOpen(selected); }}>打开会话</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CreateTaskSessionDialog({
+  task,
+  history,
+  loading,
+  onCancel,
+  onSubmit
+}: {
+  task: TaskSummary;
+  history: SessionSummary[];
+  loading: boolean;
+  onCancel: () => void;
+  onSubmit: (workspace: string) => Promise<void>;
+}) {
+  const workspaces = [...new Set(history.map((session) => session.workspace).filter(Boolean))];
+  const recentWorkspace = history.find((session) => session.id === task.recentSessionId)?.workspace ?? workspaces[0] ?? "";
+  const [mode, setMode] = useState(recentWorkspace ? "recent" : "new");
+  const [workspace, setWorkspace] = useState(recentWorkspace);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (mode === "recent") setWorkspace(recentWorkspace);
+  }, [mode, recentWorkspace]);
+
+  const canSubmit = !loading && !submitting && workspace.trim().length > 0;
+  return (
+    <div className="modalBackdrop taskDialogBackdrop" role="presentation" onMouseDown={(event) => {
+      if (event.currentTarget === event.target && !submitting) onCancel();
+    }}>
+      <section className="taskCreateDialog sessionAttachDialog" role="dialog" aria-modal="true" aria-labelledby="create-task-session-title">
+        <div className="dialogHeader">
+          <div>
+            <p className="dialogEyebrow">{task.name}</p>
+            <h2 id="create-task-session-title">选择项目目录</h2>
+          </div>
+          <button className="iconButton" type="button" aria-label="关闭项目目录选择弹框" title="关闭" onClick={onCancel} disabled={submitting}>×</button>
+        </div>
+        {loading ? <p className="muted">正在加载任务历史…</p> : (
+          <>
+            <div className="taskDirectoryOptions">
+              <label className={`taskDirectoryOption${mode === "recent" ? " selected" : ""}`}>
+                <input type="radio" name="task-directory-mode" checked={mode === "recent"} onChange={() => setMode("recent")} disabled={!recentWorkspace} />
+                <span><strong>使用最近会话目录</strong><small>{recentWorkspace || "暂无历史目录"}</small></span>
+              </label>
+              {workspaces.filter((item) => item !== recentWorkspace).map((item) => (
+                <label className={`taskDirectoryOption${mode === item ? " selected" : ""}`} key={item}>
+                  <input type="radio" name="task-directory-mode" checked={mode === item} onChange={() => { setMode(item); setWorkspace(item); }} />
+                  <span><strong>使用历史会话目录</strong><small>{item}</small></span>
+                </label>
+              ))}
+              <label className={`taskDirectoryOption${mode === "new" ? " selected" : ""}`}>
+                <input type="radio" name="task-directory-mode" checked={mode === "new"} onChange={() => { setMode("new"); setWorkspace(""); }} />
+                <span><strong>输入新的项目目录</strong><small>目录不存在时会自动创建</small></span>
+              </label>
+            </div>
+            {mode === "new" ? (
+              <label className="taskDialogLabel" htmlFor="new-task-workspace">项目目录<input id="new-task-workspace" value={workspace} onChange={(event) => setWorkspace(event.target.value)} placeholder="例如：/workspace/my-project" autoFocus /></label>
+            ) : <p className="taskDirectorySelected">将使用：<code>{workspace}</code></p>}
+          </>
+        )}
+        <div className="dialogActions">
+          <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
+          <button className="primaryButton" type="button" disabled={!canSubmit} onClick={async () => { setSubmitting(true); try { await onSubmit(workspace.trim()); } finally { setSubmitting(false); } }}>{submitting ? "创建中…" : "创建任务会话"}</button>
         </div>
       </section>
     </div>

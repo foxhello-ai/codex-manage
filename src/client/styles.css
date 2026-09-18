@@ -8677,6 +8677,15 @@ textarea::placeholder {
 .taskCreateDialog input::placeholder { color: #77777f; }
 .taskCreateDialog select { width: 100%; min-height: 46px; border: 1px solid #66666d; border-radius: 9px; padding: 0 12px; color: #f5f5f7; background: #18181a; outline: none; }
 .taskCreateDialog select:focus { border-color: #0a84ff; box-shadow: 0 0 0 3px rgb(10 132 255 / 24%); }
+.taskDirectoryOptions { display: grid; gap: 8px; margin-bottom: 14px; }
+.taskDirectoryOption { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 9px; border: 1px solid #3d3d42; border-radius: 9px; padding: 10px; color: #d1d1d6; background: #2a2a2d; cursor: pointer; }
+.taskDirectoryOption.selected { border-color: #0a84ff; background: #25364a; }
+.taskDirectoryOption input { width: auto; min-height: 18px; margin: 2px 0 0; accent-color: #0a84ff; }
+.taskDirectoryOption span { min-width: 0; display: grid; gap: 3px; }
+.taskDirectoryOption strong { font-size: .8rem; }
+.taskDirectoryOption small { overflow-wrap: anywhere; color: #a1a1a8; font-size: .72rem; line-height: 1.4; }
+.taskDirectorySelected { margin: 0 0 14px; color: #a1a1a8; font-size: .78rem; }
+.taskDirectorySelected code { color: #f5f5f7; overflow-wrap: anywhere; }
 .taskCreateDialog .dialogActions { justify-content: flex-end; margin-top: 18px; }
 
 @media (max-width: 767px) {
@@ -8690,6 +8699,7 @@ textarea::placeholder {
   .taskCreateDialog .dialogHeader { margin: -16px -16px 16px; padding: 14px 16px; }
   .taskCreateDialog .dialogActions { display: grid; grid-template-columns: 1fr 1fr; }
   .taskCreateDialog .dialogActions button { width: 100%; }
+  .taskDirectoryOption { padding: 9px; }
 }
 
 @media (min-width: 768px) {
