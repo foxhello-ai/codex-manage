@@ -8684,3 +8684,14 @@ textarea::placeholder {
   .taskCreateDialog .dialogActions { display: grid; grid-template-columns: 1fr 1fr; }
   .taskCreateDialog .dialogActions button { width: 100%; }
 }
+
+@media (min-width: 768px) {
+  .appShell.desktopWorkspaceShell .taskPanel {
+    margin: 0;
+    padding: 8px 16px 10px;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
