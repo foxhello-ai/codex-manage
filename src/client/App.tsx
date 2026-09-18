@@ -1115,11 +1115,9 @@ function Dashboard({
     }
   }
 
-  async function handleAttachSession(task: TaskSummary) {
-    const selected = selectedSessionIdRef.current;
-    if (!selected) return;
+  async function handleAttachSession(task: TaskSummary, selected: SessionSummary) {
     try {
-      const response = await attachSessionToTask(task.id, selected);
+      const response = await attachSessionToTask(task.id, selected.id);
       setTasks((current) => current.map((item) => item.id === task.id ? response.task : item));
     } catch (caught) {
       setTaskError(caught instanceof Error ? caught.message : "会话归属任务失败");
@@ -3460,13 +3458,15 @@ function TaskPanel({
   error: string | null;
   onCreate: () => Promise<void>;
   onTogglePin: (task: TaskSummary) => Promise<void>;
-  onAttachSession: (task: TaskSummary) => Promise<void>;
+  onAttachSession: (task: TaskSummary, session: SessionSummary) => Promise<void>;
   onCreateSession: (task: TaskSummary) => Promise<void>;
   onSelectSession: (session: SessionSummary) => void;
 }) {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
   const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
+  const [attachTask, setAttachTask] = useState<TaskSummary | null>(null);
+  const [attachSessionId, setAttachSessionId] = useState("");
   const sessionMap = new Map(sessions.map((session) => [session.id, session]));
   async function toggleTask(task: TaskSummary) {
     if (expandedTaskId === task.id) { setExpandedTaskId(null); return; }
@@ -3475,6 +3475,7 @@ function TaskPanel({
     try { setTaskDetail((await getTask(task.id)).task); } finally { setLoadingTaskId(null); }
   }
   return (
+    <>
     <section className="taskPanel" aria-labelledby="task-panel-title">
       <div className="taskPanelHeader">
         <div><p className="workspaceWelcomeEyebrow">TASKS</p><h2 id="task-panel-title">任务</h2></div>
@@ -3490,8 +3491,8 @@ function TaskPanel({
               <small>{task.sessionCount} 个会话{recent ? ` · 最近：${recent.title}` : ""}</small>
               {expandedTaskId === task.id ? <div className="taskSessionDetails">{loadingTaskId === task.id ? <span className="muted">正在加载任务会话…</span> : taskDetail?.sessions.map((session) => <button className="taskSessionLink" type="button" key={session.id} onClick={() => onSelectSession(session)}>{session.title}<small>{session.updatedAt}</small></button>)}</div> : null}
               <div className="taskCardActions">
-                {recent ? <button className="ghostButton" type="button" onClick={() => onSelectSession(recent)}>打开最近会话</button> : null}
-                <button className="ghostButton" type="button" onClick={() => void onAttachSession(task)} disabled={!sessions.length}>归入当前会话</button>
+                {recent ? <button className="taskRecentButton" type="button" onClick={() => onSelectSession(recent)}><span>打开最近会话</span><small>{recent.title}</small></button> : null}
+                <button className="ghostButton" type="button" onClick={() => { setAttachTask(task); setAttachSessionId(""); }} disabled={!sessions.length}>选择会话归入</button>
                 <button className="ghostButton" type="button" onClick={() => void onCreateSession(task)} disabled={!sessions.length}>新建任务会话</button>
               </div>
             </article>;
@@ -3499,6 +3500,64 @@ function TaskPanel({
         </div>
       )}
     </section>
+    {attachTask ? (
+      <SessionAttachDialog
+        task={attachTask}
+        sessions={sessions}
+        selectedSessionId={attachSessionId}
+        onSelect={setAttachSessionId}
+        onCancel={() => setAttachTask(null)}
+        onSubmit={async () => {
+          const selected = sessions.find((session) => session.id === attachSessionId);
+          if (!selected) return;
+          await onAttachSession(attachTask, selected);
+          setAttachTask(null);
+        }}
+      />
+    ) : null}
+    </>
+  );
+}
+
+function SessionAttachDialog({
+  task,
+  sessions,
+  selectedSessionId,
+  onSelect,
+  onCancel,
+  onSubmit
+}: {
+  task: TaskSummary;
+  sessions: SessionSummary[];
+  selectedSessionId: string;
+  onSelect: (sessionId: string) => void;
+  onCancel: () => void;
+  onSubmit: () => Promise<void>;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  return (
+    <div className="modalBackdrop taskDialogBackdrop" role="presentation" onMouseDown={(event) => {
+      if (event.currentTarget === event.target && !submitting) onCancel();
+    }}>
+      <section className="taskCreateDialog sessionAttachDialog" role="dialog" aria-modal="true" aria-labelledby="attach-session-title">
+        <div className="dialogHeader">
+          <div>
+            <p className="dialogEyebrow">{task.name}</p>
+            <h2 id="attach-session-title">选择要归入的会话</h2>
+          </div>
+          <button className="iconButton" type="button" aria-label="关闭会话选择弹框" title="关闭" onClick={onCancel} disabled={submitting}>×</button>
+        </div>
+        <label className="taskDialogLabel" htmlFor="task-session-select">会话</label>
+        <select id="task-session-select" value={selectedSessionId} onChange={(event) => onSelect(event.target.value)} autoFocus>
+          <option value="">请选择一个会话</option>
+          {sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.workspace}</option>)}
+        </select>
+        <div className="dialogActions">
+          <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
+          <button className="primaryButton" type="button" disabled={!selectedSessionId || submitting} onClick={async () => { setSubmitting(true); try { await onSubmit(); } finally { setSubmitting(false); } }}>{submitting ? "归入中…" : "归入任务"}</button>
+        </div>
+      </section>
+    </div>
   );
 }
 

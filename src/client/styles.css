@@ -8657,6 +8657,10 @@ textarea::placeholder {
 .taskCard.pinned { border-color: #d69e2e; }
 .taskCard small { display: block; color: #a1a1a8; margin: .45rem 0 .7rem; }
 .taskCardActions { display: flex; flex-wrap: wrap; gap: .45rem; }
+.taskRecentButton { min-height: 44px; display: grid; gap: 2px; max-width: 220px; border: 1px solid #505057; border-radius: 9px; padding: 6px 10px; color: #f5f5f7; background: #303034; text-align: left; }
+.taskRecentButton span { font-size: .8rem; font-weight: 700; }
+.taskRecentButton small { min-width: 0; overflow: hidden; margin: 0; color: #a1a1a8; font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.taskRecentButton:hover { border-color: #707078; background: #3a3a3f; }
 .taskNameButton { min-height: auto; padding: 0; color: inherit; background: transparent; text-align: left; }
 .taskSessionDetails { display: grid; gap: .35rem; margin: .4rem 0 .7rem; }
 .taskSessionLink { min-height: auto; padding: .45rem; border: 1px solid #505057; color: #f5f5f7; background: #303034; text-align: left; }
@@ -8671,6 +8675,8 @@ textarea::placeholder {
 .taskCreateDialog input { min-height: 46px; border: 1px solid #66666d; border-radius: 9px; padding: 0 12px; color: #f5f5f7; background: #18181a; outline: none; }
 .taskCreateDialog input:focus { border-color: #0a84ff; box-shadow: 0 0 0 3px rgb(10 132 255 / 24%); }
 .taskCreateDialog input::placeholder { color: #77777f; }
+.taskCreateDialog select { width: 100%; min-height: 46px; border: 1px solid #66666d; border-radius: 9px; padding: 0 12px; color: #f5f5f7; background: #18181a; outline: none; }
+.taskCreateDialog select:focus { border-color: #0a84ff; box-shadow: 0 0 0 3px rgb(10 132 255 / 24%); }
 .taskCreateDialog .dialogActions { justify-content: flex-end; margin-top: 18px; }
 
 @media (max-width: 767px) {
@@ -8679,6 +8685,7 @@ textarea::placeholder {
   .taskGrid { grid-template-columns: 1fr; }
   .taskCardActions { display: grid; grid-template-columns: 1fr; }
   .taskCardActions button { width: 100%; }
+  .taskRecentButton { width: 100%; max-width: none; }
   .taskCreateDialog { width: min(100%, 420px); padding: 16px; border-radius: 14px; }
   .taskCreateDialog .dialogHeader { margin: -16px -16px 16px; padding: 14px 16px; }
   .taskCreateDialog .dialogActions { display: grid; grid-template-columns: 1fr 1fr; }
