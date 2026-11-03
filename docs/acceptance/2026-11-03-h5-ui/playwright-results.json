@@ -1,0 +1,3070 @@
+{
+  "config": {
+    "argv": [
+      "/Users/fumingzhen/.nvm/versions/node/v22.22.0/bin/node",
+      "/Volumes/T7/project/project_fmzh/2026/codex-manage/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "playwright.ui.config.ts"
+    ],
+    "configFile": "/Volumes/T7/project/project_fmzh/2026/codex-manage/playwright.ui.config.ts",
+    "rootDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-320",
+        "name": "mobile-320",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-375",
+        "name": "mobile-375",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-390",
+        "name": "mobile-390",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-430",
+        "name": "mobile-430",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "landscape-736",
+        "name": "landscape-736",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "landscape-844",
+        "name": "landscape-844",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "desktop",
+        "name": "desktop",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report/ui",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "docs/acceptance/2026-11-03-h5-ui/playwright-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 2,
+    "webServer": {
+      "command": "npx vite preview --host 127.0.0.1 --port 4317 --strictPort",
+      "url": "http://127.0.0.1:4317",
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "h5-ui.e2e.ts",
+      "file": "h5-ui.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "three list views, search, rename and ordinary directory selection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6055,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:02.212Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-1dcd72674bee70cd522f",
+          "file": "h5-ui.e2e.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "task grouping, pin, attach, and recent/history/manual task directories",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3234,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:13.623Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-3f32e7f0cb46f8149619",
+          "file": "h5-ui.e2e.ts",
+          "line": 73,
+          "column": 1
+        },
+        {
+          "title": "full replies, local code scrolling, process collapse and stable history reading",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5831,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:16.886Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-d1373b42759cd3611b38",
+          "file": "h5-ui.e2e.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4581,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:22.738Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-12790b8fda6f0b00236a",
+          "file": "h5-ui.e2e.ts",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "approval accept preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2357,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:27.339Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-54d5dbceb2b3c5c557a8",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2041,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:29.723Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-3e432ea45dccc9cf9a21",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval decline preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2238,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:31.789Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-5f75b62e147a72812b7b",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval cancel preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1879,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:34.046Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-c04b8bb74db06365563d",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1558,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:35.948Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-73a776a1eef2799ce0b3",
+          "file": "h5-ui.e2e.ts",
+          "line": 242,
+          "column": 1
+        },
+        {
+          "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2184,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:37.543Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-819120e91abcc43ae8ca",
+          "file": "h5-ui.e2e.ts",
+          "line": 262,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1816,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:39.747Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-5e04ec955e4840de7076",
+          "file": "h5-ui.e2e.ts",
+          "line": 310,
+          "column": 1
+        },
+        {
+          "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-320",
+              "projectName": "mobile-320",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1019,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:41.585Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-32750d6376c4c85255c0",
+          "file": "h5-ui.e2e.ts",
+          "line": 327,
+          "column": 1
+        },
+        {
+          "title": "three list views, search, rename and ordinary directory selection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 6195,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:02.207Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-f018be21b30f86bb8304",
+          "file": "h5-ui.e2e.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "task grouping, pin, attach, and recent/history/manual task directories",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 3193,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:13.753Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-4ef3b3562b296e38ac6d",
+          "file": "h5-ui.e2e.ts",
+          "line": 73,
+          "column": 1
+        },
+        {
+          "title": "full replies, local code scrolling, process collapse and stable history reading",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4734,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:16.974Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-24e4c5ebf07433bf3acc",
+          "file": "h5-ui.e2e.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4187,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:21.727Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-c14c3645c120b9877fbe",
+          "file": "h5-ui.e2e.ts",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "approval accept preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2470,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:25.953Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-b57ec1a7fcb58c29238c",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1986,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:28.467Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-e3b2254d9e4e8df813dc",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval decline preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2004,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:30.476Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-c9132c9884d6ce2933ed",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval cancel preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1918,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:32.502Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-a1b3b5a511604475311d",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1394,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:34.446Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-b08b263f57eb218d566b",
+          "file": "h5-ui.e2e.ts",
+          "line": 242,
+          "column": 1
+        },
+        {
+          "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2366,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:35.869Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-5d3d457f68155d470f61",
+          "file": "h5-ui.e2e.ts",
+          "line": 262,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1693,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:38.260Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-3c7185032976401f8645",
+          "file": "h5-ui.e2e.ts",
+          "line": 310,
+          "column": 1
+        },
+        {
+          "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1186,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:39.980Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-996688d996b62a810776",
+          "file": "h5-ui.e2e.ts",
+          "line": 327,
+          "column": 1
+        },
+        {
+          "title": "three list views, search, rename and ordinary directory selection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 3245,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:43.148Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-211e9a7bf3f28d9d2d63",
+          "file": "h5-ui.e2e.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "task grouping, pin, attach, and recent/history/manual task directories",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4249,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:46.781Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-470cdadb54a4f4c6b97e",
+          "file": "h5-ui.e2e.ts",
+          "line": 73,
+          "column": 1
+        },
+        {
+          "title": "full replies, local code scrolling, process collapse and stable history reading",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 6348,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:51.069Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-4f60cddafb37cb3a1baf",
+          "file": "h5-ui.e2e.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4462,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:57.435Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-d3e229ed0bcc77095851",
+          "file": "h5-ui.e2e.ts",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "approval accept preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2570,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:01.918Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-9209290bb7c873a1ad4e",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1771,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:04.511Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-27b77f5adcbd4d391a47",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval decline preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2023,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:06.318Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-80c815265cff2c3f812f",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval cancel preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1735,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:08.363Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-dd9152c6c1a66f5f49de",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1402,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:10.128Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-149e479fe923af3a2fd1",
+          "file": "h5-ui.e2e.ts",
+          "line": 242,
+          "column": 1
+        },
+        {
+          "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1982,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:11.559Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-8123034ed8c811206d3d",
+          "file": "h5-ui.e2e.ts",
+          "line": 262,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1702,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:13.563Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-c87c165ddcc6323b9b5f",
+          "file": "h5-ui.e2e.ts",
+          "line": 310,
+          "column": 1
+        },
+        {
+          "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1106,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:15.286Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-9bd80a7d9b3a719709b1",
+          "file": "h5-ui.e2e.ts",
+          "line": 327,
+          "column": 1
+        },
+        {
+          "title": "three list views, search, rename and ordinary directory selection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3410,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:44.765Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-2c1bdd8a8e39ff540b58",
+          "file": "h5-ui.e2e.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "task grouping, pin, attach, and recent/history/manual task directories",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4034,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:48.786Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-e6c057a543ef0fb64a1c",
+          "file": "h5-ui.e2e.ts",
+          "line": 73,
+          "column": 1
+        },
+        {
+          "title": "full replies, local code scrolling, process collapse and stable history reading",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6281,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:52.874Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-8b99c094de7c7479c98c",
+          "file": "h5-ui.e2e.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4651,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:25:59.191Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-8527bd0db60b2df9bd7c",
+          "file": "h5-ui.e2e.ts",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "approval accept preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2280,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:03.887Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-24fed846820bada5974c",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1988,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:06.195Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-ff6742d967fb1ad7ea12",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval decline preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1818,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:08.203Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-8abc631aa760b1d0d63d",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval cancel preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1900,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:10.072Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-953b900460cd007311ac",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1468,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:11.992Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-d5a039790b2c415edb65",
+          "file": "h5-ui.e2e.ts",
+          "line": 242,
+          "column": 1
+        },
+        {
+          "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1882,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:13.488Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-1d1ee797afd8f0b7cc9f",
+          "file": "h5-ui.e2e.ts",
+          "line": 262,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1714,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:15.392Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-8de3748697bbdcbf94a1",
+          "file": "h5-ui.e2e.ts",
+          "line": 310,
+          "column": 1
+        },
+        {
+          "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-430",
+              "projectName": "mobile-430",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 982,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:17.130Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-7a32becb8a6350199a19",
+          "file": "h5-ui.e2e.ts",
+          "line": 327,
+          "column": 1
+        },
+        {
+          "title": "three list views, search, rename and ordinary directory selection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2620,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:18.357Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-48c2306eda47be6ca11e",
+          "file": "h5-ui.e2e.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "task grouping, pin, attach, and recent/history/manual task directories",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 3714,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:21.381Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-3c9d2b21f99ce2b30e59",
+          "file": "h5-ui.e2e.ts",
+          "line": 73,
+          "column": 1
+        },
+        {
+          "title": "full replies, local code scrolling, process collapse and stable history reading",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 5165,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:25.129Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-eb74ae64cc54a4672879",
+          "file": "h5-ui.e2e.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4695,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:30.319Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-c678246656eb43309a19",
+          "file": "h5-ui.e2e.ts",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "approval accept preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2262,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:35.042Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-9ee83b63fe6324a81060",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2059,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:37.326Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-c8f6ae843cd3cb5409fd",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval decline preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2136,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:39.419Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-dd5765126ba06cc5a347",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval cancel preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1890,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:41.588Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-fbe83c354c5e36b7bf56",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1492,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:43.510Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-247bb09a2b8dd429c969",
+          "file": "h5-ui.e2e.ts",
+          "line": 242,
+          "column": 1
+        },
+        {
+          "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2179,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:45.037Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-295b6e439ccd20749a54",
+          "file": "h5-ui.e2e.ts",
+          "line": 262,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1615,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:47.240Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-7f44d6287564a490be68",
+          "file": "h5-ui.e2e.ts",
+          "line": 310,
+          "column": 1
+        },
+        {
+          "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1123,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:48.884Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-98765094d344fe8c5d8c",
+          "file": "h5-ui.e2e.ts",
+          "line": 327,
+          "column": 1
+        },
+        {
+          "title": "three list views, search, rename and ordinary directory selection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3536,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:20.375Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-31bd437a798e3008f696",
+          "file": "h5-ui.e2e.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "task grouping, pin, attach, and recent/history/manual task directories",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3480,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:24.398Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-38455aa48fcb31c5fe01",
+          "file": "h5-ui.e2e.ts",
+          "line": 73,
+          "column": 1
+        },
+        {
+          "title": "full replies, local code scrolling, process collapse and stable history reading",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5305,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:27.918Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-15f71fa79999f65b9250",
+          "file": "h5-ui.e2e.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4317,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:33.251Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-713a69b07b0b7b3a06a8",
+          "file": "h5-ui.e2e.ts",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "approval accept preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2223,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:37.612Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-600fa7179e4da47530ac",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1915,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:39.858Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-dc2c668e8106128db1cf",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval decline preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1870,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:41.805Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-2fdb2a3d63b348c13c6a",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval cancel preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1920,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:43.710Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-21caad81628ad5f1e8b1",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1435,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:45.656Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-d899cb18e24a90f76b3b",
+          "file": "h5-ui.e2e.ts",
+          "line": 242,
+          "column": 1
+        },
+        {
+          "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1797,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:47.109Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-53589b8f239d65620b60",
+          "file": "h5-ui.e2e.ts",
+          "line": 262,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1733,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:48.926Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-f6579bdcddd494670003",
+          "file": "h5-ui.e2e.ts",
+          "line": 310,
+          "column": 1
+        },
+        {
+          "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1019,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:50.682Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-8cbcd24976795e93586a",
+          "file": "h5-ui.e2e.ts",
+          "line": 327,
+          "column": 1
+        },
+        {
+          "title": "three list views, search, rename and ordinary directory selection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2682,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:51.905Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-14f79a0aa75db4ad9e57",
+          "file": "h5-ui.e2e.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "task grouping, pin, attach, and recent/history/manual task directories",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2683,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:54.945Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-cd967f98512ce85ba713",
+          "file": "h5-ui.e2e.ts",
+          "line": 73,
+          "column": 1
+        },
+        {
+          "title": "full replies, local code scrolling, process collapse and stable history reading",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4061,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:26:57.649Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-d3e200e6ea47e908ea4c",
+          "file": "h5-ui.e2e.ts",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 3426,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:27:01.726Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-e8b0285b4d5438bbadb5",
+          "file": "h5-ui.e2e.ts",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "approval accept preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1751,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:27:05.175Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-2eb8e49a3d4d0aae1b43",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1449,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:27:06.945Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-da07efb18d79fbdcc6de",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval decline preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1461,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:27:08.416Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-395f4f1229fea525f3c9",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "approval cancel preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1437,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:27:09.893Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-b76b7a39fa19b7fc37f8",
+          "file": "h5-ui.e2e.ts",
+          "line": 216,
+          "column": 3
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1206,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:27:11.347Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-ad22464b2e4cdf769bae",
+          "file": "h5-ui.e2e.ts",
+          "line": 242,
+          "column": 1
+        },
+        {
+          "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "Mobile visual viewport simulation only",
+                  "location": {
+                    "file": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui/h5-ui.e2e.ts",
+                    "line": 263,
+                    "column": 8
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "skipped",
+                  "duration": 199,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:27:12.572Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Mobile visual viewport simulation only",
+                      "location": {
+                        "file": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui/h5-ui.e2e.ts",
+                        "line": 263,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-6e6694b542f0741be716",
+          "file": "h5-ui.e2e.ts",
+          "line": 262,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1473,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:27:12.788Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-234edd01a5309208756f",
+          "file": "h5-ui.e2e.ts",
+          "line": 310,
+          "column": 1
+        },
+        {
+          "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 917,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T07:27:14.275Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-dca7b860ca546122c4cf",
+          "file": "h5-ui.e2e.ts",
+          "line": 327,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-03T07:24:55.013Z",
+    "duration": 140300.66400000002,
+    "expected": 83,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
