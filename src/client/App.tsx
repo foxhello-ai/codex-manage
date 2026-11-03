@@ -1,7 +1,9 @@
-import { CSSProperties, ChangeEvent, ClipboardEvent, FormEvent, Fragment, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, ChangeEvent, ClipboardEvent, FormEvent, Fragment, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ApiRequestError, attachSessionToTask, branchSession, continueSessionFromHistory, createCollaborator, createSession, createTask, createTaskSession, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, getTask, getTasks, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel, updateTask, uploadSessionAttachment, type UploadedSessionAttachment } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionBranchMode, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, TaskDetail, TaskSummary, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
 import { ModelSelector } from "./ModelSelector";
+import { BottomSheet } from "./BottomSheet";
+import { useVisualViewport } from "./useVisualViewport";
 import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
 import { findRetryContextForTurn, findRetryContextFromFailedTurns, isCommentaryPhase, isFinalAnswerPhase, isTaskSendShortcut, isUnmaterializedThreadHistoryError, type RetryContext } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
@@ -55,6 +57,7 @@ type SendInputOptions = {
 
 
 export function App() {
+  useVisualViewport();
   const [bootstrapSession] = useState(() => readBootstrapSession());
   const [loadState, setLoadState] = useState<LoadState>(bootstrapSession ? "ready" : "loading");
   const [session, setSession] = useState<UserSession | null>(bootstrapSession);
@@ -237,6 +240,7 @@ function Dashboard({
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [creatingSessionWorkspace, setCreatingSessionWorkspace] = useState<string | null>(null);
+  const [createSessionDirectory, setCreateSessionDirectory] = useState<string | null>(null);
   const [createSessionError, setCreateSessionError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [taskError, setTaskError] = useState<string | null>(null);
@@ -245,7 +249,7 @@ function Dashboard({
   const [createTaskSessionTask, setCreateTaskSessionTask] = useState<TaskSummary | null>(null);
   const [createTaskSessionHistory, setCreateTaskSessionHistory] = useState<SessionSummary[]>([]);
   const [loadingCreateTaskSession, setLoadingCreateTaskSession] = useState(false);
-  const [sessionListMode, setSessionListMode] = useState<SessionListMode>("workspace");
+  const [sessionListMode, setSessionListMode] = useState<SessionListMode>("recent");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null
   );
@@ -1090,6 +1094,7 @@ function Dashboard({
       const path = buildSessionDetailPath(response.threadId);
       if (window.location.pathname !== path) window.history.pushState(null, "", path);
       applySessionRoute({ kind: "detail", sessionId: response.threadId });
+      setCreateSessionDirectory(null);
     } catch (caught) {
       setCreateSessionError(caught instanceof Error ? caught.message : "新会话创建失败");
     } finally {
@@ -1098,6 +1103,7 @@ function Dashboard({
   }
 
   async function handleCreateTask() {
+    setTaskError(null);
     setCreateTaskDialogOpen(true);
   }
 
@@ -1130,6 +1136,7 @@ function Dashboard({
       setTasks((current) => current.map((item) => item.id === task.id ? response.task : item));
     } catch (caught) {
       setTaskError(caught instanceof Error ? caught.message : "会话归属任务失败");
+      throw caught;
     }
   }
 
@@ -1141,6 +1148,7 @@ function Dashboard({
       handleSelectSession(response.session);
     } catch (caught) {
       setTaskError(caught instanceof Error ? caught.message : "任务会话创建失败");
+      throw caught;
     }
   }
 
@@ -1448,6 +1456,39 @@ function Dashboard({
     applySessionRoute({ kind: "members" });
   }
 
+  function requestCreateSession(workspace: string) {
+    setCreateSessionError(null);
+    setCreateSessionDirectory(workspace);
+    return Promise.resolve();
+  }
+
+  function renderTaskPanel() {
+    return (
+      <TaskPanel
+            tasks={tasks}
+            sessions={sessions}
+            error={taskError}
+            onCreate={handleCreateTask}
+            onTogglePin={handleToggleTask}
+            onAttachSession={handleAttachSession}
+            onCreateSession={async (task) => {
+              setCreateTaskSessionHistory([]);
+              setCreateTaskSessionTask(task);
+              setLoadingCreateTaskSession(true);
+              try {
+                setCreateTaskSessionHistory((await getTask(task.id)).task.sessions);
+              } catch (caught) {
+                setTaskError(caught instanceof Error ? caught.message : "任务项目目录加载失败");
+                setCreateTaskSessionTask(null);
+              } finally {
+                setLoadingCreateTaskSession(false);
+              }
+            }}
+            onSelectSession={handleSelectTaskSession}
+          />
+    );
+  }
+
   function renderSessionBrowser(showHeading = true) {
     return (
       <SessionBrowser
@@ -1458,13 +1499,14 @@ function Dashboard({
         sessionError={sessionError}
         selectedSessionId={selectedSessionId}
         showHeading={showHeading}
+        taskPanel={user.role === "owner" ? renderTaskPanel() : undefined}
         onSearchChange={setSearch}
         onSearchSubmit={handleSearchSubmit}
         onSelect={handleSelectSession}
         mode={sessionListMode}
         onModeChange={setSessionListMode}
         onMetadataSaved={handleMetadataSaved}
-        onCreateSession={user.role === "owner" ? handleCreateSession : undefined}
+        onCreateSession={user.role === "owner" ? requestCreateSession : undefined}
         creatingSessionWorkspace={creatingSessionWorkspace}
         createSessionError={createSessionError}
       />
@@ -1512,28 +1554,10 @@ function Dashboard({
         <ChildAccessPage sessions={sessions} loading={loadingSessions} error={sessionError} onSelect={handleSelectSession} />
       ) : viewMode === "list" ? (
         <>
-          <TaskPanel
-            tasks={tasks}
-            sessions={sessions}
-            error={taskError}
-            onCreate={handleCreateTask}
-            onTogglePin={handleToggleTask}
-            onAttachSession={handleAttachSession}
-            onCreateSession={async (task) => {
-              setCreateTaskSessionTask(task);
-              setLoadingCreateTaskSession(true);
-              try {
-                setCreateTaskSessionHistory((await getTask(task.id)).task.sessions);
-              } catch (caught) {
-                setTaskError(caught instanceof Error ? caught.message : "任务项目目录加载失败");
-                setCreateTaskSessionTask(null);
-              } finally {
-                setLoadingCreateTaskSession(false);
-              }
-            }}
-            onSelectSession={handleSelectTaskSession}
-          />
-          <DesktopWorkspaceHome
+          {compactViewport ? (
+            <section className="mobileDashboardHome" aria-label="会话管理">{renderSessionBrowser()}</section>
+          ) : <DesktopWorkspaceHome
+            taskPanel={renderTaskPanel()}
             sessions={sessions}
             tasks={tasks}
             search={search}
@@ -1546,36 +1570,11 @@ function Dashboard({
             mode={sessionListMode}
             onModeChange={setSessionListMode}
             onMetadataSaved={handleMetadataSaved}
-            onCreateSession={user.role === "owner" ? handleCreateSession : undefined}
+            onCreateSession={user.role === "owner" ? requestCreateSession : undefined}
             creatingSessionWorkspace={creatingSessionWorkspace}
             createSessionError={createSessionError}
-          />
+          />}
 
-          <div className="mobileDashboardHome">
-            <section className="mobileDashboardWelcome workspaceWelcome" aria-labelledby="mobile-workspace-welcome-title">
-              <p className="workspaceWelcomeEyebrow">CODEX MANAGE</p>
-              <h2 id="mobile-workspace-welcome-title">选择一个会话开始工作</h2>
-              <p className="workspaceWelcomeDescription">从侧边栏浏览、搜索并继续本机 Codex 会话。打开后，任务进度与输入框会保留在此工作区。</p>
-
-              {loadingSessions ? <div className="workspaceWelcomeLoading" role="status">正在准备你的工作台…</div> : null}
-              {!loadingSessions && sessionError ? <div className="workspaceWelcomeHint">会话暂时无法加载，请点击刷新重试。</div> : null}
-              {!loadingSessions && !sessionError && sessions.length === 0 ? (
-                <div className="workspaceWelcomeHint">还没有可显示的会话。请先在 Codex CLI 中创建会话，再返回这里刷新。</div>
-              ) : null}
-              {!loadingSessions && !sessionError ? (
-                <RecentSessions
-                  sessions={sessions}
-                  onSelect={handleSelectSession}
-                  onOpenDrawer={(trigger) => {
-                    drawerTriggerRef.current = trigger;
-                    setDrawerOpen(true);
-                  }}
-                  onRefresh={() => loadSessions(search)}
-                  refreshing={loadingSessions}
-                />
-              ) : null}
-            </section>
-          </div>
         </>
       ) : viewMode === "detail" ? (
         <ResizableWorkspaceLayout
@@ -1738,6 +1737,7 @@ function Dashboard({
           >
             <MobileSessionDrawer
               isOwner={user.role === "owner"}
+              taskPanel={user.role === "owner" ? renderTaskPanel() : undefined}
               sessions={sessions}
               tasks={tasks}
               selectedSessionId={selectedSessionId}
@@ -1754,7 +1754,7 @@ function Dashboard({
               mode={sessionListMode}
               onModeChange={setSessionListMode}
               onMetadataSaved={handleMetadataSaved}
-              onCreateSession={user.role === "owner" ? handleCreateSession : undefined}
+              onCreateSession={user.role === "owner" ? requestCreateSession : undefined}
               creatingSessionWorkspace={creatingSessionWorkspace}
               createSessionError={createSessionError}
             />
@@ -1762,9 +1762,21 @@ function Dashboard({
         </div>
       ) : null}
 
+      {createSessionDirectory !== null ? (
+        <CreateSessionDialog
+          workspaces={[...new Set(sessions.map((item) => item.workspace).filter((path) => path.trim()))]}
+          initialWorkspace={createSessionDirectory}
+          submitting={Boolean(creatingSessionWorkspace)}
+          error={createSessionError}
+          onClose={() => setCreateSessionDirectory(null)}
+          onSubmit={handleCreateSession}
+        />
+      ) : null}
+
       {createTaskDialogOpen ? (
         <CreateTaskDialog
           submitting={creatingTask}
+          error={taskError}
           onCancel={() => { if (!creatingTask) setCreateTaskDialogOpen(false); }}
           onSubmit={handleSubmitCreateTask}
         />
@@ -1814,10 +1826,10 @@ const DEFAULT_VISIBLE_GROUP_SESSIONS = 5;
 const MAX_LIVE_COMMAND_OUTPUT_CHARS = 12000;
 
 function useCompactViewport() {
-  const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+  const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 767px), (max-height: 500px) and (pointer: coarse)").matches);
 
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 767px)");
+    const query = window.matchMedia("(max-width: 767px), (max-height: 500px) and (pointer: coarse)");
     const update = () => setCompact(query.matches);
     update();
     query.addEventListener("change", update);
@@ -2300,7 +2312,6 @@ function SessionDetailPanel({
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
   const session = detail ?? fallbackSession;
-  const [expandedMessage, setExpandedMessage] = useState<{ title: string; text: string; meta?: string } | null>(null);
   const [copiedSessionId, setCopiedSessionId] = useState(false);
   const [visibleTurnCount, setVisibleTurnCount] = useState(DEFAULT_VISIBLE_TURNS);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
@@ -2359,6 +2370,17 @@ function SessionDetailPanel({
     updateTimelineScrollState();
   }, [liveTimeline, liveMessages, liveCommands, liveErrors]);
 
+  useEffect(() => {
+    const element = timelineScrollRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => {
+      if (timelineAtLatestRef.current) element.scrollTop = element.scrollHeight;
+      updateTimelineScrollState();
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [session.id]);
+
   function updateTimelineScrollState() {
     const timelineScroll = timelineScrollRef.current;
     if (!timelineScroll) return;
@@ -2395,7 +2417,7 @@ function SessionDetailPanel({
       <div className="detailScrollContent">
         <div className="sessionHero sessionMetaStrip">
           <div className="sessionHeroContext">
-            <span className="sessionMetaLabel">当前项目</span>
+            <span className="sessionMetaLabel">工作目录</span>
             <strong title={session.workspace}>{workspaceDisplayName(session.workspace)}</strong>
           </div>
           <div className="sessionHeroMeta" aria-label="会话元信息">
@@ -2456,7 +2478,6 @@ function SessionDetailPanel({
                 }
                 setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS);
               }}
-              onOpenMessage={setExpandedMessage}
               liveMessages={liveMessages}
               liveCommands={liveCommands}
               liveErrors={liveErrors}
@@ -2473,7 +2494,6 @@ function SessionDetailPanel({
               detail={{ turns: [] }}
               visibleTurnCount={0}
               onLoadMore={() => undefined}
-              onOpenMessage={setExpandedMessage}
               liveMessages={liveMessages}
               liveCommands={liveCommands}
               liveErrors={liveErrors}
@@ -2502,12 +2522,12 @@ function SessionDetailPanel({
               <button
                 className="timelineScrollButton"
                 type="button"
-                aria-label="跳到会话底部"
-                title="跳到会话底部"
+                aria-label="回到最新"
+                title="回到最新"
                 onClick={() => scrollTimelineTo("bottom")}
                 disabled={!timelineScrollState.canScrollDown}
               >
-                <span aria-hidden="true">↓</span>
+                <span aria-hidden="true">↓</span><span>回到最新</span>
               </button>
             </div>
           ) : null}
@@ -2515,7 +2535,7 @@ function SessionDetailPanel({
       </div>
       <div className="composerDock">
         {sessionNotice ? <div className="successBanner composerWarning" role="status">{sessionNotice}</div> : null}
-        {runtimeError ? <div className="errorBanner composerWarning" role="alert">{runtimeError}</div> : null}
+        {runtimeError && !(timelineAtLatestRef.current && liveErrors.some((notice) => notice.message === runtimeError && visibleLiveTimeline.some((entry) => entry.kind === "error" && entry.id === notice.id))) ? <div className="errorBanner composerWarning" role="alert">{runtimeError}</div> : null}
         {runtime?.permissionMode === "full_access" && pendingApprovals.length > 0 ? (
           <div className="errorBanner composerWarning" role="alert">完全权限模式收到未预期的审批请求，系统未自动处理；你仍可拒绝或取消该请求。</div>
         ) : null}
@@ -2524,24 +2544,19 @@ function SessionDetailPanel({
           pendingCount={pendingApprovalCount}
           onSubmitApproval={onSubmitApproval}
         />
-        <TaskInput key={session.id} sessionId={session.id} workspace={session.workspace} runtime={runtime} onSend={handleSendInput} />
+        <div className="composerStatus" role="status"><StatusBadge status={runtime?.status ?? "history"} /><span>{runtimeStatusDescription(runtime?.status ?? "history", runtime?.activeTurnId)}</span></div>
+        <TaskInput key={session.id} sessionId={session.id} workspace={session.workspace} runtime={runtime} onSend={handleSendInput} controls={(
         <ComposerRuntimeBar
           runtime={runtime}
           modelState={modelState}
           permissionMode={permissionMode}
-          pendingApprovalCount={pendingApprovalCount}
           isChild={isChild}
           updatingModel={updatingModel}
           onPermissionModeChange={onPermissionModeChange}
-          onFocusApprovals={() => {
-            const approvalPanel = document.getElementById("session-approval-panel");
-            approvalPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
-            approvalPanel?.focus({ preventScroll: true });
-          }}
           onOpenModelPicker={() => onOpenModelPicker()}
         />
+        )} />
       </div>
-      {expandedMessage ? <MessageDetailDialog message={expandedMessage} onClose={() => setExpandedMessage(null)} /> : null}
     </div>
   );
 }
@@ -2550,20 +2565,16 @@ function ComposerRuntimeBar({
   runtime,
   modelState,
   permissionMode,
-  pendingApprovalCount,
   updatingModel,
   onPermissionModeChange,
-  onFocusApprovals,
   onOpenModelPicker,
   isChild
 }: {
   runtime: RuntimeSnapshot | null;
   modelState: SessionModelState;
   permissionMode: SessionPermissionMode;
-  pendingApprovalCount: number;
   updatingModel: boolean;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
-  onFocusApprovals: () => void;
   onOpenModelPicker: () => void;
   isChild: boolean;
 }) {
@@ -2594,64 +2605,22 @@ function ComposerRuntimeBar({
   }
 
   async function confirmPermissionMode() {
-    setConfirmFullAccess(false);
     await applyPermissionMode("full_access");
+    setConfirmFullAccess(false);
   }
 
   return (
     <>
-      <section
-        className={`composerRuntimeBar ${status}${pendingApprovalCount > 0 ? " hasApproval" : ""}`}
-        aria-label="当前运行状态、模型与权限"
-      >
-        <div className="composerRuntimeState" title={runtimeStatusDescription(status, runtime?.activeTurnId)}>
-          <span className="composerRuntimeDot" aria-hidden="true" />
-          <span>状态</span>
-          <strong>{runtimeStatusDescription(status, runtime?.activeTurnId)}</strong>
-        </div>
-        <div className="composerRuntimeModel" title={[model, effort].filter(Boolean).join(" · ") || "模型未识别"}>
-          <span>模型</span>
-          <strong>{model ?? "未识别"}</strong>
-          {effort ? <small>{effort}</small> : null}
-        </div>
-        {pendingApprovalCount > 0 ? (
-          <div className="composerRuntimeBadges">
-            <span className="approvalCount">待审批 {pendingApprovalCount}</span>
-          </div>
-        ) : null}
-        {isChild ? (
-          <span className="permissionBadge controlled">受控模式 · 原始 workspace</span>
-        ) : (
-          <button
-            className="ghostButton composerPermissionButton"
-            type="button"
-            onClick={handlePermissionToggle}
-            disabled={!canChangePermission || updatingPermission}
-            title={!canChangePermission ? "当前状态不可切换权限模式" : "切换权限模式"}
-          >
+      <div className="composerRuntimeControls">
+        <button className="ghostButton composerModelButton" type="button" onClick={onOpenModelPicker} disabled={Boolean(modelDisabledReason) || updatingModel} aria-label={`模型设置：${model ?? "跟随会话"}`} title={modelDisabledReason ?? [model ?? "跟随会话", effort].filter(Boolean).join(" · ")}>
+          <span>{updatingModel ? "切换中" : model ?? "跟随会话"}</span><span aria-hidden="true">⌄</span>
+        </button>
+        {isChild ? <span className="permissionBadge controlled">受控模式</span> : (
+          <button className={`ghostButton composerPermissionButton${permissionMode === "full_access" ? " fullAccess" : ""}`} type="button" onClick={handlePermissionToggle} disabled={!canChangePermission || updatingPermission} title={!canChangePermission ? "当前状态不可切换权限模式" : "切换权限模式"}>
             {updatingPermission ? "切换中" : permissionMode === "full_access" ? "完全权限" : "需审批"}
           </button>
         )}
-        {pendingApprovalCount > 0 ? (
-          <button
-            className="ghostButton composerApprovalButton"
-            type="button"
-            onClick={onFocusApprovals}
-            aria-label={`处理审批（${pendingApprovalCount}）`}
-          >
-            处理审批（{pendingApprovalCount}）
-          </button>
-        ) : null}
-        <button
-          className="ghostButton composerModelButton"
-          type="button"
-          onClick={onOpenModelPicker}
-          disabled={Boolean(modelDisabledReason) || updatingModel}
-          title={modelDisabledReason ?? "切换模型"}
-        >
-          {updatingModel ? "切换中" : <><span className="composerModelButtonLabel">模型选择</span><span className="composerModelButtonChevron" aria-hidden="true">›</span></>}
-        </button>
-      </section>
+      </div>
       {confirmFullAccess ? (
         <FullAccessConfirmDialog
           submitting={updatingPermission}
@@ -2663,229 +2632,94 @@ function ComposerRuntimeBar({
   );
 }
 
-function FullAccessConfirmDialog({
-  submitting,
-  onCancel,
-  onConfirm
-}: {
-  submitting: boolean;
-  onCancel: () => void;
-  onConfirm: () => Promise<void>;
-}) {
+function FullAccessConfirmDialog({ submitting, onCancel, onConfirm }: { submitting: boolean; onCancel: () => void; onConfirm: () => Promise<void> }) {
+  const [error, setError] = useState<string | null>(null);
   return (
-    <div className="modalBackdrop" role="presentation" onClick={submitting ? undefined : onCancel}>
-      <section className="messageDialog fullAccessDialog" role="dialog" aria-modal="true" aria-labelledby="full-access-title" onClick={(event) => event.stopPropagation()}>
-        <div className="dialogHeader">
-          <div>
-            <h2 id="full-access-title">启用完全权限</h2>
-            <p className="muted">当前会话</p>
-          </div>
-        </div>
-        <div className="dialogBody fullAccessDialogBody">
-          <div className="fullAccessWarning" role="alert">
-            <div className="fullAccessWarningHeading">
-              <span className="approvalAlertIcon" aria-hidden="true">!</span>
-              <strong>该会话将跳过审批。</strong>
-            </div>
-            <p>Codex 将以 Web 服务账号获得完整文件系统和网络访问权限。</p>
-          </div>
-          <div className="dialogActions">
-            <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
-            <button className="dangerButton" type="button" onClick={() => void onConfirm()} disabled={submitting}>{submitting ? "启用中" : "确认启用"}</button>
-          </div>
-        </div>
-      </section>
-    </div>
+    <BottomSheet title="启用完全权限" description="当前会话" onClose={onCancel} busy={submitting} actions={(
+      <><button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button><button className="dangerButton" type="button" onClick={() => void onConfirm().catch((caught) => setError(caught instanceof Error ? caught.message : "权限切换失败"))} disabled={submitting}>{submitting ? "启用中" : "确认启用"}</button></>
+    )}>
+      <div className="warning"><strong>该会话将跳过审批。</strong><p>Codex 将以 Web 服务账号获得完整文件系统和网络访问权限。</p></div>
+      {error ? <div className="errorBanner" role="alert">{error}</div> : null}
+    </BottomSheet>
   );
 }
 
-function RetryLastMessageDialog({
-  message,
-  model,
-  onCancel,
-  onConfirm
-}: {
-  message: string;
-  model: string | null;
-  onCancel: () => void;
-  onConfirm: () => Promise<void>;
-}) {
+function RetryLastMessageDialog({ message, model, onCancel, onConfirm }: { message: string; model: string | null; onCancel: () => void; onConfirm: () => Promise<void> }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   async function confirmRetry() {
+    if (submitting) return;
     setSubmitting(true);
     setError(null);
-    try {
-      await onConfirm();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "重试发送失败");
-    } finally {
-      setSubmitting(false);
-    }
+    try { await onConfirm(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "重试发送失败"); }
+    finally { setSubmitting(false); }
   }
-
   return (
-    <div className="modalBackdrop" role="presentation" onClick={submitting ? undefined : onCancel}>
-      <section className="messageDialog retryMessageDialog" role="dialog" aria-modal="true" aria-labelledby="retry-message-title" onClick={(event) => event.stopPropagation()}>
-        <div className="dialogHeader">
-          <div>
-            <h2 id="retry-message-title">确认重试上一条消息</h2>
-            <p className="muted">将创建新的 turn，原失败记录会保留。</p>
-          </div>
-        </div>
-        <div className="dialogBody retryMessageBody">
-          <div className="retryModelSummary">
-            <span>本次使用模型</span>
-            <strong title={model ?? "跟随会话"}>{model ?? "跟随会话"}</strong>
-          </div>
-          <div className="retryMessagePreview">
-            <span>原消息内容</span>
-            <div><MarkdownContent text={message} /></div>
-          </div>
-          {error ? <div className="errorBanner">{error}</div> : null}
-          <div className="dialogActions">
-            <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
-            <button type="button" onClick={() => void confirmRetry()} disabled={submitting}>{submitting ? "重试中" : "使用当前模型重试"}</button>
-          </div>
-        </div>
-      </section>
-    </div>
+    <BottomSheet title="确认重试上一条消息" description="将创建新的回合，原失败记录会保留。" onClose={onCancel} busy={submitting} actions={(
+      <><button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button><button type="button" onClick={() => void confirmRetry()} disabled={submitting}>{submitting ? "重试中" : "使用当前模型重试"}</button></>
+    )}>
+      <p className="retryModelSummary">本次使用模型 <strong>{model ?? "跟随会话"}</strong></p>
+      <div className="retryMessagePreview"><MarkdownContent text={message} /></div>
+      {error ? <div className="errorBanner" role="alert">{error}</div> : null}
+    </BottomSheet>
   );
 }
 
-
-function ApprovalPanel({
-  approvals,
-  pendingCount,
-  onSubmitApproval
-}: {
-  approvals: ApprovalSummary[];
-  pendingCount: number;
-  onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
-}) {
+function ApprovalPanel({ approvals, pendingCount, onSubmitApproval }: { approvals: ApprovalSummary[]; pendingCount: number; onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const approval = approvals.find((item) => item.id === selectedId) ?? approvals[0];
+  useEffect(() => { if (pendingCount === 0 && approvals.length === 0) setOpen(false); }, [pendingCount, approvals.length]);
   if (approvals.length === 0 && pendingCount === 0) return null;
-
   return (
-    <section id="session-approval-panel" className="approvalPanel" aria-label="审批请求" tabIndex={-1}>
-      <div className="panelHeaderCompact">
-        <h3>待审批</h3>
-        <span>{pendingCount}</span>
-      </div>
-      {approvals.length > 0 ? (
-        <div className="approvalList">
-          {approvals.map((approval) => (
-            <ApprovalCard approval={approval} key={approval.id} onSubmitApproval={onSubmitApproval} />
-          ))}
-        </div>
-      ) : (
-        <div className="approvalLoadingState" role="status">正在加载审批请求，请稍候…</div>
-      )}
+    <section id="session-approval-panel" className="approvalPanel" aria-label="审批请求">
+      <button className="approvalTrigger" type="button" onClick={() => setOpen(true)}><span aria-hidden="true">!</span><span><strong>有 {pendingCount} 项操作需要确认</strong><small>{approval?.title ?? "正在加载审批请求…"}</small></span><span aria-hidden="true">›</span></button>
+      {open ? approval ? (
+        <ApprovalCard key={approval.id} approval={approval} onClose={() => setOpen(false)} onSubmitApproval={onSubmitApproval} navigation={approvals.length > 1 ? (
+          <label className="sheetField">待审批操作<select value={approval.id} onChange={(event) => setSelectedId(event.target.value)}>{approvals.map((item, index) => <option key={item.id} value={item.id}>{index + 1}. {item.title}</option>)}</select></label>
+        ) : null} />
+      ) : <BottomSheet title="待审批" onClose={() => setOpen(false)}><p role="status">正在加载审批请求，请稍候…</p></BottomSheet> : null}
     </section>
   );
 }
 
-function ApprovalCard({
-  approval,
-  onSubmitApproval,
-  variant = "panel"
-}: {
-  approval: ApprovalSummary;
-  onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
-  variant?: "panel" | "sheet";
-}) {
+function ApprovalCard({ approval, onSubmitApproval, onClose, navigation }: { approval: ApprovalSummary; onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>; onClose: () => void; navigation?: ReactNode }) {
   const [submitting, setSubmitting] = useState<ApprovalDecision | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  async function submit(decision: ApprovalDecision): Promise<boolean> {
+  async function submit(decision: ApprovalDecision) {
+    if (submitting) return;
     setSubmitting(decision);
     setSubmitError(null);
     try {
-      const answerPayload = Object.fromEntries(Object.entries(answers).map(([key, value]) => [key, value.trim() ? [value.trim()] : []]));
-      await onSubmitApproval(approval, decision, answerPayload);
-      return true;
-    } catch (caught) {
-      setSubmitError(caught instanceof Error ? caught.message : "审批处理失败，请重试。");
-      return false;
-    } finally {
-      setSubmitting(null);
-    }
+      const payload = Object.fromEntries(Object.entries(answers).map(([key, value]) => [key, value.trim() ? [value.trim()] : []]));
+      await onSubmitApproval(approval, decision, payload);
+    } catch (caught) { setSubmitError(caught instanceof Error ? caught.message : "审批处理失败，请重试。"); }
+    finally { setSubmitting(null); }
   }
-
   return (
-    <article className={`approvalCard ${variant === "sheet" ? "approvalCardSheet" : ""}`}>
-      <div className="approvalHeader">
-        <div>
-          <strong>{variant === "sheet" ? "Review access" : approval.title}</strong>
-          <p className="approvalDescription">{approval.reason ?? approvalExplanation(approval)}</p>
-        </div>
-        {variant === "panel" ? <span>{approvalKindLabel(approval.kind)}</span> : null}
-      </div>
-      <div className="approvalRiskRow">
-        <span className={`approvalRiskBadge ${approvalRiskLevel(approval)}`}><i aria-hidden="true" />{approvalRiskLabel(approval)}</span>
-        <span>{approvalRiskExplanation(approval)}</span>
-      </div>
-      {approval.command ? (
-        <div className="approvalDetailField">
-          <span>COMMAND</span>
-          <pre className="commandText approvalCommandText" title="命令过长时可在此区域滚动查看完整内容">{approval.command}</pre>
-        </div>
-      ) : null}
-      {approval.cwd ? (
-        <div className="approvalDetailField approvalScopeField">
-          <span>SCOPE</span>
-          <div>
-            <code>{approval.cwd}</code>
-            <strong>{approvalScopeLabel(approval)}</strong>
-          </div>
-        </div>
-      ) : null}
-      {approval.questions.length > 0 ? (
-        <div className="approvalQuestions">
-          {approval.questions.map((question) => (
-            <label key={question.id}>
-              <span>{question.header}: {question.question}</span>
-              {question.options && question.options.length > 0 ? (
-                <select value={answers[question.id] ?? ""} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}>
-                  <option value="">请选择</option>
-                  {question.options.map((option) => (
-                    <option key={option.label} value={option.label}>{option.label}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type={question.isSecret ? "password" : "text"}
-                  value={answers[question.id] ?? ""}
-                  onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}
-                />
-              )}
-            </label>
-          ))}
-        </div>
-      ) : null}
-      {submitError ? <p className="errorText" role="alert">{submitError}</p> : null}
+    <BottomSheet title={approval.title} description="关闭面板后仍会保持待审批。" onClose={onClose} busy={submitting !== null} className="approvalSheet" actions={(
       <div className="approvalActions">
-        <div className="approvalAllowActions">
-          <button className="approvalAcceptButton" type="button" onClick={() => void submit("accept")} disabled={submitting !== null} aria-busy={submitting === "accept"}>
-            {submitting === "accept" ? "Allowing" : "Allow once"}
-          </button>
-          <button className="approvalSessionButton" type="button" onClick={() => void submit("acceptForSession")} disabled={submitting !== null} aria-busy={submitting === "acceptForSession"}>
-            {submitting === "acceptForSession" ? "Allowing" : "Allow for this session"}
-          </button>
-        </div>
-        <div className="approvalDismissActions">
-          <button className="approvalDeclineButton" type="button" onClick={() => void submit("decline")} disabled={submitting !== null} aria-busy={submitting === "decline"}>
-            {submitting === "decline" ? "Denying" : "Deny request"}
-          </button>
-          <button className="ghostButton" type="button" onClick={() => void submit("cancel")} disabled={submitting !== null} aria-busy={submitting === "cancel"}>
-            {submitting === "cancel" ? "Cancelling" : "Cancel"}
-          </button>
-        </div>
+        <button className="approvalAcceptButton" type="button" onClick={() => void submit("accept")} disabled={submitting !== null}>{submitting === "accept" ? "提交中…" : "仅允许这一次"}</button>
+        <button className="ghostButton approvalSessionButton" type="button" onClick={() => void submit("acceptForSession")} disabled={submitting !== null}>{submitting === "acceptForSession" ? "提交中…" : "本会话内允许"}</button>
+        <button className="ghostButton approvalDeclineButton" type="button" onClick={() => void submit("decline")} disabled={submitting !== null}>{submitting === "decline" ? "提交中…" : "拒绝此操作"}</button>
+        <button className="ghostButton" type="button" onClick={() => void submit("cancel")} disabled={submitting !== null}>{submitting === "cancel" ? "提交中…" : "取消请求"}</button>
+        <p>“本会话内允许”仅适用于当前会话内对应范围的审批。</p>
       </div>
-      <p className="approvalSessionHint">Keeps this scope for the current session only</p>
-      <p className="approvalPausedHint" role="status">Conversation paused until resolved</p>
-    </article>
+    )}>
+      {navigation}
+      <div className="approvalRiskRow"><span className={`approvalRiskBadge ${approvalRiskLevel(approval)}`}>{approvalRiskLabel(approval)}</span><span>{approvalRiskExplanation(approval)}</span></div>
+      <p>{approval.reason ?? approvalExplanation(approval)}</p>
+      {approval.command ? <div className="approvalDetailField"><span>请求执行的命令</span><pre className="commandText approvalCommandText" tabIndex={0}>{approval.command}</pre></div> : null}
+      {approval.cwd ? <div className="workspacePath"><span>Codex 服务所在机器上的工作目录</span><code>{approval.cwd}</code><small>{approvalScopeLabel(approval)}</small></div> : null}
+      {approval.questions.map((question) => (
+        <label className="sheetField" key={question.id}><span>{question.header}：{question.question}</span>
+          {question.options?.length ? <select value={answers[question.id] ?? ""} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}><option value="">请选择</option>{question.options.map((option) => <option key={option.label} value={option.label}>{option.label}</option>)}</select> : <input type={question.isSecret ? "password" : "text"} value={answers[question.id] ?? ""} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} />}
+        </label>
+      ))}
+      {submitError ? <p className="errorText" role="alert">{submitError}</p> : null}
+    </BottomSheet>
   );
 }
 
@@ -2902,26 +2736,26 @@ function approvalRiskLevel(approval: ApprovalSummary): "readOnly" | "elevated" |
 
 function approvalRiskLabel(approval: ApprovalSummary): string {
   const level = approvalRiskLevel(approval);
-  return level === "readOnly" ? "READ-ONLY" : level === "high" ? "HIGH RISK" : "REQUIRES ACCESS";
+  return level === "readOnly" ? "读取或检查" : level === "high" ? "扩大访问权限" : "需要授权";
 }
 
 function approvalRiskExplanation(approval: ApprovalSummary): string {
   const level = approvalRiskLevel(approval);
   return level === "readOnly"
-    ? "No changes will be written"
+    ? "请核对实际命令及访问范围"
     : level === "high"
-      ? "Can change permissions or broaden access"
-      : "Review the command before allowing it";
+      ? "可能改变权限或扩大访问范围"
+      : "允许前请核对操作内容";
 }
 
 function approvalScopeLabel(approval: ApprovalSummary): string {
-  return isReadOnlyApproval(approval) ? "read-only" : "command scope";
+  return `${approvalKindLabel(approval.kind)}的请求范围`;
 }
 
 function approvalExplanation(approval: ApprovalSummary): string {
   return isReadOnlyApproval(approval)
-    ? "This command only reads project files."
-    : "This request needs access to the current project scope.";
+    ? "Codex 请求执行读取或检查操作，请核对实际命令。"
+    : "此请求需要访问当前工作目录范围，请确认是否允许。";
 }
 
 function approvalKindLabel(kind: ApprovalSummary["kind"]): string {
@@ -3015,19 +2849,37 @@ function tailText(text: string, maxChars: number): string {
   return `已隐藏前 ${hiddenChars} 字符，仅展示最新输出\n\n${text.slice(-maxChars)}`;
 }
 
-function TaskInput({ sessionId, workspace, runtime, onSend }: { sessionId: string; workspace: string; runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void> }) {
+function TaskInput({ sessionId, workspace, runtime, onSend, controls }: { sessionId: string; workspace: string; runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void>; controls: ReactNode }) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<UploadedSessionAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const waitingApproval = runtime?.status === "waiting_approval";
   const waitingTurnId = runtime?.status === "running" && !runtime.activeTurnId;
   const disabled = submitting || uploading || waitingApproval || waitingTurnId || runtime?.status === "starting";
 
+  useLayoutEffect(() => {
+    const input = textareaRef.current;
+    if (!input) return;
+    const resize = () => {
+      input.style.height = "0px";
+      input.style.height = `${Math.min(132, Math.max(48, input.scrollHeight))}px`;
+    };
+    resize();
+    const observer = new ResizeObserver(() => {
+      if (input.clientWidth !== width) { width = input.clientWidth; resize(); }
+    });
+    let width = input.clientWidth;
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [text]);
+
   async function uploadFiles(files: File[]) {
-    if (files.length === 0) return;
+    if (files.length === 0 || disabled) return;
     setUploading(true);
     setUploadError(null);
     try {
@@ -3062,7 +2914,7 @@ function TaskInput({ sessionId, workspace, runtime, onSend }: { sessionId: strin
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextText = text.trim();
-    if (!nextText || submittingRef.current) return;
+    if (!nextText || disabled || submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
     try {
@@ -3072,6 +2924,7 @@ function TaskInput({ sessionId, workspace, runtime, onSend }: { sessionId: strin
       await onSend(`${nextText}${attachmentText}`);
       setText("");
       setAttachments([]);
+      setUploadError(null);
     } catch {
       return;
     } finally {
@@ -3089,35 +2942,39 @@ function TaskInput({ sessionId, workspace, runtime, onSend }: { sessionId: strin
 
   return (
     <form className="taskInput" onSubmit={handleSubmit}>
-      <label className="taskInputPlus" title="上传附件" aria-label="上传附件">
-        <span aria-hidden="true">+</span>
-        <input className="srOnly" type="file" accept="image/*,.pdf,.txt,.md,.json,.zip,.exe" multiple onChange={(event) => void handleFiles(event)} disabled={disabled} />
-      </label>
       {attachments.length > 0 ? (
         <div className="taskInputAttachments" aria-label="已添加附件">
           {attachments.map((attachment) => (
-            <button key={attachment.path} type="button" className="taskAttachmentChip" title={attachment.path} onClick={() => setAttachments((current) => current.filter((item) => item.path !== attachment.path))}>
-              {attachment.name} ×
+            <button key={attachment.path} type="button" className="taskAttachmentChip" aria-label={`移除附件 ${attachment.name}`} disabled={submitting} title={attachment.path} onClick={() => setAttachments((current) => current.filter((item) => item.path !== attachment.path))}>
+              <span>{attachment.name}</span><span aria-hidden="true">×</span>
             </button>
           ))}
         </div>
       ) : null}
       <textarea
+        ref={textareaRef}
+        aria-label="发送给 Codex 的消息"
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        placeholder={uploading ? "正在上传附件" : waitingApproval ? "请先处理审批" : waitingTurnId ? "正在同步任务状态" : "Message Codex"}
+        placeholder={uploading ? "正在上传附件" : waitingApproval ? "请先处理审批" : waitingTurnId ? "正在同步任务状态" : "继续提问，或描述新的想法…"}
         disabled={disabled}
         aria-keyshortcuts="Control+Enter Meta+Enter"
         rows={1}
       />
       {uploadError ? <span className="taskAttachmentError" role="alert">{uploadError}</span> : null}
+      {uploading ? <span className="taskAttachmentStatus" role="status">正在上传附件…</span> : null}
+      <div className="taskInputTools">
+        <input ref={fileInputRef} className="srOnly" type="file" accept="image/*,.pdf,.txt,.md,.json,.zip,.exe" multiple onChange={(event) => void handleFiles(event)} disabled={disabled} tabIndex={-1} />
+        <button className="taskInputPlus" type="button" title="添加附件" aria-label="添加附件" onClick={() => fileInputRef.current?.click()} disabled={disabled}><span aria-hidden="true">＋</span></button>
+        {controls}
       <button className="sendButton" type="submit" aria-label={submitting ? "发送中" : "发送消息"} title={submitting ? "发送中" : "发送消息"} disabled={disabled || text.trim().length === 0}>
         <svg className="sendIcon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4.4 4.8 19.8 12 4.4 19.2l2.2-6.1 7.1-1.1-7.1-1.1-2.2-6.1Z" />
         </svg>
       </button>
+      </div>
     </form>
   );
 }
@@ -3126,7 +2983,6 @@ function SessionTimeline({
   detail,
   visibleTurnCount,
   onLoadMore,
-  onOpenMessage,
   liveMessages,
   liveCommands,
   liveErrors,
@@ -3141,7 +2997,6 @@ function SessionTimeline({
   detail: Pick<SessionDetail, "turns">;
   visibleTurnCount: number;
   onLoadMore: () => void;
-  onOpenMessage: (message: { title: string; text: string; meta?: string }) => void;
   liveMessages: LiveMessage[];
   liveCommands: LiveCommand[];
   liveErrors: LiveErrorNotice[];
@@ -3178,7 +3033,7 @@ function SessionTimeline({
         <summary>查看 {commentaryItems.length} 条过程消息</summary>
         <div className="commentaryItems">
           {commentaryItems.map((item) => (
-            <TurnItemView item={item} key={item.id} onOpenMessage={onOpenMessage} />
+            <TurnItemView item={item} key={item.id} />
           ))}
         </div>
       </details>
@@ -3188,14 +3043,14 @@ function SessionTimeline({
       <section className="turnBlock" key={turn.id}>
         <div className="turnHeader">
           <h3>Turn {absoluteIndex + 1}</h3>
-          <span>{turn.status}</span>
+          <span>{turn.status === "completed" ? "本轮已完成" : turn.status === "failed" ? "本轮失败" : turn.status === "interrupted" ? "本轮已中断" : turn.status === "inProgress" ? "进行中" : turn.status}</span>
           <span>{formatDateTime(turn.startedAt)}</span>
         </div>
         <div className="turnItems">
           {visibleItems.map((item) => (
             <Fragment key={item.id}>
               {item.type === "agent_message" && isFinalAnswerPhase(item.phase) ? commentaryDetails : null}
-              <TurnItemView item={item} onOpenMessage={onOpenMessage} />
+              <TurnItemView item={item} />
             </Fragment>
           ))}
         </div>
@@ -3262,16 +3117,14 @@ function SessionTimeline({
 
 function TurnItemView({
   item,
-  onOpenMessage
 }: {
   item: SessionTurnItem;
-  onOpenMessage: (message: { title: string; text: string; meta?: string }) => void;
 }) {
   switch (item.type) {
     case "user_message":
-      return <MessageItem role="user" label="用户" text={stripAmbientBrowserContext(item.text)} onOpenMessage={onOpenMessage} />;
+      return <MessageItem role="user" label="用户" text={stripAmbientBrowserContext(item.text)} />;
     case "agent_message":
-      return <MessageItem role="agent" label="Codex" text={item.text} meta={item.phase ?? undefined} onOpenMessage={onOpenMessage} />;
+      return <MessageItem role="agent" label="Codex" text={item.text} />;
     case "file_change":
       return null;
     case "context_compaction":
@@ -3286,93 +3139,44 @@ function MessageItem({
   role,
   label,
   text,
-  meta,
-  onOpenMessage
 }: {
   role: "user" | "agent";
   label: string;
   text: string;
-  meta?: string;
-  onOpenMessage: (message: { title: string; text: string; meta?: string }) => void;
 }) {
   return (
-    <button className={`messageItem ${role} messagePreview`} type="button" onClick={() => onOpenMessage({ title: label, text, meta })}>
+    <article className={`messageItem ${role}`}>
       <div className="messageHeader">
         <strong>{label}</strong>
-        {meta ? <span>{meta}</span> : null}
       </div>
-      <div className="messageBody previewBody">
+      <div className="messageBody">
         <MarkdownContent text={text || "无内容"} />
       </div>
-    </button>
+    </article>
   );
 }
 
-function MessageDetailDialog({ message, onClose }: { message: { title: string; text: string; meta?: string }; onClose: () => void }) {
+function CreateSessionDialog({ workspaces, initialWorkspace, submitting, error, onClose, onSubmit }: { workspaces: string[]; initialWorkspace: string; submitting: boolean; error: string | null; onClose: () => void; onSubmit: (workspace: string) => Promise<void> }) {
+  const [workspace, setWorkspace] = useState(workspaces.includes(initialWorkspace) ? initialWorkspace : workspaces[0] ?? "");
   return (
-    <div className="modalBackdrop" role="presentation" onClick={onClose}>
-      <section className="messageDialog" role="dialog" aria-modal="true" aria-label={`${message.title} 详情`} onClick={(event) => event.stopPropagation()}>
-        <div className="dialogHeader">
-          <div>
-            <h2>{message.title}</h2>
-            {message.meta ? <p className="muted">{message.meta}</p> : null}
-          </div>
-          <button className="ghostButton" onClick={onClose}>关闭</button>
-        </div>
-        <div className="dialogBody">
-          <MarkdownContent text={message.text || "无内容"} />
-        </div>
-      </section>
-    </div>
+    <BottomSheet title="选择工作目录" description="从已有会话的工作目录中选择，创建后再输入要求。" onClose={onClose} busy={submitting} actions={<button type="button" disabled={!workspace || submitting} onClick={() => void onSubmit(workspace)}>{submitting ? "创建中…" : "在此目录新建会话"}</button>}>
+      <label className="sheetField">工作目录<select value={workspace} onChange={(event) => setWorkspace(event.target.value)}>{workspaces.map((path) => <option key={path} value={path}>{workspaceDisplayName(path)}</option>)}</select></label>
+      <div className="workspacePath"><span>Codex 服务所在机器上的路径（不是手机目录）</span><code>{workspace}</code></div>
+      {error ? <p className="errorText" role="alert">{error}</p> : null}
+    </BottomSheet>
   );
 }
 
-function CreateTaskDialog({
-  submitting,
-  onCancel,
-  onSubmit
-}: {
-  submitting: boolean;
-  onCancel: () => void;
-  onSubmit: (name: string) => Promise<void>;
-}) {
+function CreateTaskDialog({ submitting, error, onCancel, onSubmit }: { submitting: boolean; error: string | null; onCancel: () => void; onSubmit: (name: string) => Promise<void> }) {
   const [name, setName] = useState("");
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    function handleKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape" && !submitting) onCancel();
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel, submitting]);
-
+  const formId = "create-task-form";
   return (
-    <div className="modalBackdrop taskDialogBackdrop" role="presentation" onMouseDown={(event) => {
-      if (event.currentTarget === event.target) onCancel();
-    }}>
-      <section className="taskCreateDialog" role="dialog" aria-modal="true" aria-labelledby="create-task-title">
-        <div className="dialogHeader">
-          <div>
-            <p className="dialogEyebrow">TASKS</p>
-            <h2 id="create-task-title">新建任务</h2>
-          </div>
-          <button className="iconButton" type="button" aria-label="关闭新建任务弹框" title="关闭" onClick={onCancel} disabled={submitting}>×</button>
-        </div>
-        <form onSubmit={(event) => { event.preventDefault(); void onSubmit(name); }}>
-          <label className="taskDialogLabel" htmlFor="create-task-name">任务名称</label>
-          <input ref={inputRef} id="create-task-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="例如：实现文件上传能力" autoComplete="off" />
-          <div className="dialogActions">
-            <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
-            <button className="primaryButton" type="submit" disabled={submitting || !name.trim()}>{submitting ? "创建中…" : "创建任务"}</button>
-          </div>
-        </form>
-      </section>
-    </div>
+    <BottomSheet title="新建任务" description="将相关会话归为一组，任务本身不会创建工作目录。" onClose={onCancel} busy={submitting} actions={(
+      <><button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button><button type="submit" form={formId} disabled={submitting || !name.trim()}>{submitting ? "创建中…" : "创建任务"}</button></>
+    )}>
+      <form id={formId} onSubmit={(event) => { event.preventDefault(); void onSubmit(name); }}><label className="sheetField">任务名称<input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="例如：移动端体验优化" autoComplete="off" /></label></form>
+      {error ? <p className="errorText" role="alert">{error}</p> : null}
+    </BottomSheet>
   );
 }
 
@@ -3400,8 +3204,14 @@ function clampWorkspaceSidebarWidth(width: number): number {
 
 function readWorkspaceSidebarWidth(): number {
   if (typeof window === "undefined") return DEFAULT_WORKSPACE_SIDEBAR_WIDTH;
-  const stored = Number(window.localStorage.getItem(WORKSPACE_SIDEBAR_WIDTH_STORAGE_KEY));
-  return Number.isFinite(stored) ? clampWorkspaceSidebarWidth(stored) : DEFAULT_WORKSPACE_SIDEBAR_WIDTH;
+  try {
+    const stored = window.localStorage.getItem(WORKSPACE_SIDEBAR_WIDTH_STORAGE_KEY);
+    if (!stored) return DEFAULT_WORKSPACE_SIDEBAR_WIDTH;
+    const width = Number(stored);
+    return Number.isFinite(width) ? clampWorkspaceSidebarWidth(width) : DEFAULT_WORKSPACE_SIDEBAR_WIDTH;
+  } catch {
+    return DEFAULT_WORKSPACE_SIDEBAR_WIDTH;
+  }
 }
 
 function ResizableWorkspaceLayout({
@@ -3511,6 +3321,8 @@ function TaskPanel({
   onCreateSession: (task: TaskSummary) => Promise<void>;
   onSelectSession: (session: SessionSummary) => void;
 }) {
+  const headingId = useId();
+  const [actionError, setActionError] = useState<string | null>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
   const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
@@ -3523,8 +3335,12 @@ function TaskPanel({
   async function toggleTask(task: TaskSummary) {
     if (expandedTaskId === task.id) { setExpandedTaskId(null); return; }
     setExpandedTaskId(task.id);
+    setTaskDetail(null);
     setLoadingTaskId(task.id);
-    try { setTaskDetail((await getTask(task.id)).task); } finally { setLoadingTaskId(null); }
+    setActionError(null);
+    try { setTaskDetail((await getTask(task.id)).task); }
+    catch (caught) { setActionError(caught instanceof Error ? caught.message : "任务会话加载失败"); }
+    finally { setLoadingTaskId(null); }
   }
 
   async function openTaskSession(task: TaskSummary, recent: SessionSummary | null) {
@@ -3533,21 +3349,26 @@ function TaskPanel({
       return;
     }
     setOpenTask(task);
+    setOpenTaskSessions([]);
+    setActionError(null);
     setLoadingOpenTask(true);
     try {
       setOpenTaskSessions((await getTask(task.id)).task.sessions);
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : "任务会话加载失败");
+      setOpenTask(null);
     } finally {
       setLoadingOpenTask(false);
     }
   }
   return (
     <>
-    <section className="taskPanel" aria-labelledby="task-panel-title">
+    <section className="taskPanel" aria-labelledby={headingId}>
       <div className="taskPanelHeader">
-        <div><p className="workspaceWelcomeEyebrow">TASKS</p><h2 id="task-panel-title">任务</h2></div>
+        <div><p className="workspaceWelcomeEyebrow">TASKS</p><h2 id={headingId}>任务</h2></div>
         <button className="primaryButton" type="button" onClick={() => void onCreate()}>新建任务</button>
       </div>
-      {error ? <div className="errorBanner">{error}</div> : null}
+      {error || actionError ? <div className="errorBanner" role="alert">{error ?? actionError}</div> : null}
       {tasks.length === 0 ? <p className="muted">创建任务后，可聚合多个相关会话并共享上下文。</p> : (
         <div className="taskGrid">
           {tasks.map((task) => {
@@ -3594,162 +3415,66 @@ function TaskPanel({
   );
 }
 
-function SessionAttachDialog({
-  task,
-  sessions,
-  selectedSessionId,
-  onSelect,
-  onCancel,
-  onSubmit
-}: {
-  task: TaskSummary;
-  sessions: SessionSummary[];
-  selectedSessionId: string;
-  onSelect: (sessionId: string) => void;
-  onCancel: () => void;
-  onSubmit: () => Promise<void>;
-}) {
+function SessionAttachDialog({ task, sessions, selectedSessionId, onSelect, onCancel, onSubmit }: { task: TaskSummary; sessions: SessionSummary[]; selectedSessionId: string; onSelect: (sessionId: string) => void; onCancel: () => void; onSubmit: () => Promise<void> }) {
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const selected = sessions.find((item) => item.id === selectedSessionId);
   return (
-    <div className="modalBackdrop taskDialogBackdrop" role="presentation" onMouseDown={(event) => {
-      if (event.currentTarget === event.target && !submitting) onCancel();
-    }}>
-      <section className="taskCreateDialog sessionAttachDialog" role="dialog" aria-modal="true" aria-labelledby="attach-session-title">
-        <div className="dialogHeader">
-          <div>
-            <p className="dialogEyebrow">{task.name}</p>
-            <h2 id="attach-session-title">选择要归入的会话</h2>
-          </div>
-          <button className="iconButton" type="button" aria-label="关闭会话选择弹框" title="关闭" onClick={onCancel} disabled={submitting}>×</button>
-        </div>
-        <label className="taskDialogLabel" htmlFor="task-session-select">会话</label>
-        <select id="task-session-select" value={selectedSessionId} onChange={(event) => onSelect(event.target.value)} autoFocus>
-          <option value="">请选择一个会话</option>
-          {sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.workspace}</option>)}
-        </select>
-        <div className="dialogActions">
-          <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
-          <button className="primaryButton" type="button" disabled={!selectedSessionId || submitting} onClick={async () => { setSubmitting(true); try { await onSubmit(); } finally { setSubmitting(false); } }}>{submitting ? "归入中…" : "归入任务"}</button>
-        </div>
-      </section>
-    </div>
+    <BottomSheet title="选择要归入的会话" description={task.name} onClose={onCancel} busy={submitting} actions={(
+      <><button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button><button type="button" disabled={!selected || submitting} onClick={async () => { setSubmitting(true); setError(null); try { await onSubmit(); } catch (caught) { setError(caught instanceof Error ? caught.message : "归入失败"); } finally { setSubmitting(false); } }}>{submitting ? "归入中…" : "归入任务"}</button></>
+    )}>
+      <label className="sheetField">会话<select value={selectedSessionId} onChange={(event) => onSelect(event.target.value)}><option value="">请选择一个会话</option>{sessions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
+      {selected ? <div className="workspacePath"><span>工作目录</span><code>{selected.workspace}</code></div> : null}
+      {error ? <p className="errorText" role="alert">{error}</p> : null}
+    </BottomSheet>
   );
 }
 
-function SessionOpenDialog({
-  task,
-  sessions,
-  loading,
-  onCancel,
-  onOpen
-}: {
-  task: TaskSummary;
-  sessions: SessionSummary[];
-  loading: boolean;
-  onCancel: () => void;
-  onOpen: (session: SessionSummary) => void;
-}) {
+function SessionOpenDialog({ task, sessions, loading, onCancel, onOpen }: { task: TaskSummary; sessions: SessionSummary[]; loading: boolean; onCancel: () => void; onOpen: (session: SessionSummary) => void }) {
   const [selectedSessionId, setSelectedSessionId] = useState("");
-  const selected = sessions.find((session) => session.id === selectedSessionId);
+  const selected = sessions.find((item) => item.id === selectedSessionId);
   return (
-    <div className="modalBackdrop taskDialogBackdrop" role="presentation" onMouseDown={(event) => {
-      if (event.currentTarget === event.target) onCancel();
-    }}>
-      <section className="taskCreateDialog sessionAttachDialog" role="dialog" aria-modal="true" aria-labelledby="open-session-title">
-        <div className="dialogHeader">
-          <div>
-            <p className="dialogEyebrow">{task.name}</p>
-            <h2 id="open-session-title">选择要打开的会话</h2>
-          </div>
-          <button className="iconButton" type="button" aria-label="关闭会话选择弹框" title="关闭" onClick={onCancel}>×</button>
-        </div>
-        {loading ? <p className="muted">正在加载任务会话…</p> : (
-          <>
-            <label className="taskDialogLabel" htmlFor="open-task-session-select">会话</label>
-            <select id="open-task-session-select" value={selectedSessionId} onChange={(event) => setSelectedSessionId(event.target.value)} autoFocus>
-              <option value="">请选择一个会话</option>
-              {sessions.map((session) => <option key={session.id} value={session.id}>{session.title} · {session.workspace}</option>)}
-            </select>
-          </>
-        )}
-        <div className="dialogActions">
-          <button className="ghostButton" type="button" onClick={onCancel}>取消</button>
-          <button className="primaryButton" type="button" disabled={!selected} onClick={() => { if (selected) onOpen(selected); }}>打开会话</button>
-        </div>
-      </section>
-    </div>
+    <BottomSheet title="选择要打开的会话" description={task.name} onClose={onCancel} actions={(
+      <><button className="ghostButton" type="button" onClick={onCancel}>取消</button><button type="button" disabled={!selected} onClick={() => { if (selected) onOpen(selected); }}>打开会话</button></>
+    )}>
+      {loading ? <p role="status">正在加载任务会话…</p> : <label className="sheetField">会话<select value={selectedSessionId} onChange={(event) => setSelectedSessionId(event.target.value)}><option value="">请选择一个会话</option>{sessions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>}
+      {selected ? <div className="workspacePath"><span>工作目录</span><code>{selected.workspace}</code></div> : null}
+    </BottomSheet>
   );
 }
 
-function CreateTaskSessionDialog({
-  task,
-  history,
-  loading,
-  onCancel,
-  onSubmit
-}: {
-  task: TaskSummary;
-  history: SessionSummary[];
-  loading: boolean;
-  onCancel: () => void;
-  onSubmit: (workspace: string) => Promise<void>;
-}) {
-  const workspaces = [...new Set(history.map((session) => session.workspace).filter(Boolean))];
-  const recentWorkspace = history.find((session) => session.id === task.recentSessionId)?.workspace ?? workspaces[0] ?? "";
-  const [mode, setMode] = useState(recentWorkspace ? "recent" : "new");
-  const [workspace, setWorkspace] = useState(recentWorkspace);
+function CreateTaskSessionDialog({ task, history, loading, onCancel, onSubmit }: { task: TaskSummary; history: SessionSummary[]; loading: boolean; onCancel: () => void; onSubmit: (workspace: string) => Promise<void> }) {
+  const workspaces = [...new Set(history.map((item) => item.workspace).filter(Boolean))];
+  const recentWorkspace = history.find((item) => item.id === task.recentSessionId)?.workspace ?? workspaces[0] ?? "";
+  const [mode, setMode] = useState("recent");
+  const [newWorkspace, setNewWorkspace] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (mode === "recent") setWorkspace(recentWorkspace);
-  }, [mode, recentWorkspace]);
-
+  const [error, setError] = useState<string | null>(null);
+  const effectiveMode = !recentWorkspace && mode === "recent" ? "new" : mode;
+  const workspace = effectiveMode === "recent" ? recentWorkspace : effectiveMode === "new" ? newWorkspace : effectiveMode;
   const canSubmit = !loading && !submitting && workspace.trim().length > 0;
   return (
-    <div className="modalBackdrop taskDialogBackdrop" role="presentation" onMouseDown={(event) => {
-      if (event.currentTarget === event.target && !submitting) onCancel();
-    }}>
-      <section className="taskCreateDialog sessionAttachDialog" role="dialog" aria-modal="true" aria-labelledby="create-task-session-title">
-        <div className="dialogHeader">
-          <div>
-            <p className="dialogEyebrow">{task.name}</p>
-            <h2 id="create-task-session-title">选择项目目录</h2>
+    <BottomSheet title="选择任务会话目录" description={task.name} onClose={onCancel} busy={submitting} actions={(
+      <><button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button><button type="button" disabled={!canSubmit} onClick={async () => { setSubmitting(true); setError(null); try { await onSubmit(workspace.trim()); } catch (caught) { setError(caught instanceof Error ? caught.message : "创建失败"); } finally { setSubmitting(false); } }}>{submitting ? "创建中…" : "创建任务会话"}</button></>
+    )}>
+      <p className="muted">路径在 Codex 服务所在机器上，不是手机目录。</p>
+      {loading ? <p role="status">正在加载任务历史…</p> : (
+        <>
+          <div className="taskDirectoryOptions">
+            <label className={`taskDirectoryOption${effectiveMode === "recent" ? " selected" : ""}`}><input type="radio" name="task-directory-mode" checked={effectiveMode === "recent"} onChange={() => setMode("recent")} disabled={!recentWorkspace} /><span><strong>使用最近会话目录</strong><small>{recentWorkspace ? `${workspaceDisplayName(recentWorkspace)} · ${recentWorkspace}` : "暂无历史目录"}</small></span></label>
+            {workspaces.filter((path) => path !== recentWorkspace).map((path) => <label className={`taskDirectoryOption${effectiveMode === path ? " selected" : ""}`} key={path}><input type="radio" name="task-directory-mode" checked={effectiveMode === path} onChange={() => setMode(path)} /><span><strong>使用历史会话目录 · {workspaceDisplayName(path)}</strong><small>{path}</small></span></label>)}
+            <label className={`taskDirectoryOption${effectiveMode === "new" ? " selected" : ""}`}><input type="radio" name="task-directory-mode" checked={effectiveMode === "new"} onChange={() => setMode("new")} /><span><strong>输入新的工作目录</strong><small>仅任务新会话沿用“目录不存在时自动创建”</small></span></label>
           </div>
-          <button className="iconButton" type="button" aria-label="关闭项目目录选择弹框" title="关闭" onClick={onCancel} disabled={submitting}>×</button>
-        </div>
-        {loading ? <p className="muted">正在加载任务历史…</p> : (
-          <>
-            <div className="taskDirectoryOptions">
-              <label className={`taskDirectoryOption${mode === "recent" ? " selected" : ""}`}>
-                <input type="radio" name="task-directory-mode" checked={mode === "recent"} onChange={() => setMode("recent")} disabled={!recentWorkspace} />
-                <span><strong>使用最近会话目录</strong><small>{recentWorkspace || "暂无历史目录"}</small></span>
-              </label>
-              {workspaces.filter((item) => item !== recentWorkspace).map((item) => (
-                <label className={`taskDirectoryOption${mode === item ? " selected" : ""}`} key={item}>
-                  <input type="radio" name="task-directory-mode" checked={mode === item} onChange={() => { setMode(item); setWorkspace(item); }} />
-                  <span><strong>使用历史会话目录</strong><small>{item}</small></span>
-                </label>
-              ))}
-              <label className={`taskDirectoryOption${mode === "new" ? " selected" : ""}`}>
-                <input type="radio" name="task-directory-mode" checked={mode === "new"} onChange={() => { setMode("new"); setWorkspace(""); }} />
-                <span><strong>输入新的项目目录</strong><small>目录不存在时会自动创建</small></span>
-              </label>
-            </div>
-            {mode === "new" ? (
-              <label className="taskDialogLabel" htmlFor="new-task-workspace">项目目录<input id="new-task-workspace" value={workspace} onChange={(event) => setWorkspace(event.target.value)} placeholder="例如：/workspace/my-project" autoFocus /></label>
-            ) : <p className="taskDirectorySelected">将使用：<code>{workspace}</code></p>}
-          </>
-        )}
-        <div className="dialogActions">
-          <button className="ghostButton" type="button" onClick={onCancel} disabled={submitting}>取消</button>
-          <button className="primaryButton" type="button" disabled={!canSubmit} onClick={async () => { setSubmitting(true); try { await onSubmit(workspace.trim()); } finally { setSubmitting(false); } }}>{submitting ? "创建中…" : "创建任务会话"}</button>
-        </div>
-      </section>
-    </div>
+          {effectiveMode === "new" ? <label className="sheetField">Codex 服务所在机器上的路径<input value={newWorkspace} onChange={(event) => setNewWorkspace(event.target.value)} placeholder="例如：/workspace/my-project" /></label> : <div className="workspacePath"><span>将使用</span><code>{workspace}</code></div>}
+        </>
+      )}
+      {error ? <p className="errorText" role="alert">{error}</p> : null}
+    </BottomSheet>
   );
 }
 
 function DesktopWorkspaceHome({
+  taskPanel,
   sessions,
   tasks,
   search,
@@ -3766,6 +3491,7 @@ function DesktopWorkspaceHome({
   creatingSessionWorkspace,
   createSessionError
 }: {
+  taskPanel?: ReactNode;
   sessions: SessionSummary[];
   tasks: TaskSummary[];
   search: string;
@@ -3792,6 +3518,7 @@ function DesktopWorkspaceHome({
             <span>{sessions.length > 0 ? `最近会话 · ${sessions.length}` : "最近会话"}</span>
           </div>
           <SessionBrowser
+            taskPanel={taskPanel}
             sessions={sessions}
             tasks={tasks}
             search={search}
@@ -3912,6 +3639,7 @@ function RecentSessions({
 }
 
 function SessionBrowser({
+  taskPanel,
   sessions,
   tasks,
   search,
@@ -3929,6 +3657,7 @@ function SessionBrowser({
   creatingSessionWorkspace,
   createSessionError
 }: {
+  taskPanel?: ReactNode;
   sessions: SessionSummary[];
   tasks: TaskSummary[];
   search: string;
@@ -3946,25 +3675,15 @@ function SessionBrowser({
   creatingSessionWorkspace?: string | null;
   createSessionError?: string | null;
 }) {
-  const workspaceFilterId = `session-workspace-filter-${showHeading ? "mobile" : "desktop"}`;
+  const workspaceFilterId = useId();
 
-  const workspaceTab = (
-    <button className={mode === "workspace" ? "active" : ""} type="button" role="tab" aria-selected={mode === "workspace"} onClick={() => onModeChange("workspace")}>
-      按项目目录
-    </button>
-  );
-  const taskTab = (
-    <button className={mode === "task" ? "active" : ""} type="button" role="tab" aria-selected={mode === "task"} onClick={() => onModeChange("task")}>
-      按任务
-    </button>
-  );
 
   return (
     <>
       <div className={`sectionHeader${showHeading ? "" : " noHeading"}`}>
         {showHeading ? (
           <div>
-            <h2>会话列表</h2>
+            <h2>我的会话</h2>
             <p className="muted">共 {sessions.length} 个会话</p>
           </div>
         ) : null}
@@ -3973,7 +3692,7 @@ function SessionBrowser({
             aria-label="搜索会话"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="搜索 ID、标题、备注或工作目录"
+            placeholder="搜索标题、备注或工作目录"
           />
           <button className="iconButton" type="submit" aria-label="搜索" title="搜索">
             <span aria-hidden="true">⌕</span>
@@ -3982,18 +3701,14 @@ function SessionBrowser({
       </div>
 
       <div className="sessionViewTabs" role="tablist" aria-label="会话列表视图">
-        {mode === "task" ? taskTab : workspaceTab}
-        {mode === "task" ? workspaceTab : taskTab}
-        <button
-          className={mode === "recent" ? "active" : ""}
-          type="button"
-          role="tab"
-          aria-selected={mode === "recent"}
-          onClick={() => onModeChange("recent")}
-        >
-          最近 10 个
-        </button>
+        {([["recent", "最近会话"], ["workspace", "按工作目录"], ["task", "按任务"]] as const).map(([value, label]) => (
+          <button key={value} className={mode === value ? "active" : ""} type="button" role="tab" aria-selected={mode === value} onClick={() => onModeChange(value)}>{label}</button>
+        ))}
       </div>
+      {mode === "task" ? taskPanel : null}
+      {onCreateSession && mode !== "task" ? (
+        <button className="primaryButton newSessionButton" type="button" onClick={() => void onCreateSession("")} disabled={Boolean(creatingSessionWorkspace) || !sessions.some((item) => item.workspace.trim())}>＋ 新建会话</button>
+      ) : null}
 
       {sessionError ? <div className="errorBanner">{sessionError}</div> : null}
       {createSessionError ? <div className="errorBanner">{createSessionError}</div> : null}
@@ -4018,6 +3733,7 @@ function SessionBrowser({
 
 function MobileSessionDrawer({
   isOwner,
+  taskPanel,
   sessions,
   tasks,
   selectedSessionId,
@@ -4039,6 +3755,7 @@ function MobileSessionDrawer({
   createSessionError
 }: {
   isOwner: boolean;
+  taskPanel?: ReactNode;
   sessions: SessionSummary[];
   tasks: TaskSummary[];
   selectedSessionId: string | null;
@@ -4062,17 +3779,17 @@ function MobileSessionDrawer({
   return (
     <div className="mobileSessionDrawerContent">
       <header className="drawerHeader mobileDrawerHeader">
-        <h2>Chats</h2>
+        <h2>会话列表</h2>
         <div>
           {isOwner ? (
             <button
               className="drawerNewButton"
               type="button"
-              aria-label="查看会话管理（不创建新会话）"
-              title="新会话由 Codex CLI 创建"
+              aria-label="返回完整会话列表"
+              title="返回完整会话列表"
               onClick={onOpenList}
             >
-              <span aria-hidden="true">+</span> New
+              全部会话
             </button>
           ) : null}
           <button ref={closeButtonRef} className="iconButton" type="button" aria-label="关闭会话列表" title="关闭" onClick={onClose}>
@@ -4083,6 +3800,7 @@ function MobileSessionDrawer({
 
       <div className="mobileDrawerSessionBrowser">
         <SessionBrowser
+            taskPanel={taskPanel}
           sessions={sessions}
           tasks={tasks}
           search={search}
@@ -4106,8 +3824,7 @@ function MobileSessionDrawer({
         <footer className="drawerUtility">
           <button type="button" aria-label="打开设置和诊断" onClick={onOpenSettings}>
             <span aria-hidden="true">⚙</span>
-            <span>Settings &amp; diagnostics</span>
-            <strong>Healthy</strong>
+            <span>设置与诊断</span>
           </button>
         </footer>
       ) : null}
@@ -4235,17 +3952,17 @@ function SessionList({
     <div className="sessionList">
       {mode === "workspace" && activeGroup ? (
         <div className="workspaceFilterRow">
-          <label htmlFor={workspaceFilterId}>项目路径</label>
+          <label htmlFor={workspaceFilterId}>工作目录</label>
           <div className="workspaceSelectControl">
             <select
               id={workspaceFilterId}
-              aria-label="按项目路径切换会话列表"
+              aria-label="按工作目录筛选"
               value={activeWorkspace}
               onChange={(event) => setSelectedWorkspace(event.target.value)}
             >
               {groups.map((group) => (
                 <option value={group.workspace} key={group.workspace}>
-                  {group.workspace} · {group.sessions.length} 个会话
+                  {workspaceDisplayName(group.workspace)} · {group.sessions.length} 个会话
                 </option>
               ))}
             </select>
@@ -4271,6 +3988,7 @@ function SessionList({
               </button>
             ) : null}
           </div>
+          <p className="workspacePath"><span>Codex 服务所在机器上的路径（不是手机目录）</span><code>{activeGroup.workspace}</code></p>
         </div>
       ) : null}
 
@@ -4475,15 +4193,13 @@ function SessionItem({
             />
           ) : (
             <button
-              className="titleEditButton"
+              className="sessionOpenButton"
               type="button"
-              aria-label={`编辑 ${session.title} 的备注标题`}
-              title={session.defaultTitle}
-              onClick={beginTitleEdit}
-              disabled={saving}
+              aria-label={`打开会话：${session.title}`}
+              title={session.title}
+              onClick={() => onSelect(session)}
             >
               <span title={session.title}>{session.title}</span>
-              <small className="titleEditIcon" aria-hidden="true">{saving ? "…" : "✎"}</small>
             </button>
           )}
           {session.status !== "history" ? <StatusBadge status={session.status} /> : null}
@@ -4491,15 +4207,13 @@ function SessionItem({
         {session.remarkTitle ? <p className="remarkHint">默认标题：{session.defaultTitle}</p> : null}
         <p className="sessionSummary">{session.summary}</p>
         <div className="sessionMeta">
-          <span>{session.workspace}</span>
+          <span title={session.workspace}>{workspaceDisplayName(session.workspace)}</span>
           <span>{formatDateTime(session.updatedAt)}</span>
         </div>
         {error ? <div className="errorText">{error}</div> : null}
       </div>
       <div className="sessionActions">
-        <button className="ghostButton" onClick={() => onSelect(session)}>
-          {selected ? "已选择" : "进入"}
-        </button>
+        <button className="iconButton titleEditButton" type="button" aria-label={`编辑 ${session.title} 的备注标题`} title="修改备注标题" onClick={beginTitleEdit} disabled={saving}>{saving ? "…" : "✎"}</button>
         <div className="sessionId" title={session.id}>
           {session.id}
         </div>
@@ -4603,14 +4317,15 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
 function renderMarkdownBlock(block: MarkdownBlock, index: number) {
   switch (block.type) {
     case "heading": {
-      const Heading = (`h${block.level + 2}` as "h3" | "h4" | "h5");
+      const Heading = (`h${block.level}` as "h1" | "h2" | "h3");
       return <Heading key={index}>{renderInlineMarkdown(block.text)}</Heading>;
     }
     case "code":
       return (
-        <pre className="markdownCode" key={index}>
-          <code>{block.text}</code>
-        </pre>
+        <div className="markdownCode" key={index}>
+          {block.language ? <span>{block.language}</span> : null}
+          <pre tabIndex={0}><code>{block.text}</code></pre>
+        </div>
       );
     case "quote":
       return <blockquote key={index}>{renderInlineMarkdown(block.text)}</blockquote>;

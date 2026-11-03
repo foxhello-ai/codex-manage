@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ModelCatalogResponse, ModelOption, SessionModelState, UpdateModelSelectionInput } from "../shared/models";
 import { defaultEffortForModel, filterAndSortModels } from "./modelSelection";
+import { BottomSheet } from "./BottomSheet";
 
 type MobileModelMenu = "model" | "effort" | null;
 
@@ -46,20 +47,6 @@ export function ModelSelector({
     setMobileMenu(null);
   }, [open, catalog, current.mode, current.preferredModel, current.preferredReasoningEffort, current.actualReasoningEffort]);
 
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !submitting) onClose();
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, submitting, onClose]);
-
   if (!open) return null;
 
   function applyMobileModel(model: ModelOption) {
@@ -78,13 +65,8 @@ export function ModelSelector({
   }
 
   return (
-    <div className="modelSelectorBackdrop" role="presentation" onClick={submitting ? undefined : onClose}>
-      <section className="modelSelectorDialog" role="dialog" aria-modal="true" aria-label="切换会话模型" onClick={(event) => event.stopPropagation()}>
+    <BottomSheet title="会话模型" description="选择模型或推理强度后立即应用到当前会话。" onClose={onClose} busy={submitting} className="modelSheet" actions={<button className="ghostButton" type="button" disabled={submitting} onClick={() => void onApply({ mode: "follow_session" })}>重置为默认设置</button>}>
         <div className="modelSelectorMobile">
-          <header className="modelSelectorMobileHeader">
-            <h2 id="model-selector-title-mobile">会话模型</h2>
-            <button className="iconButton" type="button" aria-label="关闭模型选择器" onClick={onClose} disabled={submitting}>×</button>
-          </header>
 
           {error ? <div className="modelSelectorMobileMessage errorBanner">{error}</div> : null}
           {effortNotice ? <div className="modelSelectorMobileMessage modelEffortNotice" role="status">{effortNotice}</div> : null}
@@ -110,15 +92,7 @@ export function ModelSelector({
               <strong>{reasoningEffort ?? "默认"}</strong>
               <span aria-hidden="true">›</span>
             </button>
-            <button
-              className="mobileModelResetRow"
-              type="button"
-              disabled={submitting}
-              onClick={() => void onApply({ mode: "follow_session" })}
-            >
-              <span>重置为默认设置</span>
-              <span aria-hidden="true">↻</span>
-            </button>
+
           </div>
 
           {mobileMenu === "model" ? (
@@ -160,7 +134,6 @@ export function ModelSelector({
             </div>
           ) : null}
         </div>
-      </section>
-    </div>
+    </BottomSheet>
   );
 }
