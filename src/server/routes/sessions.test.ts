@@ -72,6 +72,50 @@ function buildApp(
 }
 
 describe("session routes", () => {
+  it("lets the owner explicitly follow desktop settings without applying stored Manage overrides", async () => {
+    let submitted: any;
+    let resolutions = 0;
+    const runtime = runtimeSnapshot("thread-1", { executionSource: "external_queue" });
+    const app = buildApp({
+      listSessions: async () => [], getSessionDetail: async () => ({}) as any,
+      updateMetadata: async () => ({}) as any, getPermissionMode: async () => "full_access"
+    }, undefined, {
+      getRuntime: () => runtime,
+      sendInput: async (_id: string, body: any) => { submitted = body; return runtime; }
+    } as any, {
+      resolveForTurn: async () => { resolutions++; throw Error("must not resolve"); }
+    } as any);
+    const sent = await app.inject({ method: "POST", url: "/api/sessions/thread-1/input", payload: { text: "follow desktop", useDesktopSettings: true } });
+    expect(sent.statusCode).toBe(202);
+    expect(submitted).toMatchObject({ allowExternalQueue: true });
+    expect(submitted.permissionMode).toBeUndefined();
+    expect(submitted.modelOverride).toBeUndefined();
+    expect(resolutions).toBe(0);
+    const invalid = await app.inject({ method: "POST", url: "/api/sessions/thread-1/input", payload: { text: "follow desktop", useDesktopSettings: true, permissionMode: "full_access" } });
+    expect(invalid.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it("reads runtime without acquiring a writer and returns queued input as accepted rather than completed", async () => {
+    let resumes = 0;
+    let submitted: any;
+    const runtime = runtimeSnapshot("thread-1", { status: "history" });
+    const app = buildApp({ listSessions: async () => [], getSessionDetail: async () => ({}) as any, updateMetadata: async () => ({}) as any }, undefined, {
+      getRuntime: () => runtime,
+      hydratePermissionMode: () => runtime,
+      resumeThread: async () => { resumes++; return runtime; },
+      sendInput: async (_id: string, body: any) => { submitted = body; return { ...runtime, executionSource: "external_queue", deliveries: [{ status: "queued" }] }; }
+    } as any);
+    const read = await app.inject({ method: "GET", url: "/api/sessions/thread-1/runtime" });
+    expect(read.statusCode).toBe(200);
+    expect(resumes).toBe(0);
+    const sent = await app.inject({ method: "POST", url: "/api/sessions/thread-1/input", payload: { text: "follow up", clientRequestId: "request-1" } });
+    expect(sent.statusCode).toBe(202);
+    expect(submitted).toMatchObject({ clientRequestId: "request-1", allowExternalQueue: true });
+    expect(sent.json().runtime.deliveries[0].status).toBe("queued");
+    await app.close();
+  });
+
   it("creates a new session with the requested workspace", async () => {
     let requestedCwd: string | undefined;
     const app = buildApp(
@@ -392,7 +436,7 @@ describe("session routes", () => {
 
       expect(response.statusCode).toBe(200);
       expect(resumeOptions).toEqual({ permissionMode: "default" });
-      expect(inputOptions).toEqual({ text: "继续", permissionMode: "default" });
+      expect(inputOptions).toMatchObject({ text: "继续", permissionMode: "default", allowExternalQueue: false, clientRequestId: expect.any(String) });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -641,7 +685,7 @@ describe("session routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ runtime: { threadId: "thread-1", status: "running" } });
-    expect(submittedBody).toEqual({ text: "继续", permissionMode: "full_access" });
+    expect(submittedBody).toMatchObject({ text: "继续", permissionMode: "full_access", allowExternalQueue: true, clientRequestId: expect.any(String) });
   });
 
   it("uses the persisted permission mode when the refreshed browser sends a stale default", async () => {
@@ -674,7 +718,7 @@ describe("session routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(submittedBody).toEqual({ text: "继续", permissionMode: "full_access" });
+    expect(submittedBody).toMatchObject({ text: "继续", permissionMode: "full_access", allowExternalQueue: true, clientRequestId: expect.any(String) });
   });
 
   it("maps an active writer error to a clear session conflict", async () => {
@@ -705,7 +749,7 @@ describe("session routes", () => {
     expect(response.json()).toMatchObject({
       error: {
         code: "SESSION_ACTIVE_WRITER",
-        message: "检测到 ChatGPT 正在占用此会话。切换会话或关闭窗口可能不会释放锁，请完全退出 ChatGPT（⌘Q）或重启 ChatGPT，也可以从下方创建新分支"
+        message: "此会话由其他客户端持有写入权，当前操作无法继续。文字续聊可通过兼容版本的原生队列投递；请保留输入，勿重复发送"
       }
     });
   });

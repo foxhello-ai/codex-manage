@@ -12,6 +12,8 @@ export type RetryContext = {
   messageId: string;
   turnId: string | null;
   text: string;
+  clientRequestId?: string;
+  attachmentPaths?: string[];
 };
 
 export type RetryMessageCandidate = {

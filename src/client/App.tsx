@@ -33,7 +33,7 @@ type LiveMessage = {
   turnId: string | null;
   itemId: string | null;
   text: string;
-  deliveryStatus: "sending" | "sent" | "failed" | null;
+  deliveryStatus: "sending" | "sent" | "failed" | "queued" | "unknown" | null;
 };
 
 type LiveErrorNotice = {
@@ -53,6 +53,8 @@ type LiveTimelineEntry = {
 
 type SendInputOptions = {
   isRetry?: boolean;
+  attachmentPaths?: string[];
+  clientRequestId?: string;
 };
 
 
@@ -430,6 +432,26 @@ function Dashboard({
   }, [selectedSessionId]);
 
   useEffect(() => {
+    if (!selectedSessionId || viewMode !== "detail") return;
+    const sessionId = selectedSessionId;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function observe() {
+      if (cancelled) return;
+      const nextRuntime = await loadRuntime(sessionId, { silent: true });
+      if (cancelled) return;
+      if (document.visibilityState === "visible" && nextRuntime?.executionSource !== "manage") {
+        await loadSessionDetail(sessionId, { silent: true, includeTurns: true });
+      }
+      if (cancelled) return;
+      const pending = nextRuntime?.deliveries?.some(row => !["completed", "failed"].includes(row.status));
+      timer = setTimeout(() => void observe(), pending ? 1000 : 5000);
+    }
+    timer = setTimeout(() => void observe(), 1000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [selectedSessionId, viewMode]);
+
+  useEffect(() => {
     searchRef.current = search;
   }, [search]);
 
@@ -611,6 +633,7 @@ function Dashboard({
     const removedMessageIds = new Set<string>();
     const retainedMessages = liveMessagesRef.current.filter((message) => {
       const belongsToHistory = Boolean(message.itemId && historicalItemIds.has(message.itemId))
+        || (message.role === "user" && historicalTurns.some(turn => turn.items.some(item => item.type === "user_message" && item.clientId === message.id)))
         || Boolean(message.turnId && historicalTurnIds.has(message.turnId))
         || (message.role === "user" && Boolean(message.turnId) && historicalTurns.some((turn) => turn.id === message.turnId
           && turn.items.some((item): item is Extract<SessionTurnItem, { type: "user_message" }> => item.type === "user_message"
@@ -721,6 +744,7 @@ function Dashboard({
   }
 
   function handleOpenModelPicker() {
+    if (runtime?.executionSource === "external_queue") { setModelActionError("此会话的模型、权限和审批请到桌面调整"); return; }
     const disabledReason = modelSwitchDisabledReason(runtime?.status ?? selectedSession?.status ?? "history");
     if (disabledReason) {
       setModelActionError(disabledReason);
@@ -766,7 +790,9 @@ function Dashboard({
 
   async function handleRetryLastMessage() {
     if (!retryContext) return;
-    await handleSendInput(retryContext.text, { isRetry: true });
+    if (selectedSessionId) await sendInputToSession(selectedSessionId, retryContext.text, permissionMode, {
+      isRetry: true, clientRequestId: retryContext.clientRequestId, attachmentPaths: retryContext.attachmentPaths
+    });
     setRetryDialogOpen(false);
     setRetryContext(null);
     retryContextRef.current = null;
@@ -1203,9 +1229,14 @@ function Dashboard({
     };
   }, [selectedSessionId, wsReconnectKey]);
 
-  async function handleSendInput(text: string, options: SendInputOptions = {}) {
+  async function handleSendInput(text: string, attachmentPaths?: string[]) {
     if (!selectedSessionId) return;
-    await sendInputToSession(selectedSessionId, text, permissionMode, options);
+    const previous = retryContextRef.current;
+    const retryingDraft = previous?.turnId === null && previous.text === text
+      && JSON.stringify(previous.attachmentPaths ?? []) === JSON.stringify(attachmentPaths ?? []);
+    await sendInputToSession(selectedSessionId, text, permissionMode, {
+      attachmentPaths, clientRequestId: retryingDraft ? previous?.clientRequestId : undefined
+    });
   }
 
   async function sendInputToSession(
@@ -1219,7 +1250,7 @@ function Dashboard({
       setRetryContext(null);
       retryContextRef.current = null;
     }
-    const messageId = createLocalMessageId();
+    const messageId = options.clientRequestId ?? createLocalMessageId();
     const localMessage: LiveMessage = {
       id: messageId,
       role: "user",
@@ -1231,13 +1262,17 @@ function Dashboard({
     registerLiveTimelineEntry("message", messageId);
     setRuntimeError(null);
     if (!options.isRetry) setSessionNotice(null);
-    liveMessagesRef.current = [...liveMessagesRef.current, localMessage];
-    setLiveMessages((current) => [...current, localMessage]);
+    liveMessagesRef.current = [...liveMessagesRef.current.filter(item => item.id !== messageId), localMessage];
+    setLiveMessages((current) => [...current.filter(item => item.id !== messageId), localMessage]);
     try {
-      const response = await sendSessionInput(sessionId, text, nextPermissionMode);
+      const external = runtime?.threadId === sessionId && runtime.executionSource === "external_queue";
+      const response = await sendSessionInput(sessionId, text, external ? undefined : nextPermissionMode, messageId, options.attachmentPaths, external);
       if (selectedSessionIdRef.current !== sessionId) return;
       const acknowledgedMessages = bindLiveMessageToTurn(
-        updateLiveMessageDeliveryStatus(liveMessagesRef.current, messageId, "sent"),
+        updateLiveMessageDeliveryStatus(liveMessagesRef.current, messageId,
+          response.runtime.executionSource === "external_queue"
+            ? response.runtime.deliveries?.find(row => row.requestId === messageId)?.status === "unknown" ? "unknown" : "queued"
+            : "sent"),
         messageId,
         response.runtime.activeTurnId
       );
@@ -1255,7 +1290,7 @@ function Dashboard({
       const activeWriter = code === "SESSION_ACTIVE_WRITER" || isActiveWriterMessage(message);
       setRuntimeError(activeWriter ? null : message);
       registerLiveTimelineEntry("error", `input-${messageId}`);
-      const nextRetryContext = { messageId, turnId: null, text };
+      const nextRetryContext = { messageId, turnId: null, text, clientRequestId: messageId, attachmentPaths: options.attachmentPaths };
       setLiveErrors((current) => upsertById(current, {
         id: `input-${messageId}`,
         turnId: null,
@@ -2304,7 +2339,7 @@ function SessionDetailPanel({
   historyContinuationPending: boolean;
   onPermissionModeChange: (permissionMode: SessionPermissionMode) => Promise<void>;
   onOpenModelPicker: (retryContext?: RetryContext | null) => void;
-  onSendInput: (text: string) => Promise<void>;
+  onSendInput: (text: string, attachmentPaths?: string[]) => Promise<void>;
   onOpenRetry: (context: RetryContext) => void;
   onBranchSession: (mode: SessionBranchMode, retryContext?: RetryContext | null) => Promise<void>;
   onContinueFromHistory: (retryContext?: RetryContext | null) => void;
@@ -2408,8 +2443,8 @@ function SessionDetailPanel({
     });
   }
 
-  async function handleSendInput(text: string) {
-    await onSendInput(text);
+  async function handleSendInput(text: string, attachmentPaths?: string[]) {
+    await onSendInput(text, attachmentPaths);
   }
 
   return (
@@ -2534,6 +2569,16 @@ function SessionDetailPanel({
         </div>
       </div>
       <div className="composerDock">
+        {runtime?.executionSource === "external_queue" ? (
+          <div className="successBanner composerWarning" role="status">
+            此会话由桌面或其他客户端处理。后续文字沿用桌面设置并通过原生队列发送，审批、停止任务和设置请到桌面操作。
+            {runtime.deliveries?.filter(row => row.status !== "completed").map(row => (
+              <div key={row.requestId}>{row.status === "unknown" || row.status === "submitting" ? "投递结果待确认，请勿重复发送" : row.status === "failed" ? "桌面处理失败" : row.status === "observed" ? "消息已进入原会话，等待桌面完成" : "已入队，等待桌面处理"}：{row.text.slice(0, 120)}{row.error ? `（${row.error}）` : ""}</div>
+            ))}
+          </div>
+        ) : runtime?.leaseStatus === "releasing" ? <div className="composerWarning" role="status">正在释放占用，后续消息会按顺序处理。</div>
+          : runtime?.leaseStatus === "released" ? <div className="composerWarning" role="status">已释放占用，可在桌面继续原会话。</div>
+          : runtime?.leaseStatus === "blocked" ? <div className="composerWarning" role="status">暂未释放：{runtime.leaseReason}</div> : null}
         {sessionNotice ? <div className="successBanner composerWarning" role="status">{sessionNotice}</div> : null}
         {runtimeError && !(timelineAtLatestRef.current && liveErrors.some((notice) => notice.message === runtimeError && visibleLiveTimeline.some((entry) => entry.kind === "error" && entry.id === notice.id))) ? <div className="errorBanner composerWarning" role="alert">{runtimeError}</div> : null}
         {runtime?.permissionMode === "full_access" && pendingApprovals.length > 0 ? (
@@ -2581,8 +2626,9 @@ function ComposerRuntimeBar({
   const status = runtime?.status ?? "history";
   const model = runtime?.model ?? modelState.actualModel ?? modelState.preferredModel;
   const effort = runtime?.reasoningEffort ?? modelState.actualReasoningEffort ?? modelState.preferredReasoningEffort;
-  const modelDisabledReason = modelSwitchDisabledReason(status);
-  const canChangePermission = status === "history" || status === "waiting_input" || status === "exited" || status === "failed";
+  const external = runtime?.executionSource === "external_queue";
+  const modelDisabledReason = external ? "请到桌面调整模型" : modelSwitchDisabledReason(status);
+  const canChangePermission = !external && (status === "history" || status === "waiting_input" || status === "exited" || status === "failed");
   const [updatingPermission, setUpdatingPermission] = useState(false);
   const [confirmFullAccess, setConfirmFullAccess] = useState(false);
 
@@ -2617,7 +2663,7 @@ function ComposerRuntimeBar({
         </button>
         {isChild ? <span className="permissionBadge controlled">受控模式</span> : (
           <button className={`ghostButton composerPermissionButton${permissionMode === "full_access" ? " fullAccess" : ""}`} type="button" onClick={handlePermissionToggle} disabled={!canChangePermission || updatingPermission} title={!canChangePermission ? "当前状态不可切换权限模式" : "切换权限模式"}>
-            {updatingPermission ? "切换中" : permissionMode === "full_access" ? "完全权限" : "需审批"}
+            {external ? "权限由桌面管理" : updatingPermission ? "切换中" : permissionMode === "full_access" ? "完全权限" : "需审批"}
           </button>
         )}
       </div>
@@ -2849,7 +2895,7 @@ function tailText(text: string, maxChars: number): string {
   return `已隐藏前 ${hiddenChars} 字符，仅展示最新输出\n\n${text.slice(-maxChars)}`;
 }
 
-function TaskInput({ sessionId, workspace, runtime, onSend, controls }: { sessionId: string; workspace: string; runtime: RuntimeSnapshot | null; onSend: (text: string) => Promise<void>; controls: ReactNode }) {
+function TaskInput({ sessionId, workspace, runtime, onSend, controls }: { sessionId: string; workspace: string; runtime: RuntimeSnapshot | null; onSend: (text: string, attachmentPaths?: string[]) => Promise<void>; controls: ReactNode }) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<UploadedSessionAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -2880,6 +2926,7 @@ function TaskInput({ sessionId, workspace, runtime, onSend, controls }: { sessio
 
   async function uploadFiles(files: File[]) {
     if (files.length === 0 || disabled) return;
+    if (runtime?.executionSource === "external_queue") { setUploadError("桌面会话本期仅支持文字，附件请到桌面添加"); return; }
     setUploading(true);
     setUploadError(null);
     try {
@@ -2918,10 +2965,7 @@ function TaskInput({ sessionId, workspace, runtime, onSend, controls }: { sessio
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      const attachmentText = attachments.length
-        ? `\n\n请读取以下附件作为本次输入上下文：\n${attachments.map((attachment) => `- ${attachment.path}`).join("\n")}`
-        : "";
-      await onSend(`${nextText}${attachmentText}`);
+      await onSend(nextText, attachments.map(attachment => attachment.path));
       setText("");
       setAttachments([]);
       setUploadError(null);
@@ -4585,6 +4629,10 @@ function deliveryStatusLabel(status: Exclude<LiveMessage["deliveryStatus"], null
       return "发送中";
     case "sent":
       return "已发送";
+    case "queued":
+      return "已入队";
+    case "unknown":
+      return "投递待确认";
     case "failed":
       return "发送失败";
   }

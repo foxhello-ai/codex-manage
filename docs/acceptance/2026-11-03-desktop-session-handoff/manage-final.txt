@@ -1,0 +1,90 @@
+Codex Manage
+⚙
+登出
+Codex
+最近会话
+⌕
+最近会话
+按工作目录
+按任务
+＋ 新建会话
+
+最近修改的 1 个会话，按时间倒序排列
+
+DEX-DESKTOP-ONE
+
+DEX-DESKTOP-ONE
+
+workspace
+11/03 18:11
+✎
+
+当前会话
+
+DEX-DESKTOP-ONE
+刷新
+当前会话详情
+工作目录
+workspace
+更新时间
+11/03 18:12
+会话 ID
+01a1a0e4...c9cb
+⧉
+本轮已完成
+11/03 18:11
+用户
+
+DEX-DESKTOP-ONE
+
+Codex
+
+Local stub completed DEX-DESKTOP-ONE
+
+本轮已完成
+11/03 18:12
+用户
+
+DEX-EXTERNAL-QUEUE
+
+Codex
+
+Local stub completed DEX-EXTERNAL-QUEUE
+
+本轮已完成
+11/03 18:12
+用户
+
+DEX-DESKTOP-THREE
+
+Codex
+
+Local stub completed DEX-DESKTOP-THREE
+
+本轮已完成
+11/03 18:12
+用户
+
+DEX-DESKTOP-SLOW
+
+Codex
+
+Local stub completed DEX-DESKTOP-SLOW
+
+本轮已完成
+11/03 18:12
+用户
+
+DEX-EXTERNAL-AFTER-BUSY
+
+Codex
+
+Local stub completed DEX-EXTERNAL-AFTER-BUSY
+
+↑
+此会话由桌面或其他客户端处理。后续文字沿用桌面设置并通过原生队列发送，审批、停止任务和设置请到桌面操作。
+历史会话
+＋
+research-local-stub
+⌄
+权限由桌面管理

@@ -1,0 +1,542 @@
+{
+  "config": {
+    "argv": [
+      "/Users/fumingzhen/.nvm/versions/node/v22.22.0/bin/node",
+      "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "playwright.ui.config.ts",
+      "--project",
+      "desktop",
+      "--project",
+      "mobile-390",
+      "--workers",
+      "1",
+      "--grep",
+      "retry|retained draft|desktop queue|successful send|live commands"
+    ],
+    "configFile": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/playwright.ui.config.ts",
+    "rootDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/tests/ui",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-320",
+        "name": "mobile-320",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-375",
+        "name": "mobile-375",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-390",
+        "name": "mobile-390",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-430",
+        "name": "mobile-430",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "landscape-736",
+        "name": "landscape-736",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "landscape-844",
+        "name": "landscape-844",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "desktop",
+        "name": "desktop",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-session-handoff/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report/ui",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/tmp/desktop-handoff-ui-results-final.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": {
+      "command": "npx vite preview --host 127.0.0.1 --port 4321 --strictPort",
+      "url": "http://127.0.0.1:4321",
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "h5-ui.e2e.ts",
+      "file": "h5-ui.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15883,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:14:25.543Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-d3e229ed0bcc77095851",
+          "file": "h5-ui.e2e.ts",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4158,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:14:45.109Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-149e479fe923af3a2fd1",
+          "file": "h5-ui.e2e.ts",
+          "line": 249,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3285,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:14:49.313Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-c87c165ddcc6323b9b5f",
+          "file": "h5-ui.e2e.ts",
+          "line": 317,
+          "column": 1
+        },
+        {
+          "title": "desktop queue follows desktop settings and keeps uncertain delivery visible without resending",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2440,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:14:52.640Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-cd51fce846a492ae7bd3",
+          "file": "h5-ui.e2e.ts",
+          "line": 336,
+          "column": 1
+        },
+        {
+          "title": "resending a retained draft after a failed HTTP request keeps its original delivery ID",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-390",
+              "projectName": "mobile-390",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2309,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:14:55.117Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-2eee15d4cca3acd95bad",
+          "file": "h5-ui.e2e.ts",
+          "line": 352,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5378,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:15:00.842Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-e8b0285b4d5438bbadb5",
+          "file": "h5-ui.e2e.ts",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2610,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:15:07.383Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-ad22464b2e4cdf769bae",
+          "file": "h5-ui.e2e.ts",
+          "line": 249,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:15:10.034Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-234edd01a5309208756f",
+          "file": "h5-ui.e2e.ts",
+          "line": 317,
+          "column": 1
+        },
+        {
+          "title": "desktop queue follows desktop settings and keeps uncertain delivery visible without resending",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2262,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:15:12.495Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-61207594f5ce2effaa69",
+          "file": "h5-ui.e2e.ts",
+          "line": 336,
+          "column": 1
+        },
+        {
+          "title": "resending a retained draft after a failed HTTP request keeps its original delivery ID",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2335,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T10:15:14.804Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-1a4d20df5f5ff44fd40a",
+          "file": "h5-ui.e2e.ts",
+          "line": 352,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-03T10:14:17.144Z",
+    "duration": 62076.655999999995,
+    "expected": 10,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

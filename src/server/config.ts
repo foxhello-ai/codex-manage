@@ -21,6 +21,8 @@ type AppConfig = {
   metadataFile: string;
   collaborationFile?: string;
   clientDir: string;
+  autoReleaseEnabled?: boolean;
+  desktopQueueEnabled?: boolean;
 };
 
 function readPort(value: string | undefined, fallback: number): number {
@@ -68,6 +70,8 @@ export function loadConfig(): AppConfig {
     sessionSecret,
     codexCliPath: process.env.CODEX_CLI_PATH?.trim() || getDefaultCodexCliPath(),
     expectedCodexCliVersion,
+    autoReleaseEnabled: process.env.CODEX_MANAGE_AUTO_RELEASE !== "0",
+    desktopQueueEnabled: process.env.CODEX_MANAGE_DESKTOP_QUEUE !== "0",
     sessionsDir: expandHome(process.env.CODEX_SESSIONS_DIR ?? "~/.codex/sessions"),
     metadataFile: expandHome(process.env.CODEX_MANAGE_METADATA_FILE ?? join(process.cwd(), ".codex-manage/session-metadata.json")),
     collaborationFile: expandHome(process.env.CODEX_MANAGE_COLLABORATION_FILE ?? join(process.cwd(), ".codex-manage/collaboration.json")),

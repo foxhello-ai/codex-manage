@@ -1,0 +1,876 @@
+{
+  "date": "2026-11-03T10:09:23.050Z",
+  "root": "/tmp/mhi-RYx2Oc",
+  "checks": [
+    {
+      "id": "normal-private-backend",
+      "outcome": "pass",
+      "evidence": {
+        "backend": {
+          "pid": 18698,
+          "ppid": 18065,
+          "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+        }
+      }
+    },
+    {
+      "id": "desktop-existing-thread",
+      "outcome": "pass",
+      "evidence": {
+        "path": "/tmp/mhi-RYx2Oc/home/sessions/2026/11/03/rollout-2026-11-03T18-11-27-01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb.jsonl",
+        "id": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb"
+      }
+    },
+    {
+      "id": "manage-ui-enqueues-DEX-EXTERNAL-QUEUE",
+      "outcome": "pass",
+      "evidence": {
+        "status": 202,
+        "runtime": {
+          "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+          "status": "history",
+          "permissionMode": "default",
+          "activeTurnId": null,
+          "startedAt": "2026-11-03T10:11:59.847Z",
+          "updatedAt": "2026-11-03T10:12:00.414Z",
+          "lastError": null,
+          "model": null,
+          "modelProvider": null,
+          "reasoningEffort": null,
+          "modelSelection": {
+            "mode": "follow_session",
+            "preferredModel": null,
+            "preferredReasoningEffort": null,
+            "actualModel": null,
+            "actualModelProvider": null,
+            "actualReasoningEffort": null,
+            "actualModelSupported": null,
+            "applied": false,
+            "confirmationPending": false,
+            "updatedAt": null,
+            "lastError": null
+          },
+          "modelChangeStatus": "idle",
+          "modelChangeError": null,
+          "leaseStatus": "unknown",
+          "leaseReason": null,
+          "executionSource": "external_queue",
+          "deliveries": [
+            {
+              "requestId": "user-c244114a-6340-42b4-a9cc-924daa2f85c9",
+              "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+              "text": "DEX-EXTERNAL-QUEUE",
+              "queueId": "01a1a0e4-ef25-71e3-b581-c5c3eac8b622",
+              "turnId": null,
+              "itemId": null,
+              "status": "queued",
+              "createdAt": "2026-11-03T10:12:00.415Z",
+              "error": null
+            }
+          ],
+          "pendingApprovalCount": 0,
+          "eventSeq": 3
+        }
+      }
+    },
+    {
+      "id": "native-queue-continues-desktop-thread",
+      "outcome": "pass",
+      "evidence": {
+        "code": 0,
+        "output": "{\"runtime\":{\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"status\":\"history\",\"permissionMode\":\"default\",\"activeTurnId\":null,\"startedAt\":\"2026-11-03T10:11:59.847Z\",\"updatedAt\":\"2026-11-03T10:12:00.414Z\",\"lastError\":null,\"model\":null,\"modelProvider\":null,\"reasoningEffort\":null,\"modelSelection\":{\"mode\":\"follow_session\",\"preferredModel\":null,\"preferredReasoningEffort\":null,\"actualModel\":null,\"actualModelProvider\":null,\"actualReasoningEffort\":null,\"actualModelSupported\":null,\"applied\":false,\"confirmationPending\":false,\"updatedAt\":null,\"lastError\":null},\"modelChangeStatus\":\"idle\",\"modelChangeError\":null,\"leaseStatus\":\"unknown\",\"leaseReason\":null,\"executionSource\":\"external_queue\",\"deliveries\":[{\"requestId\":\"user-c244114a-6340-42b4-a9cc-924daa2f85c9\",\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"text\":\"DEX-EXTERNAL-QUEUE\",\"queueId\":\"01a1a0e4-ef25-71e3-b581-c5c3eac8b622\",\"turnId\":null,\"itemId\":null,\"status\":\"queued\",\"createdAt\":\"2026-11-03T10:12:00.415Z\",\"error\":null}],\"pendingApprovalCount\":0,\"eventSeq\":3}}",
+        "desktopReplyCount": 1,
+        "replyObservedAfterMs": 6003,
+        "modelRequests": [
+          {
+            "at": 1793700697022,
+            "path": "/v1/responses",
+            "marker": "DEX-DESKTOP-ONE",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE"
+            ],
+            "assistantMarkers": []
+          },
+          {
+            "at": 1793700699673,
+            "path": "/v1/responses",
+            "marker": "DEX-DESKTOP-ONE",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE"
+            ],
+            "assistantMarkers": []
+          },
+          {
+            "at": 1793700724836,
+            "path": "/v1/responses",
+            "marker": "DEX-EXTERNAL-QUEUE",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE"
+            ],
+            "assistantMarkers": [
+              "DEX-DESKTOP-ONE"
+            ]
+          },
+          {
+            "at": 1793700728566,
+            "path": "/v1/responses",
+            "marker": "DEX-DESKTOP-THREE",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE"
+            ],
+            "assistantMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE"
+            ]
+          },
+          {
+            "at": 1793700730535,
+            "path": "/v1/responses",
+            "marker": "DEX-DESKTOP-SLOW",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE",
+              "DEX-DESKTOP-SLOW"
+            ],
+            "assistantMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE"
+            ]
+          },
+          {
+            "at": 1793700738784,
+            "path": "/v1/responses",
+            "marker": "DEX-EXTERNAL-AFTER-BUSY",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE",
+              "DEX-DESKTOP-SLOW",
+              "DEX-EXTERNAL-AFTER-BUSY"
+            ],
+            "assistantMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE",
+              "DEX-DESKTOP-SLOW"
+            ]
+          },
+          {
+            "at": 1793700745660,
+            "path": "/v1/responses",
+            "marker": "DEX-MANAGE-START",
+            "previousMarkers": [
+              "DEX-MANAGE-START"
+            ],
+            "assistantMarkers": []
+          },
+          {
+            "at": 1793700882164,
+            "path": "/v1/responses",
+            "marker": "DEX-DESKTOP-AFTER-MANAGE",
+            "previousMarkers": [
+              "DEX-MANAGE-START",
+              "DEX-DESKTOP-AFTER-MANAGE"
+            ],
+            "assistantMarkers": [
+              "DEX-MANAGE-START"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "queue-reuses-desktop-backend",
+      "outcome": "pass",
+      "evidence": {
+        "processes": [
+          {
+            "pid": 18698,
+            "ppid": 18065,
+            "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+          },
+          {
+            "pid": 21218,
+            "ppid": 21153,
+            "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/../CodexCLI.app/Contents/MacOS/codex app-server -c thread_unload_delay_secs=1"
+          }
+        ],
+        "controlSocketExists": false
+      }
+    },
+    {
+      "id": "desktop-continues-after-external-message",
+      "outcome": "pass",
+      "evidence": {
+        "at": 1793700728566,
+        "path": "/v1/responses",
+        "marker": "DEX-DESKTOP-THREE",
+        "previousMarkers": [
+          "DEX-DESKTOP-ONE",
+          "DEX-EXTERNAL-QUEUE",
+          "DEX-DESKTOP-THREE"
+        ],
+        "assistantMarkers": [
+          "DEX-DESKTOP-ONE",
+          "DEX-EXTERNAL-QUEUE"
+        ]
+      }
+    },
+    {
+      "id": "manage-ui-enqueues-DEX-EXTERNAL-AFTER-BUSY",
+      "outcome": "pass",
+      "evidence": {
+        "status": 202,
+        "runtime": {
+          "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+          "status": "history",
+          "permissionMode": "default",
+          "activeTurnId": null,
+          "startedAt": "2026-11-03T10:11:59.847Z",
+          "updatedAt": "2026-11-03T10:12:00.414Z",
+          "lastError": null,
+          "model": null,
+          "modelProvider": null,
+          "reasoningEffort": null,
+          "modelSelection": {
+            "mode": "follow_session",
+            "preferredModel": null,
+            "preferredReasoningEffort": null,
+            "actualModel": null,
+            "actualModelProvider": null,
+            "actualReasoningEffort": null,
+            "actualModelSupported": null,
+            "applied": false,
+            "confirmationPending": false,
+            "updatedAt": null,
+            "lastError": null
+          },
+          "modelChangeStatus": "idle",
+          "modelChangeError": null,
+          "leaseStatus": "unknown",
+          "leaseReason": null,
+          "executionSource": "external_queue",
+          "deliveries": [
+            {
+              "requestId": "user-c244114a-6340-42b4-a9cc-924daa2f85c9",
+              "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+              "text": "DEX-EXTERNAL-QUEUE",
+              "queueId": "01a1a0e4-ef25-71e3-b581-c5c3eac8b622",
+              "turnId": "01a1a0e4-ff6a-7bd2-ae50-6a9639370615",
+              "itemId": "01a1a0e4-fff3-78c0-a803-efff57ca9a5f",
+              "status": "completed",
+              "createdAt": "2026-11-03T10:12:00.415Z",
+              "error": null
+            },
+            {
+              "requestId": "user-8e44dce1-8e2c-4c81-b063-e7ba896fca5e",
+              "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+              "text": "DEX-EXTERNAL-AFTER-BUSY",
+              "queueId": "01a1a0e5-1756-7763-bfe4-fed1d69bc2cc",
+              "turnId": null,
+              "itemId": null,
+              "status": "queued",
+              "createdAt": "2026-11-03T10:12:10.700Z",
+              "error": null
+            }
+          ],
+          "pendingApprovalCount": 0,
+          "eventSeq": 3
+        }
+      }
+    },
+    {
+      "id": "queue-during-active-desktop-turn",
+      "outcome": "pass",
+      "evidence": {
+        "code": 0,
+        "output": "{\"runtime\":{\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"status\":\"history\",\"permissionMode\":\"default\",\"activeTurnId\":null,\"startedAt\":\"2026-11-03T10:11:59.847Z\",\"updatedAt\":\"2026-11-03T10:12:00.414Z\",\"lastError\":null,\"model\":null,\"modelProvider\":null,\"reasoningEffort\":null,\"modelSelection\":{\"mode\":\"follow_session\",\"preferredModel\":null,\"preferredReasoningEffort\":null,\"actualModel\":null,\"actualModelProvider\":null,\"actualReasoningEffort\":null,\"actualModelSupported\":null,\"applied\":false,\"confirmationPending\":false,\"updatedAt\":null,\"lastError\":null},\"modelChangeStatus\":\"idle\",\"modelChangeError\":null,\"leaseStatus\":\"unknown\",\"leaseReason\":null,\"executionSource\":\"external_queue\",\"deliveries\":[{\"requestId\":\"user-c244114a-6340-42b4-a9cc-924daa2f85c9\",\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"text\":\"DEX-EXTERNAL-QUEUE\",\"queueId\":\"01a1a0e4-ef25-71e3-b581-c5c3eac8b622\",\"turnId\":\"01a1a0e4-ff6a-7bd2-ae50-6a9639370615\",\"itemId\":\"01a1a0e4-fff3-78c0-a803-efff57ca9a5f\",\"status\":\"completed\",\"createdAt\":\"2026-11-03T10:12:00.415Z\",\"error\":null},{\"requestId\":\"user-8e44dce1-8e2c-4c81-b063-e7ba896fca5e\",\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"text\":\"DEX-EXTERNAL-AFTER-BUSY\",\"queueId\":\"01a1a0e5-1756-7763-bfe4-fed1d69bc2cc\",\"turnId\":null,\"itemId\":null,\"status\":\"queued\",\"createdAt\":\"2026-11-03T10:12:10.700Z\",\"error\":null}],\"pendingApprovalCount\":0,\"eventSeq\":3}}",
+        "request": {
+          "at": 1793700738784,
+          "path": "/v1/responses",
+          "marker": "DEX-EXTERNAL-AFTER-BUSY",
+          "previousMarkers": [
+            "DEX-DESKTOP-ONE",
+            "DEX-EXTERNAL-QUEUE",
+            "DEX-DESKTOP-THREE",
+            "DEX-DESKTOP-SLOW",
+            "DEX-EXTERNAL-AFTER-BUSY"
+          ],
+          "assistantMarkers": [
+            "DEX-DESKTOP-ONE",
+            "DEX-EXTERNAL-QUEUE",
+            "DEX-DESKTOP-THREE",
+            "DEX-DESKTOP-SLOW"
+          ]
+        }
+      }
+    },
+    {
+      "id": "delivery-completion-correlated-with-persisted-turns",
+      "outcome": "pass",
+      "evidence": {
+        "deliveries": [
+          {
+            "requestId": "user-c244114a-6340-42b4-a9cc-924daa2f85c9",
+            "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+            "text": "DEX-EXTERNAL-QUEUE",
+            "queueId": "01a1a0e4-ef25-71e3-b581-c5c3eac8b622",
+            "turnId": "01a1a0e4-ff6a-7bd2-ae50-6a9639370615",
+            "itemId": "01a1a0e4-fff3-78c0-a803-efff57ca9a5f",
+            "status": "completed",
+            "createdAt": "2026-11-03T10:12:00.415Z",
+            "error": null
+          },
+          {
+            "requestId": "user-8e44dce1-8e2c-4c81-b063-e7ba896fca5e",
+            "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+            "text": "DEX-EXTERNAL-AFTER-BUSY",
+            "queueId": "01a1a0e5-1756-7763-bfe4-fed1d69bc2cc",
+            "turnId": "01a1a0e5-3638-7c12-9de2-964f72683dd9",
+            "itemId": "01a1a0e5-3671-7df3-bd12-6a6069480ce6",
+            "status": "completed",
+            "createdAt": "2026-11-03T10:12:10.700Z",
+            "error": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "desktop-messages-auto-sync-to-manage",
+      "outcome": "pass",
+      "evidence": {}
+    },
+    {
+      "id": "same-thread-and-no-duplicates",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+        "counts": {
+          "DEX-DESKTOP-ONE": {
+            "user": 1,
+            "assistant": 1
+          },
+          "DEX-EXTERNAL-QUEUE": {
+            "user": 1,
+            "assistant": 1
+          },
+          "DEX-DESKTOP-THREE": {
+            "user": 1,
+            "assistant": 1
+          },
+          "DEX-DESKTOP-SLOW": {
+            "user": 1,
+            "assistant": 1
+          },
+          "DEX-EXTERNAL-AFTER-BUSY": {
+            "user": 1,
+            "assistant": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "new-thread-not-discarded-before-first-input",
+      "outcome": "pass",
+      "evidence": {
+        "managedId": "01a1a0e5-4316-7bd1-9ce7-08993c3dc647"
+      }
+    },
+    {
+      "id": "manage-starts-original-thread",
+      "outcome": "pass",
+      "evidence": {
+        "managedId": "01a1a0e5-4316-7bd1-9ce7-08993c3dc647",
+        "status": 200,
+        "body": {
+          "runtime": {
+            "threadId": "01a1a0e5-4316-7bd1-9ce7-08993c3dc647",
+            "status": "running",
+            "permissionMode": "default",
+            "activeTurnId": "01a1a0e5-4ee7-7903-babd-9f8d7ff0af52",
+            "startedAt": "2026-11-03T10:12:22.005Z",
+            "updatedAt": "2026-11-03T10:12:24.953Z",
+            "lastError": null,
+            "model": "research-local-stub",
+            "modelProvider": "research",
+            "reasoningEffort": null,
+            "modelSelection": {
+              "mode": "follow_session",
+              "preferredModel": null,
+              "preferredReasoningEffort": null,
+              "actualModel": "research-local-stub",
+              "actualModelProvider": "research",
+              "actualReasoningEffort": null,
+              "actualModelSupported": null,
+              "applied": false,
+              "confirmationPending": false,
+              "updatedAt": null,
+              "lastError": null
+            },
+            "modelChangeStatus": "idle",
+            "modelChangeError": null,
+            "leaseStatus": "owned",
+            "leaseReason": null,
+            "executionSource": "manage",
+            "pendingApprovalCount": 0,
+            "eventSeq": 9
+          }
+        }
+      }
+    },
+    {
+      "id": "desktop-reports-active-writer-while-manage-runs",
+      "outcome": "pass",
+      "evidence": {
+        "managedId": "01a1a0e5-4316-7bd1-9ce7-08993c3dc647"
+      }
+    },
+    {
+      "id": "manage-auto-releases-original-thread",
+      "outcome": "pass",
+      "evidence": {
+        "managedId": "01a1a0e5-4316-7bd1-9ce7-08993c3dc647",
+        "runtime": {
+          "threadId": "01a1a0e5-4316-7bd1-9ce7-08993c3dc647",
+          "status": "history",
+          "permissionMode": "default",
+          "activeTurnId": null,
+          "startedAt": "2026-11-03T10:12:22.005Z",
+          "updatedAt": "2026-11-03T10:13:17.017Z",
+          "lastError": null,
+          "model": "research-local-stub",
+          "modelProvider": "research",
+          "reasoningEffort": null,
+          "modelSelection": {
+            "mode": "follow_session",
+            "preferredModel": null,
+            "preferredReasoningEffort": null,
+            "actualModel": "research-local-stub",
+            "actualModelProvider": "research",
+            "actualReasoningEffort": null,
+            "actualModelSupported": null,
+            "applied": false,
+            "confirmationPending": false,
+            "updatedAt": null,
+            "lastError": null
+          },
+          "modelChangeStatus": "idle",
+          "modelChangeError": null,
+          "leaseStatus": "released",
+          "leaseReason": null,
+          "pendingApprovalCount": 0,
+          "eventSeq": 20
+        }
+      }
+    },
+    {
+      "id": "desktop-continues-manage-original-with-context",
+      "outcome": "pass",
+      "evidence": {
+        "managedId": "01a1a0e5-4316-7bd1-9ce7-08993c3dc647",
+        "request": {
+          "at": 1793700882164,
+          "path": "/v1/responses",
+          "marker": "DEX-DESKTOP-AFTER-MANAGE",
+          "previousMarkers": [
+            "DEX-MANAGE-START",
+            "DEX-DESKTOP-AFTER-MANAGE"
+          ],
+          "assistantMarkers": [
+            "DEX-MANAGE-START"
+          ]
+        }
+      }
+    },
+    {
+      "id": "real-desktop-preserved",
+      "outcome": "pass",
+      "evidence": {
+        "pids": [
+          18044,
+          44531,
+          47026,
+          63473,
+          68095
+        ]
+      }
+    }
+  ],
+  "modelRequests": [
+    {
+      "at": 1793700697022,
+      "path": "/v1/responses",
+      "marker": "DEX-DESKTOP-ONE",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "at": 1793700699673,
+      "path": "/v1/responses",
+      "marker": "DEX-DESKTOP-ONE",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "at": 1793700724836,
+      "path": "/v1/responses",
+      "marker": "DEX-EXTERNAL-QUEUE",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE"
+      ],
+      "assistantMarkers": [
+        "DEX-DESKTOP-ONE"
+      ]
+    },
+    {
+      "at": 1793700728566,
+      "path": "/v1/responses",
+      "marker": "DEX-DESKTOP-THREE",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE"
+      ],
+      "assistantMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE"
+      ]
+    },
+    {
+      "at": 1793700730535,
+      "path": "/v1/responses",
+      "marker": "DEX-DESKTOP-SLOW",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE",
+        "DEX-DESKTOP-SLOW"
+      ],
+      "assistantMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE"
+      ]
+    },
+    {
+      "at": 1793700738784,
+      "path": "/v1/responses",
+      "marker": "DEX-EXTERNAL-AFTER-BUSY",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE",
+        "DEX-DESKTOP-SLOW",
+        "DEX-EXTERNAL-AFTER-BUSY"
+      ],
+      "assistantMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE",
+        "DEX-DESKTOP-SLOW"
+      ]
+    },
+    {
+      "at": 1793700745660,
+      "path": "/v1/responses",
+      "marker": "DEX-MANAGE-START",
+      "previousMarkers": [
+        "DEX-MANAGE-START"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "at": 1793700882164,
+      "path": "/v1/responses",
+      "marker": "DEX-DESKTOP-AFTER-MANAGE",
+      "previousMarkers": [
+        "DEX-MANAGE-START",
+        "DEX-DESKTOP-AFTER-MANAGE"
+      ],
+      "assistantMarkers": [
+        "DEX-MANAGE-START"
+      ]
+    }
+  ],
+  "isolation": {
+    "realSessionsUsed": false,
+    "realCredentialsUsed": false,
+    "realInferenceUsed": false,
+    "desktopPackageModified": false,
+    "backendReplaced": false,
+    "sharedServerConfigured": false
+  },
+  "protectedProcesses": [
+    {
+      "pid": 18044,
+      "ppid": 34553,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex app-server"
+    },
+    {
+      "pid": 44531,
+      "ppid": 1,
+      "command": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
+    },
+    {
+      "pid": 47026,
+      "ppid": 44531,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+    },
+    {
+      "pid": 63473,
+      "ppid": 92977,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex app-server --listen stdio://"
+    },
+    {
+      "pid": 68095,
+      "ppid": 78230,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex app-server --listen stdio://"
+    }
+  ],
+  "versions": {
+    "desktop": "26.1002.52244",
+    "cli": "codex-cli 0.162.0-alpha.2"
+  },
+  "desktopPageUrl": "app://-/index.html",
+  "desktopPid": 18065,
+  "desktopBackend": {
+    "pid": 18698,
+    "ppid": 18065,
+    "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+  },
+  "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+  "beforeQueue": {
+    "processes": [
+      {
+        "pid": 18065,
+        "ppid": 17986,
+        "command": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT --user-data-dir=/tmp/mhi-RYx2Oc/profile --remote-debugging-port=0 --remote-debugging-address=127.0.0.1"
+      },
+      {
+        "pid": 18067,
+        "ppid": 1,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/browser_crashpad_handler --monitor-self --monitor-self-annotation=ptype=crashpad-handler --database=/private/tmp/mhi-RYx2Oc/profile/Crashpad --annotation=plat=OS X --annotation=prod=ChatGPT_Mac --annotation=ver=155.0.8059.27 --handshake-fd=5"
+      },
+      {
+        "pid": 18069,
+        "ppid": 1,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/browser_crashpad_handler --no-periodic-tasks --monitor-self-annotation=ptype=crashpad-handler --database=/private/tmp/mhi-RYx2Oc/profile/Crashpad --annotation=plat=OS X --annotation=prod=ChatGPT_Mac --annotation=ver=155.0.8059.27 --handshake-fd=4"
+      },
+      {
+        "pid": 18093,
+        "ppid": 18065,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service) --type=gpu-process --gpu-recent-crash-count=0 --user-data-dir=/tmp/mhi-RYx2Oc/profile --start-stack-profiler --gpu-preferences=WAAAAAAAAAAgAQAEAAAAAAAAAAAAAGAAQAAAAAAAAAADAAAAAAAAADgAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAKAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAADAAAAAEAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAAA= --shared-files --metrics-shmem-handle=1752395122,r,1147096572854646829,13373181011365968239,262144 --field-trial-handle=1718379636,r,12535884698519479386,13680227155344449951,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,5293074359129767436,12871652707228023735,4 --trace-process-track-uuid=3190708988185955192 --seatbelt-client=43"
+      },
+      {
+        "pid": 18094,
+        "ppid": 18065,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service) --type=utility --utility-sub-type=network.mojom.NetworkService --lang=zh-CN --service-sandbox-type=network --owl-scoped-user-agent-additional-hosts=openai.com,chatgpt.com,chatgpt.site,chatgpt-team.site --owl-scoped-user-agent-prefix=CodexBrowser --user-data-dir=/tmp/mhi-RYx2Oc/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --start-stack-profiler --shared-files --metrics-shmem-handle=1752395122,r,12369458442675174797,14510523601902652042,524288 --field-trial-handle=1718379636,r,12535884698519479386,13680227155344449951,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,5293074359129767436,12871652707228023735,4 --trace-process-track-uuid=3190708989122997041 --seatbelt-client=43"
+      },
+      {
+        "pid": 18159,
+        "ppid": 18065,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service) --type=utility --utility-sub-type=storage.mojom.StorageService --lang=zh-CN --service-sandbox-type=service --user-data-dir=/tmp/mhi-RYx2Oc/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --shared-files --metrics-shmem-handle=1752395122,r,17049615020471159755,11285061447563683112,524288 --field-trial-handle=1718379636,r,12535884698519479386,13680227155344449951,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,5293074359129767436,12871652707228023735,4 --trace-process-track-uuid=3190708990060038890 --seatbelt-client=62"
+      },
+      {
+        "pid": 18690,
+        "ppid": 18065,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/native/bare-modifier-monitor --key DoubleCommand --immediate"
+      },
+      {
+        "pid": 18697,
+        "ppid": 18065,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer) --type=renderer --user-data-dir=/tmp/mhi-RYx2Oc/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --owl-scoped-user-agent-additional-hosts=openai.com,chatgpt.com,chatgpt.site,chatgpt-team.site --owl-scoped-user-agent-prefix=CodexBrowser --start-stack-profiler --remote-debugging-port=0 --enable-blink-features=WebMCP --disable-blink-features=ReplacedNormalFlowStackingInlinePaint --lang=zh-CN --num-raster-threads=4 --enable-zero-copy --enable-gpu-memory-buffer-compositor-resources --enable-main-frame-before-activation --renderer-client-id=7 --launch-time-ticks=620702090426 --shared-files --metrics-shmem-handle=1752395122,r,7810033519877332655,11672578185140584551,1572864 --field-trial-handle=1718379636,r,12535884698519479386,13680227155344449951,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,5293074359129767436,12871652707228023735,4 --trace-process-track-uuid=3190708992871164437 --seatbelt-client=144"
+      },
+      {
+        "pid": 18698,
+        "ppid": 18065,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+      },
+      {
+        "pid": 20007,
+        "ppid": 18065,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer) --type=renderer --user-data-dir=/tmp/mhi-RYx2Oc/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --owl-scoped-user-agent-additional-hosts=openai.com,chatgpt.com,chatgpt.site,chatgpt-team.site --owl-scoped-user-agent-prefix=CodexBrowser --start-stack-profiler --remote-debugging-port=0 --enable-blink-features=WebMCP --disable-blink-features=ReplacedNormalFlowStackingInlinePaint --lang=zh-CN --num-raster-threads=4 --enable-zero-copy --enable-gpu-memory-buffer-compositor-resources --enable-main-frame-before-activation --renderer-client-id=11 --launch-time-ticks=620785841567 --shared-files --metrics-shmem-handle=1752395122,r,9721111108709522831,6201241185968354530,1572864 --field-trial-handle=1718379636,r,12535884698519479386,13680227155344449951,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,5293074359129767436,12871652707228023735,4 --trace-process-track-uuid=3190708996619331833 --seatbelt-client=219"
+      },
+      {
+        "pid": 20008,
+        "ppid": 18065,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer) --type=renderer --user-data-dir=/tmp/mhi-RYx2Oc/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --owl-scoped-user-agent-additional-hosts=openai.com,chatgpt.com,chatgpt.site,chatgpt-team.site --owl-scoped-user-agent-prefix=CodexBrowser --remote-debugging-port=0 --enable-blink-features=WebMCP --disable-blink-features=ReplacedNormalFlowStackingInlinePaint --lang=zh-CN --num-raster-threads=4 --enable-zero-copy --enable-gpu-memory-buffer-compositor-resources --enable-main-frame-before-activation --renderer-client-id=12 --launch-time-ticks=620785864118 --shared-files --metrics-shmem-handle=1752395122,r,16734729761033464686,4655585882115562827,1572864 --field-trial-handle=1718379636,r,12535884698519479386,13680227155344449951,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,5293074359129767436,12871652707228023735,4 --trace-process-track-uuid=3190708997556373682 --seatbelt-client=219"
+      },
+      {
+        "pid": 20391,
+        "ppid": 18698,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node ./server.mjs"
+      },
+      {
+        "pid": 20392,
+        "ppid": 18698,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"
+      },
+      {
+        "pid": 20393,
+        "ppid": 18698,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node /Applications/ChatGPT.app/Contents/Resources/cua_node/lib/node_modules/@oai/cua-repl/bin/cua-repl.mjs"
+      },
+      {
+        "pid": 20394,
+        "ppid": 18698,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node ./server.mjs"
+      },
+      {
+        "pid": 20461,
+        "ppid": 20393,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"
+      },
+      {
+        "pid": 20717,
+        "ppid": 18698,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"
+      }
+    ],
+    "controlSocketExists": false
+  },
+  "queue": {
+    "code": 0,
+    "start": 1793700720284,
+    "output": "{\"runtime\":{\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"status\":\"history\",\"permissionMode\":\"default\",\"activeTurnId\":null,\"startedAt\":\"2026-11-03T10:11:59.847Z\",\"updatedAt\":\"2026-11-03T10:12:00.414Z\",\"lastError\":null,\"model\":null,\"modelProvider\":null,\"reasoningEffort\":null,\"modelSelection\":{\"mode\":\"follow_session\",\"preferredModel\":null,\"preferredReasoningEffort\":null,\"actualModel\":null,\"actualModelProvider\":null,\"actualReasoningEffort\":null,\"actualModelSupported\":null,\"applied\":false,\"confirmationPending\":false,\"updatedAt\":null,\"lastError\":null},\"modelChangeStatus\":\"idle\",\"modelChangeError\":null,\"leaseStatus\":\"unknown\",\"leaseReason\":null,\"executionSource\":\"external_queue\",\"deliveries\":[{\"requestId\":\"user-c244114a-6340-42b4-a9cc-924daa2f85c9\",\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"text\":\"DEX-EXTERNAL-QUEUE\",\"queueId\":\"01a1a0e4-ef25-71e3-b581-c5c3eac8b622\",\"turnId\":null,\"itemId\":null,\"status\":\"queued\",\"createdAt\":\"2026-11-03T10:12:00.415Z\",\"error\":null}],\"pendingApprovalCount\":0,\"eventSeq\":3}}",
+    "runtime": {
+      "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+      "status": "history",
+      "permissionMode": "default",
+      "activeTurnId": null,
+      "startedAt": "2026-11-03T10:11:59.847Z",
+      "updatedAt": "2026-11-03T10:12:00.414Z",
+      "lastError": null,
+      "model": null,
+      "modelProvider": null,
+      "reasoningEffort": null,
+      "modelSelection": {
+        "mode": "follow_session",
+        "preferredModel": null,
+        "preferredReasoningEffort": null,
+        "actualModel": null,
+        "actualModelProvider": null,
+        "actualReasoningEffort": null,
+        "actualModelSupported": null,
+        "applied": false,
+        "confirmationPending": false,
+        "updatedAt": null,
+        "lastError": null
+      },
+      "modelChangeStatus": "idle",
+      "modelChangeError": null,
+      "leaseStatus": "unknown",
+      "leaseReason": null,
+      "executionSource": "external_queue",
+      "deliveries": [
+        {
+          "requestId": "user-c244114a-6340-42b4-a9cc-924daa2f85c9",
+          "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+          "text": "DEX-EXTERNAL-QUEUE",
+          "queueId": "01a1a0e4-ef25-71e3-b581-c5c3eac8b622",
+          "turnId": null,
+          "itemId": null,
+          "status": "queued",
+          "createdAt": "2026-11-03T10:12:00.415Z",
+          "error": null
+        }
+      ],
+      "pendingApprovalCount": 0,
+      "eventSeq": 3
+    },
+    "replyObservedAfterMs": 6003,
+    "afterProcesses": [
+      {
+        "pid": 18698,
+        "ppid": 18065,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+      },
+      {
+        "pid": 21218,
+        "ppid": 21153,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/../CodexCLI.app/Contents/MacOS/codex app-server -c thread_unload_delay_secs=1"
+      }
+    ],
+    "controlSocketExists": false
+  },
+  "busyQueue": {
+    "code": 0,
+    "start": 1793700730599,
+    "output": "{\"runtime\":{\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"status\":\"history\",\"permissionMode\":\"default\",\"activeTurnId\":null,\"startedAt\":\"2026-11-03T10:11:59.847Z\",\"updatedAt\":\"2026-11-03T10:12:00.414Z\",\"lastError\":null,\"model\":null,\"modelProvider\":null,\"reasoningEffort\":null,\"modelSelection\":{\"mode\":\"follow_session\",\"preferredModel\":null,\"preferredReasoningEffort\":null,\"actualModel\":null,\"actualModelProvider\":null,\"actualReasoningEffort\":null,\"actualModelSupported\":null,\"applied\":false,\"confirmationPending\":false,\"updatedAt\":null,\"lastError\":null},\"modelChangeStatus\":\"idle\",\"modelChangeError\":null,\"leaseStatus\":\"unknown\",\"leaseReason\":null,\"executionSource\":\"external_queue\",\"deliveries\":[{\"requestId\":\"user-c244114a-6340-42b4-a9cc-924daa2f85c9\",\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"text\":\"DEX-EXTERNAL-QUEUE\",\"queueId\":\"01a1a0e4-ef25-71e3-b581-c5c3eac8b622\",\"turnId\":\"01a1a0e4-ff6a-7bd2-ae50-6a9639370615\",\"itemId\":\"01a1a0e4-fff3-78c0-a803-efff57ca9a5f\",\"status\":\"completed\",\"createdAt\":\"2026-11-03T10:12:00.415Z\",\"error\":null},{\"requestId\":\"user-8e44dce1-8e2c-4c81-b063-e7ba896fca5e\",\"threadId\":\"01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb\",\"text\":\"DEX-EXTERNAL-AFTER-BUSY\",\"queueId\":\"01a1a0e5-1756-7763-bfe4-fed1d69bc2cc\",\"turnId\":null,\"itemId\":null,\"status\":\"queued\",\"createdAt\":\"2026-11-03T10:12:10.700Z\",\"error\":null}],\"pendingApprovalCount\":0,\"eventSeq\":3}}",
+    "runtime": {
+      "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+      "status": "history",
+      "permissionMode": "default",
+      "activeTurnId": null,
+      "startedAt": "2026-11-03T10:11:59.847Z",
+      "updatedAt": "2026-11-03T10:12:00.414Z",
+      "lastError": null,
+      "model": null,
+      "modelProvider": null,
+      "reasoningEffort": null,
+      "modelSelection": {
+        "mode": "follow_session",
+        "preferredModel": null,
+        "preferredReasoningEffort": null,
+        "actualModel": null,
+        "actualModelProvider": null,
+        "actualReasoningEffort": null,
+        "actualModelSupported": null,
+        "applied": false,
+        "confirmationPending": false,
+        "updatedAt": null,
+        "lastError": null
+      },
+      "modelChangeStatus": "idle",
+      "modelChangeError": null,
+      "leaseStatus": "unknown",
+      "leaseReason": null,
+      "executionSource": "external_queue",
+      "deliveries": [
+        {
+          "requestId": "user-c244114a-6340-42b4-a9cc-924daa2f85c9",
+          "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+          "text": "DEX-EXTERNAL-QUEUE",
+          "queueId": "01a1a0e4-ef25-71e3-b581-c5c3eac8b622",
+          "turnId": "01a1a0e4-ff6a-7bd2-ae50-6a9639370615",
+          "itemId": "01a1a0e4-fff3-78c0-a803-efff57ca9a5f",
+          "status": "completed",
+          "createdAt": "2026-11-03T10:12:00.415Z",
+          "error": null
+        },
+        {
+          "requestId": "user-8e44dce1-8e2c-4c81-b063-e7ba896fca5e",
+          "threadId": "01a1a0e4-6ead-71c2-a8e2-adeb26b6c9cb",
+          "text": "DEX-EXTERNAL-AFTER-BUSY",
+          "queueId": "01a1a0e5-1756-7763-bfe4-fed1d69bc2cc",
+          "turnId": null,
+          "itemId": null,
+          "status": "queued",
+          "createdAt": "2026-11-03T10:12:10.700Z",
+          "error": null
+        }
+      ],
+      "pendingApprovalCount": 0,
+      "eventSeq": 3
+    }
+  },
+  "desktopRecovery": {
+    "automaticallyRetried": false,
+    "reopenRequired": true
+  },
+  "handoffDesktopUrl": "app://-/index.html",
+  "summary": {
+    "pass": 17,
+    "fail": 0
+  }
+}

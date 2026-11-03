@@ -234,6 +234,9 @@ export type ResolvedModelOverride = {
 };
 
 export type ModelErrorCode =
+  | "INPUT_REQUEST_CONFLICT"
+  | "DESKTOP_QUEUE_UNAVAILABLE"
+  | "DESKTOP_QUEUE_TEXT_ONLY"
   | "MODEL_LIST_UNAVAILABLE"
   | "MODEL_NOT_SUPPORTED"
   | "MODEL_EFFORT_NOT_SUPPORTED"
@@ -270,7 +273,7 @@ export type SessionTurn = {
 };
 
 export type SessionTurnItem =
-  | { id: string; type: "user_message"; text: string }
+  | { id: string; type: "user_message"; text: string; clientId?: string | null }
   | { id: string; type: "agent_message"; text: string; phase: string | null }
   | { id: string; type: "file_change"; status: string | null; changes: SessionFileChange[] }
   | { id: string; type: "context_compaction" }
@@ -325,8 +328,24 @@ export type RuntimeStatus = SessionStatus;
 
 export type SessionPermissionMode = "default" | "full_access";
 
+export type QueuedDelivery = {
+  requestId: string;
+  threadId: string;
+  text: string;
+  queueId: string | null;
+  turnId: string | null;
+  itemId: string | null;
+  status: "submitting" | "queued" | "observed" | "completed" | "failed" | "unknown";
+  createdAt: string;
+  error: string | null;
+};
+
 export type RuntimeSnapshot = {
   threadId: string;
+  executionSource?: "manage" | "external_queue";
+  leaseStatus?: "owned" | "releasing" | "released" | "blocked" | "unknown";
+  leaseReason?: string | null;
+  deliveries?: QueuedDelivery[];
   status: RuntimeStatus;
   permissionMode: SessionPermissionMode;
   activeTurnId: string | null;

@@ -47,6 +47,7 @@ export type CodexAppServerClientOptions = {
   requestTimeoutMs?: number;
   platform?: NodeJS.Platform;
   env?: NodeJS.ProcessEnv;
+  threadUnloadDelaySecs?: number;
 };
 
 export class CodexAppServerClient extends EventEmitter {
@@ -55,6 +56,7 @@ export class CodexAppServerClient extends EventEmitter {
   private readonly requestTimeoutMs: number;
   private readonly platform: NodeJS.Platform;
   private readonly env: NodeJS.ProcessEnv;
+  private readonly threadUnloadDelaySecs?: number;
   private process: ChildProcessWithoutNullStreams | null = null;
   private stdoutLines: Interface | null = null;
   private nextRequestId = 1;
@@ -70,6 +72,7 @@ export class CodexAppServerClient extends EventEmitter {
     this.requestTimeoutMs = options.requestTimeoutMs ?? 60000;
     this.platform = options.platform ?? process.platform;
     this.env = options.env ?? process.env;
+    this.threadUnloadDelaySecs = options.threadUnloadDelaySecs;
   }
 
   getSnapshot(): CodexAppServerSnapshot {
@@ -90,7 +93,9 @@ export class CodexAppServerClient extends EventEmitter {
 
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = this.spawnProcess(this.codexCliPath, ["app-server"], {
+      const args = ["app-server"];
+      if (this.threadUnloadDelaySecs !== undefined) args.push("-c", `thread_unload_delay_secs=${this.threadUnloadDelaySecs}`);
+      child = this.spawnProcess(this.codexCliPath, args, {
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
         shell: this.platform === "win32" && this.codexCliPath.toLowerCase().endsWith(".cmd"),

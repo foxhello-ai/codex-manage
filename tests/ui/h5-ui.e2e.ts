@@ -166,12 +166,17 @@ test("auto-growing input, attachment feedback, failed send retention, model and 
   expect(large).toBeGreaterThan(small);
   expect(large).toBeLessThanOrEqual(132);
   expect(await input.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+  let releaseUploads!: () => void;
+  const uploadsHeld = new Promise<void>(resolve => { releaseUploads = resolve; });
+  await page.route("**/api/sessions/*/attachments", async route => { await uploadsHeld; await route.fallback(); });
   await page.locator('.taskInput input[type="file"]').setInputFiles([
     { name: "长文件名-".repeat(8) + ".txt", mimeType: "text/plain", buffer: Buffer.from("attachment") },
     { name: "fail.txt", mimeType: "text/plain", buffer: Buffer.from("failed attachment") }
   ]);
-  await expect(page.getByText("正在上传附件…", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "发送消息", exact: true })).toBeDisabled();
+  try {
+    await expect(page.getByText("正在上传附件…", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "发送消息", exact: true })).toBeDisabled();
+  } finally { releaseUploads(); }
   await expect(page.locator(".taskAttachmentChip")).toHaveCount(1);
   await expect(page.getByRole("alert").filter({ hasText: "1 个附件上传失败" })).toBeVisible();
   await page.getByRole("button", { name: "发送消息", exact: true }).click();
@@ -205,6 +210,8 @@ test("auto-growing input, attachment feedback, failed send retention, model and 
   await expect(sheet).toBeVisible();
   await sheet.getByRole("button", { name: "使用当前模型重试" }).click();
   await expect.poll(() => h.calls.filter((call) => call.path.endsWith("/input")).length).toBe(2);
+  const attempts = h.calls.filter((call) => call.path.endsWith("/input"));
+  expect(attempts[1]?.body?.clientRequestId).toBe(attempts[0]?.body?.clientRequestId);
   await page.getByRole("dialog").getByRole("button", { name: "取消", exact: true }).click();
   await page.getByRole("button", { name: /移除附件/ }).click();
   await expect(page.locator(".taskAttachmentChip")).toHaveCount(0);
@@ -318,10 +325,41 @@ test("successful send clears the draft and attachments without adding reply acti
   await expect(page.locator(".taskAttachmentChip")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "发送消息", exact: true })).toBeDisabled();
   expect(h.calls.filter((call) => call.path.endsWith("/input"))).toHaveLength(1);
-  expect(h.calls.find((call) => call.path.endsWith("/input"))?.body?.text).toContain("/.attachments/context.txt");
+  expect(h.calls.find((call) => call.path.endsWith("/input"))?.body).toMatchObject({
+    text: "继续检查当前工作目录", attachmentPaths: [expect.stringContaining("/.attachments/context.txt")]
+  });
   await expect(page.locator(".messageItem.agent button")).toHaveCount(0);
   await noOverflow(page);
   expect(h.pageErrors).toEqual([]);
+});
+
+test("desktop queue follows desktop settings and keeps uncertain delivery visible without resending", async ({ page }) => {
+  const h = await installUiHarness(page, { externalQueue: true });
+  await openDetail(page);
+  await expect(page.getByRole("button", { name: /模型设置/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "权限由桌面管理" })).toBeDisabled();
+  await page.getByLabel("发送给 Codex 的消息").fill("继续桌面原会话");
+  await page.getByRole("button", { name: "发送消息", exact: true }).click();
+  await expect(page.getByText(/投递结果待确认，请勿重复发送/).first()).toBeVisible();
+  const sent = h.calls.filter(call => call.path.endsWith("/input"));
+  expect(sent).toHaveLength(1);
+  expect(sent[0]?.body).toMatchObject({ text: "继续桌面原会话", useDesktopSettings: true, clientRequestId: expect.any(String) });
+  expect(sent[0]?.body).not.toHaveProperty("permissionMode");
+  await expect(page.getByLabel("发送给 Codex 的消息")).toHaveValue("");
+  expect(h.pageErrors).toEqual([]);
+});
+
+test("resending a retained draft after a failed HTTP request keeps its original delivery ID", async ({ page }) => {
+  const h = await installUiHarness(page, { failInput: true });
+  await openDetail(page);
+  await page.getByLabel("发送给 Codex 的消息").fill("网络中断后核对原消息");
+  const send = page.getByRole("button", { name: "发送消息", exact: true });
+  await send.click();
+  await expect(page.locator(".liveErrorCard")).toBeVisible();
+  await send.click();
+  await expect.poll(() => h.calls.filter(call => call.path.endsWith("/input")).length).toBe(2);
+  const attempts = h.calls.filter(call => call.path.endsWith("/input"));
+  expect(attempts[1]?.body?.clientRequestId).toBe(attempts[0]?.body?.clientRequestId);
 });
 
 test("ordinary create failure stays in its panel and panel dismissal returns keyboard focus", async ({ page }, info) => {

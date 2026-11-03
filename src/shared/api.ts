@@ -177,10 +177,10 @@ export function resumeSession(sessionId: string, permissionMode?: SessionPermiss
   });
 }
 
-export function sendSessionInput(sessionId: string, text: string, permissionMode?: SessionPermissionMode): Promise<InputResponse> {
+export function sendSessionInput(sessionId: string, text: string, permissionMode?: SessionPermissionMode, clientRequestId?: string, attachmentPaths?: string[], useDesktopSettings = false): Promise<InputResponse> {
   return apiRequest<InputResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/input`, {
     method: "POST",
-    body: JSON.stringify({ text, ...(permissionMode ? { permissionMode } : {}) })
+    body: JSON.stringify({ text, ...(permissionMode ? { permissionMode } : {}), clientRequestId, attachmentPaths, useDesktopSettings })
   });
 }
 

@@ -1,0 +1,42 @@
+[
+  {
+    "role": "user",
+    "text": "DEX-DESKTOP-ONE"
+  },
+  {
+    "role": "assistant",
+    "text": "Local stub completed DEX-DESKTOP-ONE"
+  },
+  {
+    "role": "user",
+    "text": "DEX-EXTERNAL-QUEUE"
+  },
+  {
+    "role": "assistant",
+    "text": "Local stub completed DEX-EXTERNAL-QUEUE"
+  },
+  {
+    "role": "user",
+    "text": "DEX-DESKTOP-THREE"
+  },
+  {
+    "role": "assistant",
+    "text": "Local stub completed DEX-DESKTOP-THREE"
+  },
+  {
+    "role": "user",
+    "text": "DEX-DESKTOP-SLOW"
+  },
+  {
+    "role": "assistant",
+    "text": "Local stub completed DEX-DESKTOP-SLOW"
+  },
+  {
+    "role": "user",
+    "text": "DEX-EXTERNAL-AFTER-BUSY"
+  },
+  {
+    "role": "assistant",
+    "text": "Local stub completed DEX-EXTERNAL-AFTER-BUSY"
+  }
+]

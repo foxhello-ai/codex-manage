@@ -23,6 +23,7 @@
 
 ## 变更与追溯资料
 
+- [`implementation-notes/2026-11-03-desktop-session-handoff.md`](implementation-notes/2026-11-03-desktop-session-handoff.md)：桌面原会话文字投递、双端持久消息同步、Manage 空闲释放的实现、兼容边界和隔离验收方式。
 - [`implementation-notes/`](implementation-notes/)：按日期的调研、实现和问题修复记录。若项目级状态与笔记冲突，以日期更晚、且包含实现和验证记录的笔记为准，并在项目级文档中回写确认结论。
 - [`implementation-notes/2026-09-02-writer-lock-history-continuation.md`](implementation-notes/2026-09-02-writer-lock-history-continuation.md)：记录 active writer 下 Fork 失败的原因，以及不等待源 thread 锁、通过新会话读取 JSONL 历史后继续的实现方案。
 - [`incidents/`](incidents/)：故障记录索引。

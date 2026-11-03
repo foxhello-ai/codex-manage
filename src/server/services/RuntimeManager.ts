@@ -3,6 +3,7 @@ import { ApprovalService } from "./ApprovalService";
 import { EventHub } from "./EventHub";
 import type { CodexAppServerClient } from "./CodexAppServerClient";
 import { ModelDomainError, sanitizeModelError } from "../modelErrors";
+import type { DesktopQueueService } from "./DesktopQueueService";
 import type {
   ApprovalDecision,
   ApprovalResponse,
@@ -35,6 +36,7 @@ type RuntimeState = {
 export type ResumeThreadOptions = {
   permissionMode?: SessionPermissionMode;
   modelOverride?: ResolvedModelOverride;
+  allowExternalQueue?: boolean;
 };
 
 export type SendInputParams = {
@@ -42,6 +44,8 @@ export type SendInputParams = {
   permissionMode?: SessionPermissionMode;
   modelOverride?: ResolvedModelOverride;
   attachmentPaths?: string[];
+  clientRequestId?: string;
+  allowExternalQueue?: boolean;
 };
 
 export type StartThreadResult = {
@@ -84,7 +88,7 @@ type CompactionWaiter = {
 export type RuntimeReloadBlocker = {
   threadId: string;
   status: RuntimeStatus;
-  reason: "active_runtime" | "pending_operation" | "model_change";
+  reason: "active_runtime" | "pending_operation" | "model_change" | "unreleased_runtime";
 };
 
 export type RuntimeManagerOptions = {
@@ -92,6 +96,10 @@ export type RuntimeManagerOptions = {
   writerLockRetryDelaysMs?: number[];
   compactionTimeoutMs?: number;
   historyDirectory?: string;
+  autoRelease?: boolean;
+  releaseIdleDelayMs?: number;
+  releaseTimeoutMs?: number;
+  desktopQueue?: DesktopQueueService;
 };
 
 const DEFAULT_WRITER_LOCK_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000, 4_000, 8_000];
@@ -109,6 +117,17 @@ export class RuntimeManager {
   private readonly compactionTimeoutMs: number;
   private readonly historyDirectory: string;
   private appServerReloading = false;
+  private readonly ownedThreads = new Set<string>();
+  private readonly unmaterializedThreads = new Set<string>();
+  private readonly externalThreads = new Set<string>();
+  private readonly releaseTimers = new Map<string, NodeJS.Timeout>();
+  private readonly leases = new Map<string, { leaseStatus: NonNullable<RuntimeSnapshot["leaseStatus"]>; leaseReason: string | null }>();
+  private readonly unsubscribedThreads = new Set<string>();
+  private disposed = false;
+  private readonly autoRelease: boolean;
+  private readonly releaseIdleDelayMs: number;
+  private readonly releaseTimeoutMs: number;
+  private readonly desktopQueue?: DesktopQueueService;
 
   constructor(
     private readonly appServer: CodexAppServerClient,
@@ -119,6 +138,10 @@ export class RuntimeManager {
       .filter((delayMs) => Number.isFinite(delayMs) && delayMs >= 0);
     this.compactionTimeoutMs = options.compactionTimeoutMs ?? 120_000;
     this.historyDirectory = options.historyDirectory?.trim() || "~/.codex/sessions";
+    this.autoRelease = options.autoRelease ?? false;
+    this.releaseIdleDelayMs = options.releaseIdleDelayMs ?? 100;
+    this.releaseTimeoutMs = options.releaseTimeoutMs ?? 8_000;
+    this.desktopQueue = options.desktopQueue;
     this.approvalService = new ApprovalService(appServer, this.eventHub, (threadId) => {
       this.refreshApprovalStatus(threadId);
     });
@@ -126,6 +149,8 @@ export class RuntimeManager {
     this.appServer.on("notification", (message: JsonRpcNotification) => this.handleNotification(message));
     this.appServer.on("serverRequest", (message: JsonRpcRequest) => this.handleServerRequest(message));
     this.appServer.on("exit", () => {
+      this.stopReleaseTimers();
+      this.ownedThreads.clear();
       if (!this.appServerReloading) this.markAllFailed("Codex app-server 已退出");
     });
     this.appServer.on("error", (error: Error) => this.markAllFailed(sanitizeModelError(error)));
@@ -151,6 +176,9 @@ export class RuntimeManager {
     const thread = asRecord(response.thread);
     const threadId = readString(thread.id) ?? readString(response.threadId) ?? readString(response.id);
     if (!threadId) throw new Error("Codex app-server 未返回新会话 ID");
+    this.ownedThreads.add(threadId);
+    this.unmaterializedThreads.add(threadId);
+    this.leases.set(threadId, { leaseStatus: "owned", leaseReason: null });
 
     const actualModel = readString(response.model) ?? readString(thread.model);
     const actualModelProvider = readString(response.modelProvider) ?? readString(thread.modelProvider);
@@ -176,111 +204,131 @@ export class RuntimeManager {
   }
 
   async resumeThread(threadId: string, options: ResumeThreadOptions = {}): Promise<RuntimeSnapshot> {
-    return this.runExclusive(threadId, async () => {
-      const current = this.runtimes.get(threadId);
-      if (current && current.status !== "history" && current.status !== "failed" && current.status !== "exited") {
-        const permissionMode = options.permissionMode;
-        if (permissionMode && permissionMode !== current.permissionMode) {
-          if (current.status !== "waiting_input") {
-            throw new Error("会话运行中或正在等待审批，暂时不能切换权限模式");
-          }
-          await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", buildPermissionSettings(threadId, permissionMode)));
-          this.setRuntime(threadId, { permissionMode, lastError: null });
+    return this.runExclusive(threadId, () => this.resumeThreadInRuntime(threadId, options));
+  }
+
+  private async resumeThreadInRuntime(threadId: string, options: ResumeThreadOptions = {}): Promise<RuntimeSnapshot> {
+    const current = this.runtimes.get(threadId);
+    if (current && !this.unsubscribedThreads.has(threadId) && current.status !== "history" && current.status !== "failed" && current.status !== "exited") {
+      const permissionMode = options.permissionMode;
+      if (permissionMode && permissionMode !== current.permissionMode) {
+        if (current.status !== "waiting_input") {
+          throw new Error("会话运行中或正在等待审批，暂时不能切换权限模式");
         }
-        return this.snapshot(threadId);
+        await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", buildPermissionSettings(threadId, permissionMode)));
+        this.setRuntime(threadId, { permissionMode, lastError: null });
       }
+      return this.snapshot(threadId);
+    }
 
-      const permissionMode = options.permissionMode ?? current?.permissionMode ?? "default";
-      const override = options.modelOverride;
-      const selection = override?.mode === "override" && override.model
-        ? {
-            ...emptyModelState(),
-            mode: "override" as const,
-            preferredModel: override.model,
-            preferredReasoningEffort: override.reasoningEffort,
-            updatedAt: new Date().toISOString()
-          }
-        : current?.modelSelection ?? emptyModelState();
+    const permissionMode = options.permissionMode ?? current?.permissionMode ?? "default";
+    const override = options.modelOverride;
+    const selection = override?.mode === "override" && override.model
+      ? {
+          ...emptyModelState(),
+          mode: "override" as const,
+          preferredModel: override.model,
+          preferredReasoningEffort: override.reasoningEffort,
+          updatedAt: new Date().toISOString()
+        }
+      : current?.modelSelection ?? emptyModelState();
 
-      this.setRuntime(threadId, {
-        status: "starting",
-        permissionMode,
-        activeTurnId: null,
-        lastError: null,
-        modelSelection: { ...selection, applied: false, confirmationPending: false, lastError: null },
-        modelChangeError: null
-      });
+    this.setRuntime(threadId, {
+      status: "starting",
+      permissionMode,
+      activeTurnId: null,
+      lastError: null,
+      modelSelection: { ...selection, applied: false, confirmationPending: false, lastError: null },
+      modelChangeError: null
+    });
 
+    try {
+      const params = {
+        threadId,
+        ...(permissionMode === "full_access" ? { sandbox: "danger-full-access", approvalPolicy: "never" } : {}),
+        ...(override?.mode === "override" && override.model ? { model: override.model } : {})
+      };
+      let response: Record<string, unknown>;
       try {
-        const params = {
-          threadId,
-          ...(permissionMode === "full_access" ? { sandbox: "danger-full-access", approvalPolicy: "never" } : {}),
-          ...(override?.mode === "override" && override.model ? { model: override.model } : {})
-        };
-        const response = asRecord(await this.requestWithWriterLockRetry(() => this.appServer.request("thread/resume", params)));
-        const thread = asRecord(response.thread);
-        const actualModel = readString(response.model) ?? readString(thread.model) ?? override?.model ?? current?.model ?? null;
-        const actualModelProvider =
-          readString(response.modelProvider)
-          ?? readString(thread.modelProvider)
-          ?? current?.modelProvider
-          ?? null;
-        let actualEffort =
-          readString(response.reasoningEffort)
-          ?? readString(thread.reasoningEffort)
-          ?? current?.reasoningEffort
-          ?? null;
-
-        if (override?.mode === "override" && override.reasoningEffort) {
-          await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", {
-            threadId,
-            effort: override.reasoningEffort
-          }));
-          actualEffort = override.reasoningEffort;
-        }
-
-        if (options.permissionMode === "default") {
-          await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", buildPermissionSettings(threadId, "default")));
-        }
-
-        const applied = selection.mode === "override" ? selection.preferredModel === actualModel : false;
-        this.setRuntime(threadId, {
-          status: "waiting_input",
-          model: actualModel,
-          modelProvider: actualModelProvider,
-          reasoningEffort: actualEffort,
-          modelSelection: {
-            ...selection,
-            actualModel,
-            actualModelProvider,
-            actualReasoningEffort: actualEffort,
-            actualModelSupported: selection.mode === "override" ? applied : null,
-            applied,
-            confirmationPending: false,
-            lastError: null
-          },
-          modelChangeStatus: applied ? "applied" : "idle",
-          modelChangeError: null,
-          lastError: null
-        });
-        return this.snapshot(threadId);
+        response = asRecord(await (this.desktopQueue
+          ? this.appServer.request("thread/resume", params)
+          : this.requestWithWriterLockRetry(() => this.appServer.request("thread/resume", params))));
       } catch (error) {
-        const message = sanitizeModelError(error);
-        this.setRuntime(threadId, {
-          status: "failed",
-          lastError: message,
-          modelSelection: {
-            ...selection,
-            applied: false,
-            confirmationPending: false,
-            lastError: message
-          },
-          modelChangeStatus: selection.mode === "override" ? "failed" : "idle",
-          modelChangeError: selection.mode === "override" ? message : null
-        });
+        if (isActiveWriterError(error) && options.allowExternalQueue && this.desktopQueue) {
+          this.externalThreads.add(threadId);
+          this.setRuntime(threadId, { status: "history", activeTurnId: null, lastError: null });
+          return this.snapshot(threadId);
+        }
         throw error;
       }
-    });
+      this.ownedThreads.add(threadId);
+      this.unmaterializedThreads.delete(threadId);
+      this.unsubscribedThreads.delete(threadId);
+      this.externalThreads.delete(threadId);
+      this.leases.set(threadId, { leaseStatus: "owned", leaseReason: null });
+      const thread = asRecord(response.thread);
+      const actualModel = readString(response.model) ?? readString(thread.model) ?? override?.model ?? current?.model ?? null;
+      const actualModelProvider =
+        readString(response.modelProvider)
+        ?? readString(thread.modelProvider)
+        ?? current?.modelProvider
+        ?? null;
+      let actualEffort =
+        readString(response.reasoningEffort)
+        ?? readString(thread.reasoningEffort)
+        ?? current?.reasoningEffort
+        ?? null;
+
+      if (override?.mode === "override" && override.reasoningEffort) {
+        await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", {
+          threadId,
+          effort: override.reasoningEffort
+        }));
+        actualEffort = override.reasoningEffort;
+      }
+
+      if (options.permissionMode === "default") {
+        await this.requestWithWriterLockRetry(() => this.appServer.request("thread/settings/update", buildPermissionSettings(threadId, "default")));
+      }
+
+      const applied = selection.mode === "override" ? selection.preferredModel === actualModel : false;
+      this.setRuntime(threadId, {
+        status: thread.status ? mapRuntimeStatus(asRecord(thread.status)) : "waiting_input",
+        activeTurnId: readString(asRecord((Array.isArray(thread.turns) ? thread.turns : []).find(value => asRecord(value).status === "inProgress")).id),
+        model: actualModel,
+        modelProvider: actualModelProvider,
+        reasoningEffort: actualEffort,
+        modelSelection: {
+          ...selection,
+          actualModel,
+          actualModelProvider,
+          actualReasoningEffort: actualEffort,
+          actualModelSupported: selection.mode === "override" ? applied : null,
+          applied,
+          confirmationPending: false,
+          lastError: null
+        },
+        modelChangeStatus: applied ? "applied" : "idle",
+        modelChangeError: null,
+        lastError: null
+      });
+      return this.snapshot(threadId);
+    } catch (error) {
+      const message = sanitizeModelError(error);
+      this.setRuntime(threadId, {
+        status: "failed",
+        lastError: message,
+        modelSelection: {
+          ...selection,
+          applied: false,
+          confirmationPending: false,
+          lastError: message
+        },
+        modelChangeStatus: selection.mode === "override" ? "failed" : "idle",
+        modelChangeError: selection.mode === "override" ? message : null
+      });
+      throw error;
+    }
   }
 
   async updateModel(threadId: string, selection: ValidatedModelSelection): Promise<RuntimeSnapshot> {
@@ -367,15 +415,49 @@ export class RuntimeManager {
     const text = params.text.trim();
     if (!text) throw new Error("输入内容不能为空");
 
-    const runtime = this.runtimes.get(threadId);
-    if (!runtime || runtime.status === "history" || runtime.status === "failed" || runtime.status === "exited") {
-      await this.resumeThread(threadId, {
-        permissionMode: params.permissionMode,
-        modelOverride: params.modelOverride
-      });
-    }
+    return this.runExclusive(threadId, async () => {
+      const releaseTimer = this.releaseTimers.get(threadId);
+      if (releaseTimer) clearTimeout(releaseTimer);
+      this.releaseTimers.delete(threadId);
+      if (this.ownedThreads.has(threadId)) this.leases.set(threadId, { leaseStatus: "owned", leaseReason: null });
+      if (this.desktopQueue && !this.ownedThreads.has(threadId) && await this.desktopQueue.hasPending(threadId)) {
+        this.externalThreads.add(threadId);
+      }
+      if (this.desktopQueue && params.clientRequestId) {
+        const previous = await this.desktopQueue.find(params.clientRequestId);
+        if (previous) {
+          this.assertQueueInput(params);
+          await this.desktopQueue.enqueue(threadId, params.clientRequestId, text);
+          if (!this.ownedThreads.has(threadId)) this.externalThreads.add(threadId);
+          return this.snapshot(threadId);
+        }
+      }
+      const runtime = this.runtimes.get(threadId);
+      if (!this.externalThreads.has(threadId) && (!runtime || this.unsubscribedThreads.has(threadId) || ["history", "failed", "exited"].includes(runtime.status))) {
+        await this.resumeThreadInRuntime(threadId, params);
+      }
+      if (this.externalThreads.has(threadId)) {
+        this.assertQueueInput(params);
+        await this.desktopQueue!.enqueue(threadId, params.clientRequestId!, text);
+        return this.snapshot(threadId);
+      }
+      return this.sendInputInRuntime(threadId, params, text);
+    });
+  }
 
-    return this.sendInputInRuntime(threadId, params, text);
+  private assertQueueInput(params: SendInputParams): void {
+    if (!params.allowExternalQueue || !params.clientRequestId || params.attachmentPaths?.length
+      || params.permissionMode === "full_access" || params.modelOverride?.mode === "override") {
+      throw new ModelDomainError("DESKTOP_QUEUE_TEXT_ONLY", "此会话由桌面或其他客户端处理。本期仅支持主用户文字投递；附件、模型和权限调整请到桌面操作", 409);
+    }
+  }
+
+  async refreshExternal(threadId: string): Promise<RuntimeSnapshot> {
+    if (this.desktopQueue) {
+      const deliveries = await this.desktopQueue.refresh(threadId);
+      if (deliveries.length && !this.ownedThreads.has(threadId)) this.externalThreads.add(threadId);
+    }
+    return this.snapshot(threadId);
   }
 
   /**
@@ -419,43 +501,41 @@ export class RuntimeManager {
   }
 
   private async sendInputInRuntime(threadId: string, params: SendInputParams, text: string): Promise<RuntimeSnapshot> {
-    return this.runExclusive(threadId, async () => {
-      const latest = this.runtimes.get(threadId);
-      if (latest?.status === "waiting_approval") {
-        throw new Error("当前会话正在等待审批，请先处理审批");
-      }
+    const latest = this.runtimes.get(threadId);
+    if (latest?.status === "waiting_approval") {
+      throw new Error("当前会话正在等待审批，请先处理审批");
+    }
 
     const attachmentNotice = params.attachmentPaths?.length
       ? `\n\n附件已保存到当前 workspace，请读取以下文件并将其作为本次输入上下文：\n${params.attachmentPaths.map((path) => `- ${path}`).join("\n")}`
       : "";
     const input = [{ type: "text", text: `${text}${attachmentNotice}`, text_elements: [] }];
-      if (latest?.status === "running" && !latest.activeTurnId) {
-        throw new Error("当前会话正在运行，尚未同步活动任务标识，请稍后再试");
-      }
+    if (latest?.status === "running" && !latest.activeTurnId) {
+      throw new Error("当前会话正在运行，尚未同步活动任务标识，请稍后再试");
+    }
 
-      if (latest?.activeTurnId && latest.status === "running") {
-        await this.requestWithWriterLockRetry(() => this.appServer.request("turn/steer", {
-          threadId,
-          expectedTurnId: latest.activeTurnId,
-          input
-        }));
-      } else {
-        const override = params.modelOverride;
-        const response = asRecord(await this.requestWithWriterLockRetry(() => this.appServer.request("turn/start", {
-          threadId,
-          input,
-          ...(override?.mode === "override" && override.model ? { model: override.model } : {}),
-          ...(override?.mode === "override" && override.reasoningEffort ? { effort: override.reasoningEffort } : {})
-        })));
-        const turn = asRecord(response.turn);
-        const turnId = readString(turn.id) ?? readString(response.turnId);
-        this.setRuntime(threadId, { status: "running", activeTurnId: turnId, lastError: null });
-        return this.snapshot(threadId);
-      }
-
-      this.setRuntime(threadId, { status: "running", lastError: null });
+    if (latest?.activeTurnId && latest.status === "running") {
+      await this.requestWithWriterLockRetry(() => this.appServer.request("turn/steer", {
+        threadId,
+        expectedTurnId: latest.activeTurnId,
+        input
+      }));
+    } else {
+      const override = params.modelOverride;
+      const response = asRecord(await this.requestWithWriterLockRetry(() => this.appServer.request("turn/start", {
+        threadId,
+        input,
+        ...(override?.mode === "override" && override.model ? { model: override.model } : {}),
+        ...(override?.mode === "override" && override.reasoningEffort ? { effort: override.reasoningEffort } : {})
+      })));
+      const turn = asRecord(response.turn);
+      const turnId = readString(turn.id) ?? readString(response.turnId);
+      this.setRuntime(threadId, { status: "running", activeTurnId: turnId, lastError: null });
       return this.snapshot(threadId);
-    });
+    }
+
+    this.setRuntime(threadId, { status: "running", lastError: null });
+    return this.snapshot(threadId);
   }
 
   async branchThread(threadId: string, mode: SessionBranchMode): Promise<SessionBranchResult> {
@@ -574,6 +654,10 @@ export class RuntimeManager {
         blockers.push({ threadId, status: runtime.status, reason: "model_change" });
         seen.add(threadId);
       }
+      if (!seen.has(threadId) && this.autoRelease && this.ownedThreads.has(threadId)) {
+        blockers.push({ threadId, status: runtime.status, reason: "unreleased_runtime" });
+        seen.add(threadId);
+      }
     }
 
     for (const threadId of this.operationChains.keys()) {
@@ -589,6 +673,7 @@ export class RuntimeManager {
     const blockers = this.getReloadBlockers();
     if (blockers.length > 0) return blockers;
     this.appServerReloading = true;
+    this.stopReleaseTimers();
     for (const threadId of this.settingsWaiters.keys()) {
       this.cancelSettingsWaiter(threadId);
     }
@@ -598,6 +683,8 @@ export class RuntimeManager {
 
   finishAppServerReload(success: boolean, message: string | null = null): void {
     this.appServerReloading = false;
+    this.ownedThreads.clear();
+    this.leases.clear();
     for (const threadId of this.runtimes.keys()) {
       if (success) {
         this.setRuntime(threadId, {
@@ -785,7 +872,12 @@ export class RuntimeManager {
         this.reconcileThreadSettings(threadId, asRecord(params.threadSettings));
         break;
       case "thread/status/changed":
+        if (asRecord(params.status).type === "notLoaded") this.markReleased(threadId);
         this.setRuntime(threadId, { status: mapRuntimeStatus(asRecord(params.status)), lastError: null });
+        break;
+      case "thread/closed":
+        this.markReleased(threadId);
+        this.setRuntime(threadId, { status: "history", activeTurnId: null });
         break;
       case "turn/started": {
         const turn = asRecord(params.turn);
@@ -795,6 +887,7 @@ export class RuntimeManager {
         break;
       }
       case "turn/completed": {
+        this.unmaterializedThreads.delete(threadId);
         this.setRuntime(threadId, {
           status: this.approvalService.getPendingCount(threadId) > 0 ? "waiting_approval" : "waiting_input",
           activeTurnId: null
@@ -903,6 +996,7 @@ export class RuntimeManager {
     };
     this.runtimes.set(threadId, next);
     this.eventHub.publish(threadId, "session_status", { runtime: this.snapshot(threadId) });
+    this.scheduleRelease(threadId);
   }
 
   private snapshot(threadId: string): RuntimeSnapshot {
@@ -925,6 +1019,9 @@ export class RuntimeManager {
 
     return {
       ...runtime,
+      ...(this.autoRelease ? this.leases.get(threadId) ?? { leaseStatus: "unknown" as const, leaseReason: null } : {}),
+      ...(this.externalThreads.has(threadId) ? { executionSource: "external_queue" as const, deliveries: this.desktopQueue?.list(threadId) ?? [] }
+        : this.ownedThreads.has(threadId) ? { executionSource: "manage" as const } : {}),
       pendingApprovalCount: this.approvalService.getPendingCount(threadId),
       eventSeq: this.eventHub.getLastSeq(threadId)
     };
@@ -938,8 +1035,88 @@ export class RuntimeManager {
     return run.finally(() => {
       if (this.operationChains.get(threadId) === tail) {
         this.operationChains.delete(threadId);
+        this.scheduleRelease(threadId);
       }
     });
+  }
+
+  dispose(): void { this.disposed = true; this.stopReleaseTimers(); }
+
+  private stopReleaseTimers(): void {
+    for (const timer of this.releaseTimers.values()) clearTimeout(timer);
+    this.releaseTimers.clear();
+  }
+
+  private markReleased(threadId: string): void {
+    this.ownedThreads.delete(threadId);
+    this.unmaterializedThreads.delete(threadId);
+    this.unsubscribedThreads.delete(threadId);
+    this.leases.set(threadId, { leaseStatus: "released", leaseReason: null });
+    const timer = this.releaseTimers.get(threadId);
+    if (timer) clearTimeout(timer);
+    this.releaseTimers.delete(threadId);
+  }
+
+  private isIdle(threadId: string): boolean {
+    const runtime = this.runtimes.get(threadId);
+    return Boolean(runtime && this.ownedThreads.has(threadId) && !runtime.activeTurnId
+      && ["waiting_input", "failed"].includes(runtime.status)
+      && !this.approvalService.getPendingCount(threadId) && !this.settingsWaiters.has(threadId)
+      && !["pending", "confirming"].includes(runtime.modelChangeStatus) && !this.compactionWaiters.has(threadId));
+  }
+
+  private scheduleRelease(threadId: string, delayMs = this.releaseIdleDelayMs): void {
+    if (!this.autoRelease || this.disposed || this.appServerReloading || !this.isIdle(threadId) || this.releaseTimers.has(threadId)) return;
+    const timer = setTimeout(() => {
+      this.releaseTimers.delete(threadId);
+      if (this.operationChains.has(threadId)) { this.scheduleRelease(threadId, 250); return; }
+      void this.runExclusive(threadId, () => this.releaseIdleThread(threadId)).catch(() => undefined);
+    }, delayMs);
+    timer.unref?.();
+    this.releaseTimers.set(threadId, timer);
+  }
+
+  private async releaseIdleThread(threadId: string): Promise<void> {
+    if (!this.isIdle(threadId)) return;
+    try {
+      if (this.unmaterializedThreads.has(threadId)) throw new Error("新会话尚未完成首轮持久化，保留占用以便发送首条消息");
+      const response = asRecord(await this.appServer.request("thread/read", { threadId, includeTurns: false }));
+      if (asRecord(asRecord(response.thread).status).type !== "idle") throw new Error("无法确认会话已空闲");
+      const terminals = asRecord(await this.appServer.request("thread/backgroundTerminals/list", { threadId, limit: 1 }));
+      if (!Array.isArray(terminals.data) || terminals.data.length || terminals.nextCursor) throw new Error("后台任务尚未结束或状态未知");
+      const descendants = asRecord(await this.appServer.request("thread/list", {
+        ancestorThreadId: threadId,
+        sourceKinds: ["subAgent", "subAgentReview", "subAgentCompact", "subAgentThreadSpawn", "subAgentOther"], limit: 100
+      }));
+      if (!Array.isArray(descendants.data) || descendants.nextCursor) throw new Error("无法确认子任务状态");
+      const loaded = asRecord(await this.appServer.request("thread/loaded/list", {}));
+      if (!Array.isArray(loaded.data) || loaded.nextCursor) throw new Error("无法确认运行中的子任务");
+      // A loaded descendant may still own background work even after its turn.
+      const loadedIds = loaded.data;
+      if (descendants.data.some(value => loadedIds.includes(asRecord(value).id))) throw new Error("子任务仍在后台加载");
+      if (!this.isIdle(threadId)) return;
+      this.leases.set(threadId, { leaseStatus: "releasing", leaseReason: null });
+      this.eventHub.publish(threadId, "session_status", { runtime: this.snapshot(threadId) });
+      const result = asRecord(await this.appServer.request("thread/unsubscribe", { threadId }));
+      if (!["unsubscribed", "notSubscribed", "notLoaded"].includes(String(result.status))) throw new Error("后台未确认取消订阅");
+      this.unsubscribedThreads.add(threadId);
+      const deadline = Date.now() + this.releaseTimeoutMs;
+      while (this.ownedThreads.has(threadId)) {
+        const loaded = asRecord(await this.appServer.request("thread/loaded/list", {}));
+        if (Array.isArray(loaded.data) && !loaded.nextCursor && !loaded.data.includes(threadId)) {
+          this.markReleased(threadId);
+          this.setRuntime(threadId, { status: "history", activeTurnId: null });
+          break;
+        }
+        if (Date.now() >= deadline) throw new Error("会话释放待确认，可能仍有其他订阅者");
+        await wait(100);
+      }
+    } catch (error) {
+      if (!this.ownedThreads.has(threadId)) return;
+      this.leases.set(threadId, { leaseStatus: "blocked", leaseReason: sanitizeModelError(error) });
+      this.eventHub.publish(threadId, "session_status", { runtime: this.snapshot(threadId) });
+      this.scheduleRelease(threadId, 5_000);
+    }
   }
 }
 

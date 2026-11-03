@@ -3,6 +3,7 @@ import { ModelDomainError } from "../modelErrors";
 import { CodexAppServerClient, type CodexAppServerSnapshot } from "./CodexAppServerClient";
 import { detectCodexVersion } from "./codexVersion";
 import { RuntimeManager, type RuntimeReloadBlocker } from "./RuntimeManager";
+import { DesktopQueueService } from "./DesktopQueueService";
 
 export type RuntimeReloadTrigger = "manual" | "config_watcher";
 
@@ -45,10 +46,14 @@ export class AppRuntime {
 
   constructor(private readonly config: AppConfig) {
     this.appServer = new CodexAppServerClient({
-      codexCliPath: config.codexCliPath
+      codexCliPath: config.codexCliPath,
+      threadUnloadDelaySecs: config.autoReleaseEnabled !== false ? 1 : undefined
     });
     this.runtimeManager = new RuntimeManager(this.appServer, {
-      historyDirectory: config.sessionsDir
+      historyDirectory: config.sessionsDir,
+      autoRelease: config.autoReleaseEnabled !== false,
+      desktopQueue: config.desktopQueueEnabled !== false
+        ? new DesktopQueueService(this.appServer, `${config.metadataFile}.deliveries.json`) : undefined
     });
     this.appServer.on("error", () => {
       // Snapshot state carries the error for diagnostics; avoid an unhandled EventEmitter error.
@@ -64,6 +69,7 @@ export class AppRuntime {
   }
 
   async stop(): Promise<void> {
+    this.runtimeManager.dispose();
     await this.appServer.stop();
   }
 

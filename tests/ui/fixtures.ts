@@ -15,7 +15,7 @@ export const catalog: ModelCatalogResponse = { models: [
   { id: "model-2", model: "another-supported-model", displayName: "另一个可用模型", description: null, hidden: false, isDefault: false, supportedReasoningEfforts: ["low", "high"], defaultReasoningEffort: "low", upgradeModel: null, upgradeCopy: null }
 ], loadedAt: "2026-11-03T00:00:00Z", stale: false, lastError: null };
 
-export async function installUiHarness(page: Page, options: { status?: SessionStatus; failInput?: boolean; failUpload?: boolean; child?: boolean } = {}) {
+export async function installUiHarness(page: Page, options: { status?: SessionStatus; failInput?: boolean; failUpload?: boolean; child?: boolean; externalQueue?: boolean } = {}) {
   let seq = 10;
   const sockets = new Set<WebSocketRoute>();
   const calls: { path: string; method: string; body: Record<string, unknown> | null }[] = [];
@@ -36,6 +36,7 @@ export async function installUiHarness(page: Page, options: { status?: SessionSt
     startedAt: "2026-11-03T01:00:00Z", updatedAt: "2026-11-03T01:00:00Z", lastError: null, pendingApprovalCount: options.status === "waiting_approval" ? 1 : 0,
     eventSeq: seq, model: selection.actualModel, modelProvider: "test-provider", reasoningEffort: "high", modelSelection: selection, modelChangeStatus: "idle", modelChangeError: null
   };
+  if (options.externalQueue) runtime = { ...runtime, executionSource: "external_queue", deliveries: [], status: "history" };
   let tasks: TaskSummary[] = [{ id: "task-ui", name: "手机端体验优化与现有会话分组", pinned: false, sessionIds: [sessionId, "session-1"], sessionCount: 2, recentSessionId: sessionId, recentSessionTitle: longTitle, updatedAt: "2026-11-03T01:00:00Z" }];
   const detail = (id: string): SessionDetail => ({
     ...(sessions.find((item) => item.id === id) ?? sessions[0]!), id, sessionId: id, path: null, modelProvider: "test-provider", historyMode: null, modelState: runtime.modelSelection,
@@ -110,6 +111,13 @@ export async function installUiHarness(page: Page, options: { status?: SessionSt
     if (path.endsWith("/input")) {
       await new Promise((resolve) => setTimeout(resolve, 180));
       if (options.failInput) return json({ error: { code: "MODEL_REQUEST_TIMEOUT", message: "请求未完成，请重试或切换模型。" } }, 500);
+      if (options.externalQueue) {
+        runtime = { ...runtime, eventSeq: ++seq, deliveries: [{
+          requestId: String(body?.clientRequestId), threadId: sessionId, text: String(body?.text),
+          queueId: "native-queue-1", turnId: null, itemId: null, status: "unknown", error: null, createdAt: new Date().toISOString()
+        }] };
+        return json({ runtime }, 202);
+      }
       runtime = { ...runtime, status: "running", activeTurnId: "live-turn", eventSeq: ++seq }; return json({ runtime });
     }
     if (path.endsWith("/model")) {

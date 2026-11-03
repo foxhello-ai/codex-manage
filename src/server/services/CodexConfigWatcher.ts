@@ -128,5 +128,6 @@ function listCodexConfigFiles(directory: string): string[] {
 }
 
 function isCodexConfigFile(file: string): boolean {
+  if (file.startsWith(".") || /(?:state|cache|history|deliveries|session[-_]metadata|collaboration|tasks)/i.test(file)) return false;
   return file === "config.toml" || file === "auth.json" || file.endsWith(".toml") || file.endsWith(".json");
 }

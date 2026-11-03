@@ -52,6 +52,8 @@ const ResumeBody = z.object({
 const InputBody = z.object({
   text: z.string().trim().min(1).max(20000),
   permissionMode: PermissionMode.optional(),
+  clientRequestId: z.string().min(1).max(128).optional(),
+  useDesktopSettings: z.boolean().optional(),
   attachmentPaths: z.array(z.string().trim().min(1).max(4096)).max(10).optional()
 });
 
@@ -283,13 +285,14 @@ export function registerSessionRoutes(
     if (!user) return;
 
     try {
-      const runtime = user.role === "child"
-        ? await ensureChildControlledRuntime(user, params.data.id, runtimeManager)
-        : runtimeManager.hydratePermissionMode(
-            params.data.id,
-            await readStoredPermissionMode(sessionService, params.data.id) ?? "default"
-          );
-      return reply.send({ runtime });
+      // GET must not acquire a writer, including for controlled collaborators.
+      const runtime = runtimeManager.hydratePermissionMode(
+        params.data.id,
+        user.role === "child" ? "default" : await readStoredPermissionMode(sessionService, params.data.id) ?? "default"
+      );
+      const refreshed = typeof runtimeManager.refreshExternal === "function"
+        ? await runtimeManager.refreshExternal(params.data.id) : runtime;
+      return reply.send({ runtime: refreshed });
     } catch (error) {
       return sendChildRuntimeError(reply, error);
     }
@@ -312,6 +315,9 @@ export function registerSessionRoutes(
     if (!user) return;
 
     try {
+      if (runtimeManager?.getRuntime(params.data.id).executionSource === "external_queue" && body.data.mode !== "follow_session") {
+        throw new ModelDomainError("DESKTOP_QUEUE_TEXT_ONLY", "此会话的模型和权限请到桌面调整", 409);
+      }
       if (runtimeManager) await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
       const result = await sessionModelService.updateSelection(params.data.id, body.data);
       return reply.status(result.confirmationPending ? 202 : 200).send(result);
@@ -343,7 +349,6 @@ export function registerSessionRoutes(
     if (user.role === "child" && body.data.permissionMode === "full_access") {
       return sendError(reply, 403, "FULL_ACCESS_FORBIDDEN", "子用户只能使用默认受控模式");
     }
-
     try {
       await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
       const permissionMode = user.role === "child"
@@ -397,6 +402,10 @@ export function registerSessionRoutes(
     if (user.role === "child" && body.data.permissionMode === "full_access") {
       return sendError(reply, 403, "FULL_ACCESS_FORBIDDEN", "子用户只能使用默认受控模式");
     }
+    const useDesktopSettings = user.role === "owner" && body.data.useDesktopSettings === true;
+    if (useDesktopSettings && body.data.permissionMode !== undefined) {
+      return sendError(reply, 400, "INVALID_SESSION_INPUT", "跟随桌面设置时不能同时指定权限覆盖");
+    }
 
     try {
       await ensureChildControlledRuntime(user, params.data.id, runtimeManager);
@@ -414,15 +423,17 @@ export function registerSessionRoutes(
       if (user.role !== "child" && permissionMode === "full_access" && storedPermissionMode !== "full_access") {
         await persistPermissionMode(sessionService, params.data.id, permissionMode);
       }
-      const modelOverride = sessionModelService
+      const modelOverride = sessionModelService && !useDesktopSettings
         ? await sessionModelService.resolveForTurn(params.data.id)
         : undefined;
       const runtime = await runtimeManager.sendInput(params.data.id, {
         ...body.data,
-        permissionMode,
-        modelOverride
+        permissionMode: useDesktopSettings ? undefined : permissionMode,
+        modelOverride,
+        clientRequestId: body.data.clientRequestId ?? randomUUID(),
+        allowExternalQueue: user.role !== "child"
       });
-      return reply.send({ runtime });
+      return reply.status(runtime.executionSource === "external_queue" ? 202 : 200).send({ runtime });
     } catch (error) {
       if (error instanceof ModelDomainError) return sendModelError(reply, error);
       if (error instanceof Error && error.message === "CHILD_RUNTIME_REQUIRES_CONTROLLED_MODE") {
@@ -638,11 +649,12 @@ export function registerSessionRoutes(
       }
 
       const threadId = params.data.id;
-      try {
-        await ensureChildControlledRuntime(user, threadId, runtimeManager);
-      } catch {
-        socket.close(1008, "controlled mode required");
-        return;
+      if (user.role === "child") {
+        const observedRuntime = runtimeManager.getRuntime(threadId);
+        if (observedRuntime.permissionMode === "full_access" && ["starting", "running", "waiting_approval"].includes(observedRuntime.status)) {
+          socket.close(1008, "controlled mode required");
+          return;
+        }
       }
       const query = request.query && typeof request.query === "object" ? (request.query as Record<string, unknown>) : {};
       const afterSeq = Number(query.afterSeq ?? 0);
@@ -876,7 +888,7 @@ function sendActiveWriterError(reply: Parameters<typeof sendError>[0], error: un
     reply,
     409,
     "SESSION_ACTIVE_WRITER",
-    "检测到 ChatGPT 正在占用此会话。切换会话或关闭窗口可能不会释放锁，请完全退出 ChatGPT（⌘Q）或重启 ChatGPT，也可以从下方创建新分支",
+    "此会话由其他客户端持有写入权，当前操作无法继续。文字续聊可通过兼容版本的原生队列投递；请保留输入，勿重复发送",
     { cause: sanitizeModelError(error) }
   );
 }

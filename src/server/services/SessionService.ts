@@ -44,7 +44,7 @@ export type SessionTurn = {
 };
 
 export type SessionTurnItem =
-  | { id: string; type: "user_message"; text: string }
+  | { id: string; type: "user_message"; text: string; clientId?: string | null }
   | { id: string; type: "agent_message"; text: string; phase: string | null }
   | { id: string; type: "file_change"; status: string | null; changes: SessionFileChange[] }
   | { id: string; type: "context_compaction" }
@@ -175,6 +175,18 @@ export class SessionService {
     }
 
     const thread = response.thread && typeof response.thread === "object" ? (response.thread as Record<string, unknown>) : {};
+    if (includeTurns && thread.historyMode === "paginated") {
+      const turns: unknown[] = [];
+      let cursor: string | null = null;
+      do {
+        const page: { data: unknown[]; nextCursor?: string | null } = await this.appServer.request("thread/turns/list", {
+          threadId: sessionId, cursor, limit: 100, sortDirection: "asc", itemsView: "full"
+        });
+        turns.push(...page.data);
+        cursor = page.nextCursor ?? null;
+      } while (cursor);
+      thread.turns = turns;
+    }
     const modelState = await this.buildModelState(sessionId, readString(thread.modelProvider));
     const elapsedMs = Math.round(performance.now() - startedAt);
     if (elapsedMs >= 250) {
@@ -332,6 +344,7 @@ function toTurnItem(value: unknown, index: number, sessionId: string): SessionTu
       return {
         id,
         type: "user_message",
+        ...(readString(source.clientId) ? { clientId: readString(source.clientId) } : {}),
         text: rewriteLocalAssetLinks(stripAmbientBrowserContext(readTextContent(source.content)), sessionId)
       };
     case "agentMessage":

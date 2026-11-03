@@ -19,6 +19,23 @@ function metadataStore(entries: Record<string, { remarkTitle: string | null }> =
 }
 
 describe("SessionService", () => {
+  it("reads all stored paginated turns without resuming and preserves client IDs for exact queue reconciliation", async () => {
+    const calls: string[] = [];
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready", pid: 1, lastError: null, initialized: true }),
+      request: (async (method: string, params: any) => {
+        calls.push(method);
+        if (method === "thread/read") return { thread: { id: "thread-1", cwd: "/workspace", historyMode: "paginated", turns: [] } };
+        return params.cursor ? { data: [{ id: "turn-2", items: [{ id: "item-2", type: "userMessage", clientId: "request-2", content: [{ type: "text", text: "same" }] }] }] }
+          : { data: [{ id: "turn-1", items: [{ id: "item-1", type: "userMessage", clientId: "request-1", content: [{ type: "text", text: "same" }] }] }], nextCursor: "next" };
+      }) as any
+    });
+    const detail = await service.getSessionDetail("thread-1");
+    expect(detail.turns).toHaveLength(2);
+    expect(detail.turns.map(turn => turn.items[0])).toMatchObject([{ id: "item-1", clientId: "request-1" }, { id: "item-2", clientId: "request-2" }]);
+    expect(calls).toEqual(["thread/read", "thread/turns/list", "thread/turns/list"]);
+  });
+
   it("lists sessions from app-server thread/list", async () => {
     const calls: Array<{ method: string; params?: unknown }> = [];
     const service = new SessionService({

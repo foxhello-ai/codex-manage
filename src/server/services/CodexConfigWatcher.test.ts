@@ -5,6 +5,18 @@ import { describe, expect, it } from "vitest";
 import { CodexConfigWatcher, resolveCodexConfigDirectory } from "./CodexConfigWatcher";
 
 describe("CodexConfigWatcher", () => {
+  it("ignores desktop UI state and Manage outbox updates", () => {
+    const directory = mkdtempSync(join(tmpdir(), "codex-config-watcher-"));
+    const watcher = new CodexConfigWatcher({ directory, onChange: () => { throw Error("unexpected reload"); } });
+    try {
+      writeFileSync(join(directory, "config.toml"), "model = 'a'\n");
+      watcher.start();
+      writeFileSync(join(directory, ".codex-global-state.json"), "{}");
+      writeFileSync(join(directory, "session-metadata.json.deliveries.json"), "[]");
+      expect(watcher.checkNow()).toBe(false);
+    } finally { watcher.stop(); rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it("resolves CODEX_HOME before the default home directory", () => {
     expect(resolveCodexConfigDirectory({ CODEX_HOME: "/custom/codex" }, "/home/user")).toBe("/custom/codex");
   });
