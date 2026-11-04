@@ -1,8 +1,8 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { installUiHarness, longPath, sessionId } from "./fixtures";
 
-const artifactDir = "docs/acceptance/2026-11-03-h5-ui";
-const browser = (page: Page, info: TestInfo) => info.project.name === "desktop" ? page.locator(".desktopWorkspaceHome .workspaceSidebar") : page.locator(".mobileDashboardHome");
+const artifactDir = process.env.CODEX_UI_ARTIFACT_DIR ?? "docs/acceptance/2026-11-03-h5-ui-refinement";
+const browser = (page: Page, _info: TestInfo) => page.locator(".sessionLibrary");
 async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   for (const surface of await page.locator(".historyContent, .taskInput, .mobileDashboardHome, .sheetBody").all()) {
@@ -33,15 +33,10 @@ test("three list views, search, rename and ordinary directory selection", async 
   const list = browser(page, info);
   await expect(list.getByRole("tab", { name: "最近会话", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(list.locator(".sessionItem")).toHaveCount(10);
-  if (info.project.name === "desktop") {
-    expect((await list.boundingBox())!.width).toBe(280);
-    const separator = page.getByRole("separator", { name: "调整会话列表宽度" });
-    await separator.focus();
-    await separator.press("ArrowRight");
-    await expect.poll(async () => (await list.boundingBox())!.width).toBe(296);
-    await separator.dblclick();
-    await expect.poll(async () => (await list.boundingBox())!.width).toBe(280);
-  }
+  await expect(page.getByRole("button", { name: "打开会话列表", exact: true })).toHaveCount(0);
+  await expect(page.locator(".workspaceWelcome, .workspaceSidebar")).toHaveCount(0);
+  if (info.project.name.startsWith("landscape-")) await expect(list.locator(".sessionItem").first()).toBeInViewport({ ratio: 0.3 });
+  await touchTargets(page.locator(".topbar button, .sessionLibraryHeading button, .sessionViewTabs button, .titleEditButton"));
   await screenshot(page, info, "sessions");
   await list.getByLabel("搜索会话").fill("已有会话 3");
   await list.getByRole("button", { name: "搜索", exact: true }).click();
@@ -57,7 +52,7 @@ test("three list views, search, rename and ordinary directory selection", async 
   await list.getByLabel("按工作目录筛选").selectOption(longPath);
   await expect(list.locator(".workspacePath code")).toHaveText(longPath);
   await screenshot(page, info, "directories");
-  await list.getByRole("button", { name: "＋ 新建会话", exact: true }).click();
+  await list.getByRole("button", { name: "新建会话", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "选择工作目录", exact: true });
   await sheet.getByRole("combobox", { name: "工作目录", exact: true }).selectOption(longPath);
   await expect(sheet.locator(".workspacePath code")).toHaveText(longPath);
@@ -67,6 +62,24 @@ test("three list views, search, rename and ordinary directory selection", async 
   await sheet.getByRole("button", { name: "在此目录新建会话" }).click();
   await expect(page).toHaveURL(/\/new-session$/);
   expect(h.calls.find((call) => call.path === "/api/sessions" && call.method === "POST")?.body).toEqual({ cwd: longPath });
+  if (info.project.name === "desktop") {
+    const sidebar = page.locator(".workspaceSidebar");
+    expect((await sidebar.boundingBox())!.width).toBe(280);
+    const separator = page.getByRole("separator", { name: "调整会话列表宽度" });
+    await separator.focus();
+    await separator.press("ArrowRight");
+    await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(296);
+    await separator.dblclick();
+    await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(280);
+    await page.getByRole("button", { name: "查看全部会话", exact: true }).click();
+  } else {
+    await page.getByRole("button", { name: "打开会话列表", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "会话列表", exact: true })).toBeVisible();
+    await screenshot(page, info, "conversation-drawer");
+    await page.getByRole("button", { name: "返回完整会话列表", exact: true }).click();
+  }
+  await expect(page.locator(".sessionLibrary")).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开会话列表", exact: true })).toHaveCount(0);
   expect(h.pageErrors).toEqual([]);
 });
 
@@ -331,7 +344,7 @@ test("ordinary create failure stays in its panel and panel dismissal returns key
     await route.fulfill({ status: 500, json: { error: { code: "CREATE_FAILED", message: "已有目录暂时不可用" } } });
   });
   await page.goto("/");
-  const trigger = browser(page, info).getByRole("button", { name: "＋ 新建会话", exact: true });
+  const trigger = browser(page, info).getByRole("button", { name: "新建会话", exact: true });
   await trigger.click();
   const sheet = page.getByRole("dialog", { name: "选择工作目录", exact: true });
   await sheet.getByRole("button", { name: "在此目录新建会话" }).click();
