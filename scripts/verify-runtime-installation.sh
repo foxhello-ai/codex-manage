@@ -92,11 +92,11 @@ assert.equal((await fetch(base+'/api/health')).status,401);
 assert.equal((await fetch(base+'/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:'wrong-installation-password'})})).status,401);
 const paths=['/api/me','/api/sessions?paginated=true&limit=30'];
 if(version===releaseVersion)paths.push('/api/tasks');
-for(const path of paths)assert.equal((await fetch(base+path,{headers:{cookie}})).status,200,path);
+for(const path of paths){const response=await fetch(base+path,{headers:{cookie}});assert.equal(response.status,200,path);await response.arrayBuffer();}
 const html=await fetch(base+'/').then(r=>{assert.equal(r.status,200);return r.text();});
 const assets=[...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g)].map(match=>match[1]);
 assert.ok(assets.length>=2);
-for(const path of assets)assert.equal((await fetch(base+path)).status,200,path);
+for(const path of assets){const response=await fetch(base+path);assert.equal(response.status,200,path);assert.ok((await response.arrayBuffer()).byteLength>0,path);}
 const result={label,version,sourceCommit:commit,health:true,login:true,authenticationRequired:true,tasksApiChecked:version===releaseVersion,frontendAssets:assets.length,codexCliVersion:health.codexCli.version,environmentMode:'0600'};
 fs.appendFileSync(checksFile,JSON.stringify(result)+'\n');
 console.log(JSON.stringify(result));
