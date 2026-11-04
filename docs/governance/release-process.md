@@ -4,7 +4,9 @@
 
 ### Linux Runtime
 
-构建入口为 `.github/workflows/build-runtime-package.yml`；发布物是 `codex-manage-runtime.tgz`、同名 SHA-256 和 `build-info.txt`。版本号由 workflow 输入与 GitHub Release tag 共同确定。正式记录必须写明运行包的 Git ref、SHA-256、安装脚本版本和 systemd 验收结果。
+构建入口为 `.github/workflows/build-runtime-package.yml`，推送 `release/vX.Y.Z` 分支触发；发布物是 `codex-manage-runtime.tgz`、同名 SHA-256、包内 `build-info.txt`、安装脚本和安装验收 JSON。版本号由发布分支和 GitHub Release tag 共同确定。正式记录必须写明运行包的 Git ref、SHA-256、安装脚本版本和 systemd 验收结果。
+
+当前下载兼容入口沿用 GitHub Release 的 `vX.Y.Z` tag；通过安装验收及正式下载复核后，额外生成规范的 `runtime/vX.Y.Z` annotated tag，记录相同源码提交与安装证据。草稿 Release 通过安装、升级/回滚和服务启停后才可正式发布。每次运行结果写入 `verification/runtime-vX.Y.Z` 分支，正式发布的完整安装报告同时作为 Release asset 保存。
 
 ### Desktop
 

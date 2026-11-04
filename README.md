@@ -106,19 +106,21 @@ GitHub Actions 工作流：`.github/workflows/build-runtime-package.yml`。
 
 触发方式：
 
-- 推送到 `main` 自动构建，并在对应 Actions run 的 Artifacts 中保留运行包。
-- 手动运行 `Build Runtime Package`，默认版本号是 `1.0.1`，同时创建 GitHub Release。
+- 从已验证的 `main` 创建并推送 `release/vX.Y.Z` 分支，例如 `release/v1.0.9`。
+- 流水线运行测试、生产构建，并生成运行包、SHA-256 和包含源码提交的 `build-info.txt`。
+- 先创建草稿 Release，下载其中的实际包，在 Ubuntu 24.04/systemd 上验证安装、登录、静态资源、升级、回滚和服务启停；通过后发布 Release 和官网。
+- 发布后再次下载并核对文件，创建 `runtime/vX.Y.Z` annotated tag，并保存验收报告。失败的安装验收不会自动转为正式发布。
 
 推送触发时，运行包在 GitHub Actions run 页面底部的 Artifacts 区域下载，名称类似：
 
 ```text
-codex-manage-runtime-1.0.1-<12位commit>
+codex-manage-runtime-1.0.9-<12位commit>
 ```
 
-手动发布时，运行包会上传到 GitHub Release：
+正式运行包上传到对应的 GitHub Release：
 
 ```text
-https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.1
+https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.9
 ```
 
 Release asset 固定命名为：
@@ -126,15 +128,17 @@ Release asset 固定命名为：
 ```text
 codex-manage-runtime.tgz
 codex-manage-runtime.tgz.sha256
+install-runtime.sh
+runtime-installation-verification.json
 ```
 
-Release 版本号不可静默覆盖；如果 `v1.0.1` 已存在，workflow 会失败。需要重发时应使用新版本号，或先删除旧 Release。
+Release 版本号不可静默覆盖；已存在时 workflow 会失败。修复已发布版本应使用新版本号。
 
-也可以直接下载：
+有仓库权限时可通过 GitHub CLI 下载实际安装文件，再上传到 Linux 服务器。私有仓库不支持匿名下载：
 
 ```bash
-curl -fL -o codex-manage-runtime.tgz \
-  https://github.com/foxhello-ai/codex-manage/releases/download/v1.0.1/codex-manage-runtime.tgz
+gh release download v1.0.9 --repo foxhello-ai/codex-manage \
+  --pattern 'codex-manage-runtime.tgz*' --pattern install-runtime.sh
 ```
 
 运行包内容：
@@ -189,7 +193,7 @@ codex doctor
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scripts/install-runtime.sh \
-  | sudo bash -s -- --user deploy --version 1.0.1
+  | sudo bash -s -- --user deploy --version 1.0.9
 ```
 
 私有仓库不能匿名访问 `raw.githubusercontent.com`，GitHub 会返回 404。如果不想在服务器配置 GitHub token，先在本地或 CI 页面下载运行包，再把运行包和安装脚本上传到服务器。
@@ -198,20 +202,20 @@ curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scrip
 
 ```bash
 scp scripts/install-runtime.sh \
-  codex-manage-runtime-1.0.1-<12位commit>.zip \
+  codex-manage-runtime-1.0.9-<12位commit>.zip \
   deploy@server:/tmp/
 
 ssh deploy@server
 sudo bash /tmp/install-runtime.sh \
   --user deploy \
-  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
+  --package /tmp/codex-manage-runtime-1.0.9-<12位commit>.zip
 ```
 
 如果当前登录服务器的用户就是已登录 Codex 的用户，可以省略 `--user`：
 
 ```bash
 sudo bash /tmp/install-runtime.sh \
-  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
+  --package /tmp/codex-manage-runtime-1.0.9-<12位commit>.zip
 ```
 
 如果手里是 Release asset 里的 `codex-manage-runtime.tgz`，也可以上传 tgz 和同名 `.sha256` 后安装。`--user deploy` 里的 `deploy` 必须替换成真实存在、且已经登录 Codex 的 Linux 用户。
@@ -230,7 +234,7 @@ sudo bash /tmp/install-runtime.sh \
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scripts/install-runtime.sh \
-  | sudo bash -s -- --user deploy --version 1.0.1 --no-start
+  | sudo bash -s -- --user deploy --version 1.0.9 --no-start
 ```
 
 本地包模式：
@@ -238,7 +242,7 @@ curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scrip
 ```bash
 sudo bash /tmp/install-runtime.sh \
   --user deploy \
-  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip \
+  --package /tmp/codex-manage-runtime-1.0.9-<12位commit>.zip \
   --no-start
 ```
 
@@ -301,7 +305,7 @@ sudoedit /etc/codex-manage/codex-manage.env
 
 ```bash
 scp scripts/install-runtime.sh \
-  codex-manage-runtime-1.0.1-<12位commit>.zip \
+  codex-manage-runtime-1.0.9-<12位commit>.zip \
   deploy@server:/tmp/
 ```
 
@@ -310,7 +314,7 @@ scp scripts/install-runtime.sh \
 ```bash
 sudo bash /tmp/install-runtime.sh \
   --user deploy \
-  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
+  --package /tmp/codex-manage-runtime-1.0.9-<12位commit>.zip
 ```
 
 如果当前用户就是 Codex 用户，可以省略 `--user`。
@@ -321,7 +325,7 @@ sudo bash /tmp/install-runtime.sh \
 sudo mkdir -p /opt/codex-manage/releases
 sudo mkdir -p /home/deploy/.codex-manage
 
-release="1.0.1-<12位commit>"
+release="1.0.9-<12位commit>"
 sudo mkdir -p "/opt/codex-manage/releases/$release"
 sudo tar -xzf "/tmp/codex-manage-runtime.tgz" \
   -C "/opt/codex-manage/releases/$release" \
@@ -447,7 +451,7 @@ https://codex.example.com
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scripts/install-runtime.sh \
-  | sudo bash -s -- --user deploy --version 1.0.1
+  | sudo bash -s -- --user deploy --version 1.0.9
 ```
 
 私有仓库或离线服务器可以上传新运行包后升级：
@@ -455,13 +459,13 @@ curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scrip
 ```bash
 sudo bash /tmp/install-runtime.sh \
   --user deploy \
-  --package /tmp/codex-manage-runtime-1.0.1-<12位commit>.zip
+  --package /tmp/codex-manage-runtime-1.0.9-<12位commit>.zip
 ```
 
 也可以手动上传新 tarball 后安装到新版本目录，然后切换 `current`：
 
 ```bash
-release="1.0.1-<新的12位commit>"
+release="1.0.9-<新的12位commit>"
 sudo mkdir -p "/opt/codex-manage/releases/$release"
 sudo tar -xzf "/tmp/codex-manage-runtime.tgz" \
   -C "/opt/codex-manage/releases/$release" \

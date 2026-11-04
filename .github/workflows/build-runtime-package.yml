@@ -11,6 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,7 +49,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test application
+        id: tests
+        run: npm test 2>&1 | tee "$RUNNER_TEMP/release-tests.log"
+
       - name: Build application
+        id: build
         run: npm run build
 
       - name: Package runtime
@@ -118,15 +124,8 @@ jobs:
             ${{ steps.package.outputs.checksum_path }}
           if-no-files-found: error
 
-      - name: Deploy website to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4"
-          command: pages deploy website --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT }}
-
-      - name: Publish GitHub Release
+      - name: Create draft GitHub Release
+        id: draft
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -138,13 +137,155 @@ jobs:
         run: |
           set -euo pipefail
 
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists. Use a new version or delete the existing release first." >&2
+          existing_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null || true)"
+          if [[ "$existing_draft" == false ]]; then
+            echo "Release $RELEASE_TAG is already published. Use a new version." >&2
             exit 1
           fi
 
-          gh release create "$RELEASE_TAG" "$PACKAGE_PATH" "$CHECKSUM_PATH" \
-            --target "$GITHUB_SHA" \
-            --title "$RELEASE_TITLE" \
-            --notes-file "$RELEASE_NOTES" \
-            --latest
+          if [[ "$existing_draft" == true ]]; then
+            gh release edit "$RELEASE_TAG" --draft=true --target "$GITHUB_SHA" \
+              --title "$RELEASE_TITLE" --notes-file "$RELEASE_NOTES"
+            gh release upload "$RELEASE_TAG" "$PACKAGE_PATH" "$CHECKSUM_PATH" scripts/install-runtime.sh --clobber
+          else
+            gh release create "$RELEASE_TAG" "$PACKAGE_PATH" "$CHECKSUM_PATH" scripts/install-runtime.sh \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TITLE" \
+              --notes-file "$RELEASE_NOTES" \
+              --draft
+          fi
+
+      - name: Install verification Codex CLI
+        id: cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          cli_root="$(mktemp -d /tmp/codex-release-cli-XXXXXX)"
+          chmod 755 "$cli_root"
+          npm install --prefix "$cli_root" @openai/codex@0.163.0
+          node_binary="$(command -v node)"
+          printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' \
+            "$node_binary" "$cli_root/node_modules/@openai/codex/bin/codex.js" \
+            | sudo tee /usr/local/bin/codex >/dev/null
+          sudo chmod 755 /usr/local/bin/codex
+          codex --version
+
+      - name: Download release assets for installation
+        id: download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/release-download" "$RUNNER_TEMP/previous-release-download"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir "$RUNNER_TEMP/release-download" --pattern 'codex-manage-runtime.tgz*' --pattern install-runtime.sh
+          previous_tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+          gh release download "$previous_tag" --repo "$GITHUB_REPOSITORY" \
+            --dir "$RUNNER_TEMP/previous-release-download" --pattern 'codex-manage-runtime.tgz*'
+          echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Verify fresh installation, upgrade, rollback and systemd
+        id: installation
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          sudo env \
+            VERIFY_PACKAGE_DIR="$RUNNER_TEMP/release-download" \
+            VERIFY_PREVIOUS_PACKAGE_DIR="$RUNNER_TEMP/previous-release-download" \
+            VERIFY_EXPECTED_VERSION="$VERSION" VERIFY_EXPECTED_COMMIT="$GITHUB_SHA" \
+            VERIFY_REPORT_FILE="$RUNNER_TEMP/runtime-installation-verification.json" \
+            VERIFY_NODE="$(command -v node)" \
+            bash scripts/verify-runtime-installation.sh 2>&1 | tee "$RUNNER_TEMP/release-installation.log"
+          sudo chown "$(id -u):$(id -g)" "$RUNNER_TEMP/runtime-installation-verification.json"
+
+      - name: Deploy website to Cloudflare Pages
+        id: website
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4"
+          command: pages deploy website --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT }}
+
+      - name: Publish verified Release and record Runtime tag
+        id: publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_NOTES: ${{ steps.package.outputs.release_notes }}
+        run: |
+          set -euo pipefail
+          cat >> "$RELEASE_NOTES" <<'EOF'
+
+          Linux installation verified on Ubuntu 24.04 with systemd and Codex CLI 0.163.0:
+          fresh install, login, authenticated APIs, static assets, upgrade, rollback,
+          restart, stop/start, configuration and session-directory marker preservation.
+          This verifies installation/runtime startup; no real account login or model inference was tested.
+
+          Download install-runtime.sh together with the tarball and SHA-256 file.
+          Installation evidence is attached as runtime-installation-verification.json.
+          EOF
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --draft=false --latest --notes-file "$RELEASE_NOTES"
+          mkdir -p "$RUNNER_TEMP/published-release-download"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir "$RUNNER_TEMP/published-release-download" --pattern 'codex-manage-runtime.tgz*' --pattern install-runtime.sh
+          (cd "$RUNNER_TEMP/published-release-download" && sha256sum -c codex-manage-runtime.tgz.sha256)
+          cmp "$RUNNER_TEMP/release-download/codex-manage-runtime.tgz" "$RUNNER_TEMP/published-release-download/codex-manage-runtime.tgz"
+          cmp "$RUNNER_TEMP/release-download/install-runtime.sh" "$RUNNER_TEMP/published-release-download/install-runtime.sh"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path=process.env.RUNNER_TEMP+'/runtime-installation-verification.json';
+          const report=JSON.parse(fs.readFileSync(path,'utf8'));
+          report.publishedDownloadVerified=true;
+          report.releaseUrl=`${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/releases/tag/${process.env.RELEASE_TAG}`;
+          report.runUrl=`${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          fs.writeFileSync(path,JSON.stringify(report,null,2)+'\n');
+          NODE
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/runtime-installation-verification.json"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git tag -a "runtime/v$VERSION" "$GITHUB_SHA" -F "$RUNNER_TEMP/runtime-installation-verification.json"
+          git push origin "refs/tags/runtime/v$VERSION"
+
+      - name: Save release verification record
+        if: always() && steps.version.outputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          JOB_STATUS: ${{ job.status }}
+          STEP_RESULTS: ${{ toJSON(steps) }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const read=path=>fs.existsSync(path)?fs.readFileSync(path,'utf8'):null;
+          const report={version:process.env.VERSION,sourceCommit:process.env.GITHUB_SHA,status:process.env.JOB_STATUS,
+            runUrl:`${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            steps:Object.fromEntries(Object.entries(JSON.parse(process.env.STEP_RESULTS)).map(([key,value])=>[key,value.outcome])),
+            installation:JSON.parse(read(process.env.RUNNER_TEMP+'/runtime-installation-verification.json')??'null')};
+          if(report.status!=='success')report.diagnostics=(read(process.env.RUNNER_TEMP+'/release-installation.log')??read(process.env.RUNNER_TEMP+'/release-tests.log')??'').split('\n').slice(-120).join('\n');
+          fs.writeFileSync(process.env.RUNNER_TEMP+'/release-verification.json',JSON.stringify(report,null,2)+'\n');
+          NODE
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          verification_ref="refs/heads/verification/runtime-v$VERSION"
+          previous_record="$(git ls-remote origin "$verification_ref" | cut -f1)"
+          export GIT_INDEX_FILE="$RUNNER_TEMP/verification.index"
+          git read-tree --empty
+          record_blob="$(git hash-object -w "$RUNNER_TEMP/release-verification.json")"
+          git update-index --add --cacheinfo "100644,$record_blob,release-verification.json"
+          record_tree="$(git write-tree)"
+          parent_args=()
+          if [[ -n "$previous_record" ]]; then
+            git fetch origin "$previous_record"
+            parent_args=(-p "$previous_record")
+          fi
+          record_commit="$(git commit-tree "$record_tree" "${parent_args[@]}" -m "Record Runtime v$VERSION release verification")"
+          git push origin "$record_commit:$verification_ref"
