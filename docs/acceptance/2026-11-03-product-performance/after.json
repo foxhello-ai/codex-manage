@@ -1,0 +1,154 @@
+[
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/",
+    "status": 200,
+    "ms": 28,
+    "bytes": 968
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/assets/index-D6eizzUf.js",
+    "status": 200,
+    "ms": 31,
+    "bytes": 114294
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/assets/react-CIivRUU9.js",
+    "status": 200,
+    "ms": 55,
+    "bytes": 191817
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/assets/index-CXbCHtS9.css",
+    "status": 200,
+    "ms": 38,
+    "bytes": 71389
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/me",
+    "status": 200,
+    "ms": 8,
+    "bytes": 169
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/config",
+    "status": 200,
+    "ms": 12,
+    "bytes": 523
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/sessions?paginated=true&compact=true&limit=30",
+    "status": 200,
+    "ms": 619,
+    "bytes": 16379,
+    "count": 26,
+    "hasMore": true
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/sessions?compact=true",
+    "status": 200,
+    "ms": 8505,
+    "bytes": 211203,
+    "count": 357,
+    "hasMore": false
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/tasks",
+    "status": 200,
+    "ms": 25,
+    "bytes": 1308
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/sessions?compact=true",
+    "status": 200,
+    "ms": 62,
+    "bytes": 211203,
+    "count": 357,
+    "hasMore": false
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/",
+    "status": 200,
+    "ms": 1179,
+    "bytes": 968
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/assets/index-D6eizzUf.js",
+    "status": 200,
+    "ms": 2112,
+    "bytes": 114294
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/assets/react-CIivRUU9.js",
+    "status": 200,
+    "ms": 1612,
+    "bytes": 191817
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/assets/index-CXbCHtS9.css",
+    "status": 200,
+    "ms": 1463,
+    "bytes": 71389
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/me",
+    "status": 200,
+    "ms": 1048,
+    "bytes": 169
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/config",
+    "status": 200,
+    "ms": 735,
+    "bytes": 523
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/sessions?paginated=true&compact=true&limit=30",
+    "status": 200,
+    "ms": 1475,
+    "bytes": 16379,
+    "count": 26,
+    "hasMore": true
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/sessions?compact=true",
+    "status": 200,
+    "ms": 12811,
+    "bytes": 211203,
+    "count": 357,
+    "hasMore": false
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/tasks",
+    "status": 200,
+    "ms": 697,
+    "bytes": 1308
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/sessions?compact=true",
+    "status": 200,
+    "ms": 3756,
+    "bytes": 211203,
+    "count": 357,
+    "hasMore": false
+  }
+]

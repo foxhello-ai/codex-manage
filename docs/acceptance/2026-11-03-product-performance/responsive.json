@@ -1,0 +1,22 @@
+[
+  {
+    "viewport": 320,
+    "scrollWidth": 320,
+    "width": 320
+  },
+  {
+    "viewport": 375,
+    "scrollWidth": 375,
+    "width": 375
+  },
+  {
+    "viewport": 390,
+    "scrollWidth": 390,
+    "width": 390
+  },
+  {
+    "viewport": 430,
+    "scrollWidth": 430,
+    "width": 430
+  }
+]

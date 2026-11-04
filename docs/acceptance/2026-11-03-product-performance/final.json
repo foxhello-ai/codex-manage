@@ -1,0 +1,82 @@
+[
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/",
+    "status": 200,
+    "ms": 12,
+    "decodedBytes": 968,
+    "encoding": null
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/assets/index-Dfo4I34E.js",
+    "status": 200,
+    "ms": 66,
+    "decodedBytes": 114541,
+    "encoding": "gzip"
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/assets/react-CIivRUU9.js",
+    "status": 200,
+    "ms": 48,
+    "decodedBytes": 191817,
+    "encoding": "gzip"
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/sessions?paginated=true&compact=true&limit=30",
+    "status": 200,
+    "ms": 823,
+    "decodedBytes": 16379,
+    "encoding": "gzip"
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/tasks",
+    "status": 200,
+    "ms": 56,
+    "decodedBytes": 1308,
+    "encoding": "gzip"
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/",
+    "status": 200,
+    "ms": 1426,
+    "decodedBytes": 968,
+    "encoding": "br"
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/assets/index-Dfo4I34E.js",
+    "status": 200,
+    "ms": 1466,
+    "decodedBytes": 114541,
+    "encoding": "gzip"
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/assets/react-CIivRUU9.js",
+    "status": 200,
+    "ms": 1574,
+    "decodedBytes": 191817,
+    "encoding": "gzip"
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/sessions?paginated=true&compact=true&limit=30",
+    "status": 200,
+    "ms": 1764,
+    "decodedBytes": 16379,
+    "encoding": "gzip"
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/tasks",
+    "status": 200,
+    "ms": 588,
+    "decodedBytes": 1308,
+    "encoding": "gzip"
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-03",
+  "timezone": "Asia/Shanghai",
+  "build": "npm run build",
+  "buildPassed": true,
+  "testFiles": 7,
+  "testsPassed": 60,
+  "command": "npm test -- src/shared/api.test.ts src/server/services/SessionService.test.ts src/server/routes/sessions.test.ts src/server/services/TaskStore.test.ts src/server/staticClient.test.ts src/client/sessionRoute.test.ts src/client/sessionInteractions.test.ts",
+  "assets": [
+    "/assets/index-CpoW1xJr.js",
+    "/assets/react-CIivRUU9.js",
+    "/assets/index-BhG9Kn2f.css"
+  ],
+  "uiAutomationSuiteRun": false,
+  "physicalDeviceTested": false
+}

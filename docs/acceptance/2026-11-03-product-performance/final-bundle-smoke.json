@@ -1,0 +1,32 @@
+[
+  {
+    "path": "/assets/index-CpoW1xJr.js",
+    "status": 200,
+    "encoding": "gzip",
+    "decodedBytes": 115465
+  },
+  {
+    "path": "/assets/react-CIivRUU9.js",
+    "status": 200,
+    "encoding": "gzip",
+    "decodedBytes": 191817
+  },
+  {
+    "path": "/assets/index-BhG9Kn2f.css",
+    "status": 200,
+    "encoding": "gzip",
+    "decodedBytes": 71456
+  },
+  {
+    "path": "/api/sessions?paginated=true&compact=true&limit=30",
+    "status": 200,
+    "encoding": "gzip",
+    "decodedBytes": 16379
+  },
+  {
+    "path": "/api/tasks",
+    "status": 200,
+    "encoding": "gzip",
+    "decodedBytes": 1308
+  }
+]
