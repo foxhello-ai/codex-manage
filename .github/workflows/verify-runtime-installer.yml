@@ -1,0 +1,75 @@
+name: Verify Runtime Installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/install-runtime.sh
+      - scripts/verify-runtime-installation.sh
+      - scripts/verify-macos-runtime-installation.sh
+      - .github/workflows/verify-runtime-installer.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15-intel, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install official Codex CLI
+        run: npm install -g @openai/codex@0.163.0
+      - name: Download immutable published packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for version in 1.0.9 1.0.8; do
+            mkdir -p "$RUNNER_TEMP/assets/$version"
+            for asset in codex-manage-runtime.tgz codex-manage-runtime.tgz.sha256; do
+              curl -fsSL --connect-timeout 20 --max-time 180 --retry 3 \
+                "https://github.com/$GITHUB_REPOSITORY/releases/download/v$version/$asset" \
+                -o "$RUNNER_TEMP/assets/$version/$asset"
+            done
+          done
+          cp scripts/install-runtime.sh "$RUNNER_TEMP/assets/1.0.9/install-runtime.sh"
+      - name: Verify Linux systemd installation
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo env "PATH=$PATH" \
+            VERIFY_NODE="$(command -v node)" \
+            VERIFY_PACKAGE_DIR="$RUNNER_TEMP/assets/1.0.9" \
+            VERIFY_PREVIOUS_PACKAGE_DIR="$RUNNER_TEMP/assets/1.0.8" \
+            VERIFY_EXPECTED_VERSION=1.0.9 \
+            VERIFY_EXPECTED_COMMIT=a921a7a86005b0f9d2b11d687011aab7fcee21e7 \
+            VERIFY_REPORT_FILE="$RUNNER_TEMP/installation.json" \
+            bash scripts/verify-runtime-installation.sh 2>&1 | tee "$RUNNER_TEMP/installation.log"
+      - name: Verify macOS launchd installation
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          VERIFY_PACKAGE_DIR: ${{ runner.temp }}/assets/1.0.9
+          VERIFY_PREVIOUS_PACKAGE_DIR: ${{ runner.temp }}/assets/1.0.8
+          VERIFY_REPORT_FILE: ${{ runner.temp }}/installation.json
+        run: |
+          set -euo pipefail
+          bash scripts/verify-macos-runtime-installation.sh 2>&1 | tee "$RUNNER_TEMP/installation.log"
+      - name: Upload installation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-installer-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/installation.json
+            ${{ runner.temp }}/installation.log
+            ${{ runner.temp }}/installation.json.logs

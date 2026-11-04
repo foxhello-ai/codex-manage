@@ -187,7 +187,37 @@ codex doctor
 
 如果已有 Codex 会话本来就是 `deploy` 用户创建的，不需要迁移会话目录。如果已有会话属于另一个用户，应当用那个用户运行服务，或者为不同用户分别部署独立实例。
 
-## 一条命令安装
+## macOS 安装（MacBook Air / Pro）
+
+`v1.0.9` Release 附带的旧安装脚本仅支持 Linux。macOS 请使用 `main` 上更新后的安装器，它安装相同的 Web Runtime，并用当前用户的 launchd LaunchAgent 管理服务。这不是 `.app` 桌面安装包。
+
+先准备 Node.js 22+，并在同一个 macOS 用户下安装、登录 Codex CLI；安装器也能识别 `/Applications` 下官方桌面应用附带的 CLI。打开该用户的桌面终端执行，**不使用 `sudo`，不传 `--user deploy`**：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/foxhello-ai/codex-manage/main/scripts/install-runtime.sh \
+  | bash -s -- --version 1.0.9
+```
+
+安装完成后打开 `http://127.0.0.1:4310`。访问密码保存在当前用户配置文件中，可用以下命令查看：
+
+```bash
+sed -n 's/^CODEX_WEB_PASSWORD=//p' "$HOME/Library/Application Support/Codex Manage/runtime.env"
+```
+
+默认目录是 `~/Library/Application Support/Codex Manage`，包含 `current`、`releases`、`data`、`logs` 和 `runtime.env`。服务配置为 `~/Library/LaunchAgents/ai.foxhello.codex-manage.plist`。安装器保存 Node 与 CLI 的绝对路径、当前工具链 PATH，并生成独立的访问密码；官方桌面应用无需修改。升级时保留已有配置与数据，可通过同一命令重新安装或指定其他版本。
+
+```bash
+# 重启
+launchctl kickstart -k "gui/$(id -u)/ai.foxhello.codex-manage"
+# 停止（本次登录期间停止；下次登录仍会自动启动）
+launchctl bootout "gui/$(id -u)/ai.foxhello.codex-manage"
+# 再次启动
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/ai.foxhello.codex-manage.plist"
+```
+
+服务在当前用户登录后自动运行，退出登录后停止；Mac 休眠时无法提供持续远程访问。默认只监听本机。需要局域网访问时可在首次安装增加 `--host 0.0.0.0`；已有配置需修改 `runtime.env` 后重启。Windows 的本机服务安装暂不支持。
+
+## Linux 一条命令安装
 
 服务器上已有 `deploy` 用户并已用该用户登录 Codex 时，可以直接执行。公开仓库使用：
 

@@ -30,9 +30,9 @@
 
 ## Codex Manage Runtime 部署
 
-当前主线的 Runtime 一条命令安装只支持 Linux：安装脚本依赖 Bash、root/sudo、systemd、Node.js 和已登录 Codex 的 Linux 用户。
+当前 `main` 安装器按系统选择服务管理方式：Linux 使用 root/sudo 和 systemd；macOS 使用当前登录用户的 launchd LaunchAgent，不使用 sudo。macOS 命令和服务路径见 [README 的 macOS 安装说明](../README.md#macos-安装macbook-air--pro)。`v1.0.9` Release 附带的旧安装器仍仅支持 Linux，macOS 需要从 `main` 获取更新后的安装器。
 
-Windows/macOS 当前可以作为浏览器访问端连接 Linux Runtime；桌面安装物属于独立发布线，当前工作区没有统一的三平台一键安装入口。要补齐 Windows、macOS、Linux 一条命令部署，需要分别实现 Windows Service、launchd、systemd 的服务安装、签名、升级和回滚，并完成三平台实机验收。
+Windows 当前可以作为浏览器访问端连接已部署的 Runtime；Windows 本机服务安装仍未实现。Web Runtime 与 `.app`/Windows 桌面安装物属于不同的发布形态。官网继续以已发布版本的验收范围为准，不能把 `main` 安装器的新支持范围推定为旧 Release 资产已更新。
 
 ```bash
 codex login
