@@ -1,4 +1,5 @@
 import cookie from "@fastify/cookie";
+import compress from "@fastify/compress";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
 import { loadConfig } from "./config";
@@ -59,6 +60,7 @@ await app.register(cookie, {
   secret: config.sessionSecret
 });
 await app.register(websocket);
+await app.register(compress, { threshold: 1024, encodings: ["gzip", "deflate"] });
 
 registerAuthHook(app, collaborationStore);
 registerAuthRoutes(app, config, collaborationStore);

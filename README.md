@@ -86,6 +86,20 @@ Desktop 与 Cloud Platform 的 `v1.0.6` 已由项目负责人确认同期发布�
 
 推荐部署方式是：GitHub Actions 构建无源码运行包，Linux 服务器用同一个系统用户通过 systemd 启动。不要用 Docker 做主部署。
 
+## 本地外网试用
+
+外网入口不要直接转发 Vite 开发服务：开发模式包含 React 开发运行时、热更新和多个源码模块，高延迟网络会显著放大首屏等待。
+
+本地开发仍使用 `npm run dev`。通过现有外网隧道展示和试用时，先停止开发服务，再运行：
+
+```bash
+npm run local:public
+```
+
+该命令构建前端，在 4310 提供构建后的页面，并将 API 和 WebSocket 转发到 4311 的本地后端；原有隧道目标端口不变。前端修改后需要重新执行构建。已有后端运行时，也可以单独执行 `npm run build:client` 后运行 `npm run serve:client`，保留后端进程。
+
+这是本地试用入口。正式部署继续使用下方的单体运行包与 `npm start`。
+
 ## 构建运行包
 
 GitHub Actions 工作流：`.github/workflows/build-runtime-package.yml`。

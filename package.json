@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "local:public": "npm run build:client && concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:serve:client\"",
     "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "CODEX_WEB_PORT=4311 tsx watch src/server/index.ts",
+    "serve:client": "vite preview --host 0.0.0.0 --port 4310 --strictPort",
     "dev:client": "vite --host 0.0.0.0 --port 4310",
     "build": "npm run typecheck && npm run build:client && npm run build:server",
     "build:client": "vite build",
@@ -17,6 +19,7 @@
     "test:ui": "npm run build:client && playwright test --config playwright.ui.config.ts"
   },
   "dependencies": {
+    "@fastify/compress": "^9.3.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/static": "^10.1.0",
     "@fastify/websocket": "^11.2.0",
