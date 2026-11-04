@@ -94,6 +94,9 @@ const DEFAULT_SESSION_SCAN_LIMIT = 1000;
 const SESSION_PAGE_SIZE = 100;
 
 export class SessionService {
+  private readonly listRequests = new Map<string, Promise<ThreadListResponse>>();
+  private readonly listCache = new Map<string, { expiresAt: number; threads: unknown[] }>();
+  private readonly scanRequests = new Map<string, Promise<unknown[]>>();
   private readonly detailRequests = new Map<string, Promise<SessionDetail>>();
 
   constructor(
@@ -108,25 +111,7 @@ export class SessionService {
     this.assertReady();
 
     const scanLimit = params.search ? DEFAULT_SESSION_SCAN_LIMIT : params.limit ?? DEFAULT_SESSION_SCAN_LIMIT;
-    const threads: unknown[] = [];
-    const seenCursors = new Set<string>();
-    let cursor: string | null = null;
-
-    while (threads.length < scanLimit) {
-      const response = await this.appServer.request<ThreadListResponse>("thread/list", {
-        cursor,
-        limit: Math.min(SESSION_PAGE_SIZE, scanLimit - threads.length),
-        sortDirection: "desc",
-        sortKey: "updated_at",
-        archived: false,
-        searchTerm: null
-      });
-
-      threads.push(...(response.data ?? []));
-      cursor = readString(response.nextCursor);
-      if (!cursor || seenCursors.has(cursor)) break;
-      seenCursors.add(cursor);
-    }
+    const threads = await this.scanThreads(scanLimit);
 
     const metadata = await this.readMetadata();
     const searchTerm = params.search?.trim().toLocaleLowerCase() ?? "";
@@ -140,6 +125,91 @@ export class SessionService {
 
     const matched = sessions.filter((session) => matchesSearch(session, searchTerm));
     return params.limit ? matched.slice(0, params.limit) : matched;
+  }
+
+  // Recent sessions use the app-server cursor directly: the first screen needs one page.
+  async listSessionPage(params: { limit?: number; cursor?: string } = {}): Promise<{ sessions: SessionSummary[]; nextCursor: string | null }> {
+    this.assertReady();
+    const [response, metadata] = await Promise.all([
+      this.requestThreadPage(params.limit ?? 30, params.cursor ?? null),
+      this.readMetadata()
+    ]);
+    return {
+      sessions: deduplicateSessions((response.data ?? [])
+        .map((thread) => this.toSummary(thread, metadata))
+        .filter((session): session is SessionSummary => session !== null)),
+      nextCursor: readString(response.nextCursor)
+    };
+  }
+
+  async getSessionSummaries(sessionIds: string[]): Promise<SessionSummary[]> {
+    this.assertReady();
+    const metadata = await this.readMetadata();
+    const ids = [...new Set(sessionIds)];
+    const summaries: SessionSummary[] = [];
+    // Tasks usually reference only a handful of sessions. Avoid scanning unrelated history.
+    for (let offset = 0; offset < ids.length; offset += 4) {
+      const batch = await Promise.all(ids.slice(offset, offset + 4).map(async (threadId) => {
+        try {
+          const response = await this.appServer.request<ThreadReadResponse>("thread/read", { threadId, includeTurns: false });
+          return this.toSummary(response.thread, metadata);
+        } catch (error) {
+          if (error instanceof Error && /(?:not found|no rollout found|does not exist)/i.test(error.message)) return null;
+          throw error;
+        }
+      }));
+      summaries.push(...batch.filter((item): item is SessionSummary => item !== null));
+    }
+    return summaries;
+  }
+
+  invalidateList(): void {
+    this.listCache.clear();
+    this.scanRequests.clear();
+  }
+
+  private requestThreadPage(limit: number, cursor: string | null): Promise<ThreadListResponse> {
+    const key = JSON.stringify([this.appServer.getSnapshot().pid, limit, cursor]);
+    const existing = this.listRequests.get(key);
+    if (existing) return existing;
+    const request = this.appServer.request<ThreadListResponse>("thread/list", {
+      cursor, limit, sortDirection: "desc", sortKey: "updated_at", archived: false, searchTerm: null
+    });
+    this.listRequests.set(key, request);
+    void request.finally(() => {
+      if (this.listRequests.get(key) === request) this.listRequests.delete(key);
+    }).catch(() => undefined);
+    return request;
+  }
+
+  private async scanThreads(scanLimit: number): Promise<unknown[]> {
+    const key = `${this.appServer.getSnapshot().pid}:${scanLimit}`;
+    const cached = this.listCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.threads;
+    const existing = this.scanRequests.get(key);
+    if (existing) return existing;
+    let request!: Promise<unknown[]>;
+    request = (async () => {
+      const threads: unknown[] = [];
+      const seenCursors = new Set<string>();
+      let cursor: string | null = null;
+      while (threads.length < scanLimit) {
+        const response = await this.requestThreadPage(Math.min(SESSION_PAGE_SIZE, scanLimit - threads.length), cursor);
+        threads.push(...(response.data ?? []));
+        cursor = readString(response.nextCursor);
+        if (!cursor || seenCursors.has(cursor)) break;
+        seenCursors.add(cursor);
+      }
+      // Never cache across an explicit invalidation or failed request.
+      if (this.scanRequests.get(key) === request) {
+        this.listCache.clear();
+        this.listCache.set(key, { threads, expiresAt: Date.now() + 5_000 });
+      }
+      return threads;
+    })();
+    this.scanRequests.set(key, request);
+    try { return await request; }
+    finally { if (this.scanRequests.get(key) === request) this.scanRequests.delete(key); }
   }
 
   async getSessionDetail(sessionId: string, params: GetSessionDetailParams = {}): Promise<SessionDetail> {
@@ -197,13 +267,13 @@ export class SessionService {
     }
 
     await this.metadataStore.update(sessionId, { remarkTitle });
-    const sessions = await this.listSessions({ limit: 200 });
-    const session = sessions.find((item) => item.id === sessionId || item.sessionId === sessionId);
-    if (!session) {
-      throw new Error("Session not found");
-    }
-
-    return session;
+    const [response, metadata] = await Promise.all([
+      this.appServer.request<ThreadReadResponse>("thread/read", { threadId: sessionId, includeTurns: false }),
+      this.readMetadata()
+    ]);
+    const summary = this.toSummary(response.thread, metadata);
+    if (!summary || (summary.id !== sessionId && summary.sessionId !== sessionId)) throw new Error("Session not found");
+    return summary;
   }
 
   async setRemarkTitle(sessionId: string, remarkTitle: string | null): Promise<void> {

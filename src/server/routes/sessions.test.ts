@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { registerAuthHook } from "../auth/hooks";
 import { registerAuthRoutes } from "./auth";
 import { registerSessionRoutes } from "./sessions";
+import { TaskStore } from "../services/TaskStore";
 import { CollaborationStore } from "../services/CollaborationStore";
 import type { SessionService } from "../services/SessionService";
 import type { JsonlSessionParser } from "../services/JsonlSessionParser";
@@ -54,7 +55,7 @@ function runtimeSnapshot(threadId: string, patch: Partial<RuntimeSnapshot> = {})
 
 function buildApp(
   service: Pick<SessionService, "listSessions" | "getSessionDetail" | "updateMetadata">
-    & Partial<Pick<SessionService, "getPermissionMode" | "updatePermissionMode">>,
+    & Partial<Pick<SessionService, "getPermissionMode" | "updatePermissionMode" | "listSessionPage">>,
   parser?: Pick<JsonlSessionParser, "listCommands">,
   runtime?: Pick<RuntimeManager, "getRuntime" | "resumeThread" | "sendInput" | "submitApproval" | "eventHub" | "approvalService">
     & Partial<Pick<RuntimeManager, "branchThread" | "hydratePermissionMode" | "startThread" | "startHistoryContinuation">>,
@@ -72,6 +73,62 @@ function buildApp(
 }
 
 describe("session routes", () => {
+  it("returns a bounded recent page and compact preview without scanning history", async () => {
+    let requested: unknown;
+    const app = buildApp({
+      listSessions: async () => { throw new Error("must not scan history"); },
+      listSessionPage: async (params) => {
+        requested = params;
+        return { sessions: [{ id: "latest", summary: "x".repeat(1000) } as never], nextCursor: "older-page" };
+      },
+      getSessionDetail: async () => { throw new Error("not used"); },
+      updateMetadata: async () => { throw new Error("not used"); }
+    });
+    const response = await app.inject({ method: "GET", url: "/api/sessions?paginated=true&limit=30&cursor=page-1" });
+    expect(response.statusCode).toBe(200);
+    expect(requested).toEqual({ limit: 30, cursor: "page-1" });
+    expect(response.json()).toEqual({ sessions: [{ id: "latest", summary: "x".repeat(240) }], nextCursor: "older-page" });
+    await app.close();
+  });
+
+  it("loads task summaries and details using only their referenced sessions", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "codex-manage-task-query-"));
+    const app = Fastify();
+    try {
+      const store = new TaskStore(join(directory, "tasks.json"));
+      const task = await store.create("Small task");
+      await store.addSession(task.id, "older-session");
+      const calls: string[][] = [];
+      registerSessionRoutes(app, {
+        listSessions: async () => { throw new Error("must not scan history"); },
+        getSessionSummaries: async (ids: string[]) => {
+          calls.push(ids);
+          return [{ id: "older-session", title: "Existing session", updatedAt: "2026-11-03T00:00:00Z" }];
+        }
+      } as unknown as SessionService, undefined, undefined, undefined, undefined, store);
+      const list = await app.inject({ method: "GET", url: "/api/tasks" });
+      expect(list.statusCode).toBe(200);
+      expect(list.json().tasks[0]).toMatchObject({ id: task.id, recentSessionTitle: "Existing session" });
+      const detail = await app.inject({ method: "GET", url: `/api/tasks/${task.id}` });
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json().task.sessions).toHaveLength(1);
+      expect(calls).toEqual([["older-session"], ["older-session"]]);
+      const pinned = await app.inject({ method: "PATCH", url: `/api/tasks/${task.id}`, payload: { pinned: true } });
+      expect(pinned.statusCode).toBe(200);
+      expect(pinned.json().task.pinned).toBe(true);
+      const created = await app.inject({ method: "POST", url: "/api/tasks", payload: { name: "Empty task" } });
+      expect(created.statusCode).toBe(201);
+      expect(created.json().task.sessionCount).toBe(0);
+      const attached = await app.inject({ method: "POST", url: `/api/tasks/${task.id}/sessions/another-session`, payload: {} });
+      expect(attached.statusCode).toBe(200);
+      expect(attached.json().task.sessionCount).toBe(2);
+      expect(calls.at(-1)).toEqual(["older-session", "another-session"]);
+    } finally {
+      await app.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("creates a new session with the requested workspace", async () => {
     let requestedCwd: string | undefined;
     const app = buildApp(
@@ -217,8 +274,8 @@ describe("session routes", () => {
         app,
         {
           listSessions: async () => [
-            { id: "session-a", sessionId: "thread-a" },
-            { id: "session-b", sessionId: "thread-b" }
+            { id: "session-a", sessionId: "thread-a", summary: "allowed" },
+            { id: "session-b", sessionId: "thread-b", summary: "private" }
           ] as never,
           getSessionDetail: async (sessionId: string) => ({ id: sessionId }) as never,
           updateMetadata: async () => ({}) as never
@@ -240,7 +297,10 @@ describe("session routes", () => {
 
       const list = await app.inject({ method: "GET", url: "/api/sessions", headers: { cookie: sessionCookie } });
       expect(list.statusCode).toBe(200);
-      expect(list.json()).toEqual({ sessions: [{ id: "session-a", sessionId: "thread-a" }] });
+      expect(list.json()).toEqual({ sessions: [{ id: "session-a", sessionId: "thread-a", summary: "allowed" }] });
+      const page = await app.inject({ method: "GET", url: "/api/sessions?paginated=true&compact=true", headers: { cookie: sessionCookie } });
+      expect(page.statusCode).toBe(200);
+      expect(page.json()).toEqual({ sessions: [{ id: "session-a", sessionId: "thread-a", summary: "allowed" }], nextCursor: null });
 
       const denied = await app.inject({ method: "GET", url: "/api/sessions/session-b", headers: { cookie: sessionCookie } });
       expect(denied.statusCode).toBe(403);

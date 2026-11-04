@@ -10,6 +10,7 @@ import { ownerIdentity, resolveAuthUser } from "../auth/session";
 import type { RuntimeSnapshot, SessionBranchMode, SessionPermissionMode, SessionSummary, UserIdentity } from "../../shared/models";
 import type { CollaborationStore } from "../services/CollaborationStore";
 import type { TaskStore } from "../services/TaskStore";
+import { stripAmbientBrowserContext } from "../../shared/messageText";
 import { performance } from "node:perf_hooks";
 import { createReadStream } from "node:fs";
 import { mkdir, realpath, stat, writeFile } from "node:fs/promises";
@@ -17,7 +18,10 @@ import { basename, extname, join, relative, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 
 const ListQuery = z.object({
-  search: z.string().optional(),
+  search: z.string().max(500).optional(),
+  paginated: z.enum(["true", "false"]).optional(),
+  compact: z.enum(["true", "false"]).optional(),
+  cursor: z.string().min(1).max(8192).optional(),
   limit: z.coerce.number().int().positive().max(200).optional()
 });
 
@@ -110,12 +114,17 @@ export function registerSessionRoutes(
   collaborationStore?: CollaborationStore,
   taskStore?: TaskStore
 ) {
+  app.addHook("onResponse", async (request, reply) => {
+    if (request.method !== "GET" && request.method !== "HEAD" && reply.statusCode < 400
+      && /^\/api\/(sessions|tasks)(\/|$)/.test(request.url)) sessionService.invalidateList?.();
+  });
+
   app.get("/api/tasks", async (request, reply) => {
     const user = await resolveRouteUser(request, collaborationStore);
     if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
     if (!taskStore) return sendError(reply, 503, "TASK_SERVICE_UNAVAILABLE", "任务服务不可用");
     try {
-      const sessions = await sessionService.listSessions({ limit: 1000 });
+      const sessions = await sessionService.getSessionSummaries(await taskStore.sessionIds());
       const visible = collaborationStore ? await collaborationStore.filterSessions(user.id, sessions) : sessions;
       return reply.send({ tasks: await taskStore.list(visible) });
     } catch (error) {
@@ -132,8 +141,7 @@ export function registerSessionRoutes(
     if (!body.success) return sendError(reply, 400, "INVALID_TASK", "任务名称不正确");
     try {
       const task = await taskStore.create(body.data.name);
-      const sessions = await sessionService.listSessions({ limit: 1000 });
-      return reply.status(201).send({ task: (await taskStore.get(task.id, sessions))! });
+      return reply.status(201).send({ task: (await taskStore.get(task.id, []))! });
     } catch (error) {
       return sendError(reply, 400, "TASK_CREATE_FAILED", sanitizeModelError(error));
     }
@@ -146,7 +154,9 @@ export function registerSessionRoutes(
     const params = SessionParams.safeParse(request.params);
     if (!params.success) return sendError(reply, 400, "INVALID_TASK_PARAMS", "任务参数不正确");
     try {
-      const sessions = await sessionService.listSessions({ limit: 1000 });
+      const stored = await taskStore.get(params.data.id, []);
+      if (!stored) return sendError(reply, 404, "TASK_NOT_FOUND", "任务不存在");
+      const sessions = await sessionService.getSessionSummaries(stored.sessionIds);
       const visible = collaborationStore ? await collaborationStore.filterSessions(user.id, sessions) : sessions;
       const task = await taskStore.get(params.data.id, visible);
       if (!task) return sendError(reply, 404, "TASK_NOT_FOUND", "任务不存在");
@@ -166,7 +176,7 @@ export function registerSessionRoutes(
     if (!params.success || !body.success) return sendError(reply, 400, "INVALID_TASK", "任务参数不正确");
     try {
       const task = await taskStore.update(params.data.id, body.data);
-      const sessions = await sessionService.listSessions({ limit: 1000 });
+      const sessions = await sessionService.getSessionSummaries(task.sessionIds);
       return reply.send({ task: (await taskStore.get(task.id, sessions))! });
     } catch (error) {
       return sendError(reply, 400, "TASK_UPDATE_FAILED", sanitizeModelError(error));
@@ -182,7 +192,9 @@ export function registerSessionRoutes(
     const body = TaskSessionBody.safeParse(request.body);
     if (!params.success || !body.success) return sendError(reply, 400, "INVALID_TASK_SESSION", "任务会话参数不正确");
     try {
-      const sessions = await sessionService.listSessions({ limit: 1000 });
+      const stored = await taskStore.get(params.data.id, []);
+      if (!stored) return sendError(reply, 404, "TASK_NOT_FOUND", "任务不存在");
+      const sessions = await sessionService.getSessionSummaries(stored.sessionIds);
       const task = await taskStore.get(params.data.id, sessions);
       if (!task) return sendError(reply, 404, "TASK_NOT_FOUND", "任务不存在");
       const contextPrompt = buildTaskContextPrompt(task.name, task.sessions);
@@ -190,7 +202,7 @@ export function registerSessionRoutes(
       const result = await runtimeManager.startThread(body.data.cwd);
       const runtime = await runtimeManager.sendInput(result.threadId, { text: contextPrompt });
       await taskStore.addSession(task.id, result.threadId);
-      const nextSessions = await sessionService.listSessions({ limit: 1000 });
+      const nextSessions = [...sessions, makeCreatedSession(result.threadId, body.data.cwd, runtime)];
       return reply.status(201).send({
         threadId: result.threadId,
         runtime,
@@ -211,8 +223,8 @@ export function registerSessionRoutes(
     const params = z.object({ id: z.string().min(1), sessionId: z.string().min(1) }).safeParse(request.params);
     if (!params.success) return sendError(reply, 400, "INVALID_TASK_SESSION", "任务会话参数不正确");
     try {
-      await taskStore.addSession(params.data.id, params.data.sessionId);
-      const sessions = await sessionService.listSessions({ limit: 1000 });
+      const task = await taskStore.addSession(params.data.id, params.data.sessionId);
+      const sessions = await sessionService.getSessionSummaries(task.sessionIds);
       return reply.send({ task: (await taskStore.get(params.data.id, sessions))! });
     } catch (error) {
       return sendError(reply, 400, "TASK_SESSION_ATTACH_FAILED", sanitizeModelError(error));
@@ -254,8 +266,15 @@ export function registerSessionRoutes(
     try {
       const user = await resolveRouteUser(request, collaborationStore);
       if (!user) return sendError(reply, 401, "UNAUTHENTICATED", "请先登录");
-      const sessions = await sessionService.listSessions(parsed.data);
-      return reply.send({ sessions: collaborationStore ? await collaborationStore.filterSessions(user.id, sessions) : sessions });
+      // Child accounts are filtered before returning data. Their catalog stays permission scoped.
+      const page = parsed.data.paginated === "true" && !parsed.data.search?.trim() && user.role === "owner"
+        ? await sessionService.listSessionPage({ limit: parsed.data.limit, cursor: parsed.data.cursor })
+        : { sessions: await sessionService.listSessions(parsed.data), nextCursor: null };
+      const visible = collaborationStore ? await collaborationStore.filterSessions(user.id, page.sessions) : page.sessions;
+      const sessions = parsed.data.compact === "true" || parsed.data.paginated === "true"
+        ? visible.map((session) => ({ ...session, summary: stripAmbientBrowserContext(session.summary).replace(/\s+/g, " ").slice(0, 240) }))
+        : visible;
+      return reply.send({ sessions, ...(parsed.data.paginated === "true" ? { nextCursor: page.nextCursor } : {}) });
     } catch (error) {
       return sendError(
         reply,
