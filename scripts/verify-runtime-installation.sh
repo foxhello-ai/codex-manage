@@ -63,10 +63,10 @@ install_release() {
 }
 
 check_runtime() {
-  "$VERIFY_NODE" --input-type=module - "$1" "$2" "$3" "$VERIFY_ENV_FILE" "$VERIFY_INSTALL_DIR" "$VERIFY_CHECKS" <<'NODE'
+  "$VERIFY_NODE" --input-type=module - "$1" "$2" "$3" "$VERIFY_ENV_FILE" "$VERIFY_INSTALL_DIR" "$VERIFY_CHECKS" "$VERIFY_EXPECTED_VERSION" <<'NODE'
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-const [label,version,commit,envFile,installDir,checksFile]=process.argv.slice(2);
+const [label,version,commit,envFile,installDir,checksFile,releaseVersion]=process.argv.slice(2);
 const fields=text=>Object.fromEntries(text.trim().split('\n').filter(line=>line.includes('=')).map(line=>{const i=line.indexOf('=');return [line.slice(0,i),line.slice(i+1)];}));
 const env=fields(fs.readFileSync(envFile,'utf8'));
 assert.equal(fs.statSync(envFile).mode & 0o777,0o600);
@@ -90,12 +90,14 @@ for(let attempt=0;attempt<80;attempt++){
 assert.equal(health?.ok,true,'Installed runtime must initialize the real Codex app-server');
 assert.equal((await fetch(base+'/api/health')).status,401);
 assert.equal((await fetch(base+'/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:'wrong-installation-password'})})).status,401);
-for(const path of ['/api/me','/api/sessions?paginated=true&limit=30','/api/tasks'])assert.equal((await fetch(base+path,{headers:{cookie}})).status,200,path);
+const paths=['/api/me','/api/sessions?paginated=true&limit=30'];
+if(version===releaseVersion)paths.push('/api/tasks');
+for(const path of paths)assert.equal((await fetch(base+path,{headers:{cookie}})).status,200,path);
 const html=await fetch(base+'/').then(r=>{assert.equal(r.status,200);return r.text();});
 const assets=[...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g)].map(match=>match[1]);
 assert.ok(assets.length>=2);
 for(const path of assets)assert.equal((await fetch(base+path)).status,200,path);
-const result={label,version,sourceCommit:commit,health:true,login:true,authenticationRequired:true,frontendAssets:assets.length,codexCliVersion:health.codexCli.version,environmentMode:'0600'};
+const result={label,version,sourceCommit:commit,health:true,login:true,authenticationRequired:true,tasksApiChecked:version===releaseVersion,frontendAssets:assets.length,codexCliVersion:health.codexCli.version,environmentMode:'0600'};
 fs.appendFileSync(checksFile,JSON.stringify(result)+'\n');
 console.log(JSON.stringify(result));
 NODE
