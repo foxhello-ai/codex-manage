@@ -4,6 +4,7 @@ import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, Log
 import { ModelSelector } from "./ModelSelector";
 import { BottomSheet } from "./BottomSheet";
 import { useVisualViewport } from "./useVisualViewport";
+import { UiIcon } from "./UiIcon";
 import { modelStateAfterRuntimeSnapshot, modelSwitchDisabledReason } from "./modelSelection";
 import { findRetryContextForTurn, findRetryContextFromFailedTurns, isCommentaryPhase, isFinalAnswerPhase, isTaskSendShortcut, isUnmaterializedThreadHistoryError, type RetryContext } from "./sessionInteractions";
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
@@ -75,13 +76,10 @@ export function App() {
         if (me.authenticated) writeBootstrapSession(me);
         else clearBootstrapSession();
 
-        if (me.authenticated && me.user?.role !== "child") {
-          const publicConfig = await getPublicConfig();
-          if (cancelled) return;
-          setConfig(publicConfig);
-        }
-
         setLoadState("ready");
+        if (me.authenticated && me.user?.role !== "child") {
+          void getPublicConfig().then((value) => { if (!cancelled) setConfig(value); }).catch(() => undefined);
+        }
       } catch (caught) {
         if (cancelled) return;
         if (bootstrapSession) return;
@@ -99,7 +97,8 @@ export function App() {
   async function handleLoggedIn(nextSession: UserSession) {
     setSession(nextSession);
     writeBootstrapSession(nextSession);
-    setConfig(nextSession.user?.role === "child" ? null : await getPublicConfig());
+    setLoadState("ready");
+    if (nextSession.user?.role !== "child") void getPublicConfig().then(setConfig).catch(() => undefined);
   }
 
   async function handleLogout() {
@@ -237,12 +236,20 @@ function Dashboard({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [search, setSearch] = useState("");
+  const [sessionCursor, setSessionCursor] = useState<string | null>(null);
+  const [loadingMoreSessions, setLoadingMoreSessions] = useState(false);
+  const sessionListModeRef = useRef<SessionListMode>("recent");
+  const sessionListRequestRef = useRef<AbortController | null>(null);
+  const tasksLoadedRef = useRef(false);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [creatingSessionWorkspace, setCreatingSessionWorkspace] = useState<string | null>(null);
+  const [sessionDirectories, setSessionDirectories] = useState<string[] | null>(null);
+  const [loadingSessionDirectories, setLoadingSessionDirectories] = useState(false);
   const [createSessionDirectory, setCreateSessionDirectory] = useState<string | null>(null);
   const [createSessionError, setCreateSessionError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
@@ -308,28 +315,48 @@ function Dashboard({
     ? runtime.modelSelection
     : sessionDetail?.modelState ?? runtime?.modelSelection ?? emptyModelState();
 
-  async function loadSessions(nextSearch = search) {
-    setLoadingSessions(true);
+  async function loadSessions(nextSearch = searchRef.current, appendCursor?: string) {
+    sessionListRequestRef.current?.abort();
+    const controller = new AbortController();
+    sessionListRequestRef.current = controller;
+    if (appendCursor) setLoadingMoreSessions(true);
+    else setLoadingSessions(true);
     setSessionError(null);
-
     try {
-      const response = await getSessions(nextSearch);
-      setSessions(response.sessions);
+      const paginated = sessionListModeRef.current === "recent" && !nextSearch.trim();
+      const response = await getSessions(nextSearch, {
+        paginated, ...(paginated ? { limit: 30, cursor: appendCursor } : {}), signal: controller.signal
+      });
+      if (controller.signal.aborted) return;
+      setSessions((current) => appendCursor
+        ? [...new Map([...current, ...response.sessions].map((item) => [item.id, item])).values()]
+        : response.sessions);
+      setSessionCursor(response.nextCursor ?? null);
     } catch (caught) {
-      setSessionError(caught instanceof Error ? caught.message : "会话列表加载失败");
+      if (!controller.signal.aborted) setSessionError(caught instanceof Error ? caught.message : "会话列表加载失败");
     } finally {
-      setLoadingSessions(false);
+      if (!controller.signal.aborted) { setLoadingSessions(false); setLoadingMoreSessions(false); }
     }
   }
 
+  function handleListModeChange(mode: SessionListMode) {
+    if (mode === sessionListModeRef.current) return;
+    sessionListModeRef.current = mode;
+    setSessionListMode(mode);
+    void loadSessions(searchRef.current);
+    if (mode === "task" && user.role === "owner" && !tasksLoadedRef.current) void loadTasks();
+  }
+
   async function loadTasks() {
+    setLoadingTasks(true);
     try {
       const response = await getTasks();
       setTasks(response.tasks);
+      tasksLoadedRef.current = true;
       setTaskError(null);
     } catch (caught) {
       setTaskError(caught instanceof Error ? caught.message : "任务加载失败");
-    }
+    } finally { setLoadingTasks(false); }
   }
 
   async function loadDiagnostics() {
@@ -390,13 +417,16 @@ function Dashboard({
   useEffect(() => {
     if (user.role !== "owner") return;
     let active = true;
+    let pending = false;
     async function pollRuntimeConfig() {
+      if (document.visibilityState !== "visible" || pending) return;
+      pending = true;
       try {
         const nextConfig = await getPublicConfig();
         if (active) setCurrentConfig(nextConfig);
       } catch {
         // 自动刷新检测是后台能力，诊断页保留显式错误展示。
-      }
+      } finally { pending = false; }
     }
     const timer = setInterval(() => void pollRuntimeConfig(), 10_000);
     return () => {
@@ -407,7 +437,6 @@ function Dashboard({
 
   useEffect(() => {
     void loadSessions("");
-    if (user.role === "owner") void loadTasks();
     if (safeInitialRoute.kind === "detail") {
       void refreshCurrentSession(safeInitialRoute.sessionId);
     }
@@ -1077,6 +1106,7 @@ function Dashboard({
   }
 
   function handleSelectTaskSession(session: SessionSummary) {
+    sessionListModeRef.current = "task";
     setSessionListMode("task");
     handleSelectSession(session);
   }
@@ -1424,11 +1454,8 @@ function Dashboard({
   }
 
   async function handleRefresh() {
-    await loadSessions(search);
-    if (selectedSessionIdRef.current) {
-      const sessionId = selectedSessionIdRef.current;
-      await refreshCurrentSession(sessionId);
-    }
+    const sessionId = selectedSessionIdRef.current;
+    await Promise.all([loadSessions(search), sessionId ? refreshCurrentSession(sessionId) : Promise.resolve()]);
   }
 
   async function handleLoadHistory() {
@@ -1456,16 +1483,22 @@ function Dashboard({
     applySessionRoute({ kind: "members" });
   }
 
-  function requestCreateSession(workspace: string) {
+  async function requestCreateSession(workspace: string) {
     setCreateSessionError(null);
     setCreateSessionDirectory(workspace);
-    return Promise.resolve();
+    if (sessionCursor && !sessionDirectories && !loadingSessionDirectories) {
+      setLoadingSessionDirectories(true);
+      try { setSessionDirectories((await getSessions()).sessions.map((item) => item.workspace)); }
+      catch (caught) { setCreateSessionError(caught instanceof Error ? caught.message : "工作目录加载失败"); }
+      finally { setLoadingSessionDirectories(false); }
+    }
   }
 
   function renderTaskPanel() {
     return (
       <TaskPanel
             tasks={tasks}
+            loading={loadingTasks}
             sessions={sessions}
             error={taskError}
             onCreate={handleCreateTask}
@@ -1496,6 +1529,9 @@ function Dashboard({
         tasks={tasks}
         search={search}
         loadingSessions={loadingSessions}
+        hasMoreSessions={Boolean(sessionCursor)}
+        loadingMoreSessions={loadingMoreSessions}
+        onLoadMoreSessions={() => loadSessions(searchRef.current, sessionCursor ?? undefined)}
         sessionError={sessionError}
         selectedSessionId={selectedSessionId}
         showHeading={showHeading}
@@ -1504,7 +1540,7 @@ function Dashboard({
         onSearchSubmit={handleSearchSubmit}
         onSelect={handleSelectSession}
         mode={sessionListMode}
-        onModeChange={setSessionListMode}
+        onModeChange={handleListModeChange}
         onMetadataSaved={handleMetadataSaved}
         onCreateSession={user.role === "owner" ? requestCreateSession : undefined}
         creatingSessionWorkspace={creatingSessionWorkspace}
@@ -1516,20 +1552,6 @@ function Dashboard({
   return (
     <Shell
       title="Codex Manage"
-      leadingAction={viewMode === "list" ? (
-        <button
-          className="iconButton mobileOnly"
-          type="button"
-          aria-label="打开会话列表"
-          title="会话列表"
-          onClick={(event) => {
-            drawerTriggerRef.current = event.currentTarget;
-            setDrawerOpen(true);
-          }}
-        >
-          <span aria-hidden="true">☰</span>
-        </button>
-      ) : undefined}
       reserveFloatingStatus={viewMode === "detail" && Boolean(selectedSession) && compactViewport}
       desktopWorkspace={viewMode === "list" || (viewMode === "detail" && !compactViewport)}
       action={(
@@ -1543,46 +1565,24 @@ function Dashboard({
               onClick={handleOpenSettings}
               disabled={viewMode === "settings" || viewMode === "members"}
             >
-              <span aria-hidden="true">⚙</span>
+              <UiIcon name="settings" />
             </button>
           ) : null}
-          <button className="ghostButton" onClick={onLogout}>登出</button>
+          <button className="iconButton logoutButton" aria-label="登出" title="登出" onClick={onLogout}><UiIcon name="logout" /><span>登出</span></button>
         </div>
       )}
     >
       {viewMode === "list" && user.role === "child" ? (
         <ChildAccessPage sessions={sessions} loading={loadingSessions} error={sessionError} onSelect={handleSelectSession} />
       ) : viewMode === "list" ? (
-        <>
-          {compactViewport ? (
-            <section className="mobileDashboardHome" aria-label="会话管理">{renderSessionBrowser()}</section>
-          ) : <DesktopWorkspaceHome
-            taskPanel={renderTaskPanel()}
-            sessions={sessions}
-            tasks={tasks}
-            search={search}
-            loadingSessions={loadingSessions}
-            sessionError={sessionError}
-            selectedSessionId={selectedSessionId}
-            onSearchChange={setSearch}
-            onSearchSubmit={handleSearchSubmit}
-            onSelect={handleSelectSession}
-            mode={sessionListMode}
-            onModeChange={setSessionListMode}
-            onMetadataSaved={handleMetadataSaved}
-            onCreateSession={user.role === "owner" ? requestCreateSession : undefined}
-            creatingSessionWorkspace={creatingSessionWorkspace}
-            createSessionError={createSessionError}
-          />}
-
-        </>
+        <section className={`sessionLibrary ${compactViewport ? "mobileDashboardHome" : "desktopWorkspaceHome"}`} aria-label="会话管理">{renderSessionBrowser()}</section>
       ) : viewMode === "detail" ? (
         <ResizableWorkspaceLayout
           sidebar={(
             <>
             <div className="workspaceSidebarHeading">
-              <strong>Codex</strong>
-              <span>最近会话</span>
+              <strong>会话</strong>
+              <button className="iconButton" type="button" aria-label="查看全部会话" onClick={handleBackToList}><UiIcon name="back" /><span>全部会话</span></button>
             </div>
             {renderSessionBrowser(false)}
             </>
@@ -1601,7 +1601,7 @@ function Dashboard({
                     setDrawerOpen(true);
                   }}
                 >
-                  <span aria-hidden="true">☰</span>
+                  <UiIcon name="panel" />
                 </button>
                 <button className="iconButton backToListButton" aria-label="返回会话列表" title="返回会话列表" onClick={handleBackToList}>
                   <span aria-hidden="true">←</span>
@@ -1743,6 +1743,9 @@ function Dashboard({
               selectedSessionId={selectedSessionId}
               search={search}
               loading={loadingSessions}
+              hasMoreSessions={Boolean(sessionCursor)}
+              loadingMoreSessions={loadingMoreSessions}
+              onLoadMoreSessions={() => loadSessions(searchRef.current, sessionCursor ?? undefined)}
               error={sessionError}
               closeButtonRef={drawerCloseRef}
               onClose={() => setDrawerOpen(false)}
@@ -1752,7 +1755,7 @@ function Dashboard({
               onSearchSubmit={handleSearchSubmit}
               onSelect={handleSelectSession}
               mode={sessionListMode}
-              onModeChange={setSessionListMode}
+              onModeChange={handleListModeChange}
               onMetadataSaved={handleMetadataSaved}
               onCreateSession={user.role === "owner" ? requestCreateSession : undefined}
               creatingSessionWorkspace={creatingSessionWorkspace}
@@ -1764,7 +1767,8 @@ function Dashboard({
 
       {createSessionDirectory !== null ? (
         <CreateSessionDialog
-          workspaces={[...new Set(sessions.map((item) => item.workspace).filter((path) => path.trim()))]}
+          workspaces={[...new Set([...(sessionDirectories ?? []), ...sessions.map((item) => item.workspace)].filter((path) => path.trim()))]}
+          loadingDirectories={loadingSessionDirectories}
           initialWorkspace={createSessionDirectory}
           submitting={Boolean(creatingSessionWorkspace)}
           error={createSessionError}
@@ -1951,7 +1955,7 @@ function SettingsPage({
 
       <section className="settingsSection" aria-labelledby="access-settings-title">
         <div className="settingsSectionHeader">
-          <h3 id="access-settings-title">Access &amp; collaboration</h3>
+          <h3 id="access-settings-title">访问与协作</h3>
           <span>主用户管理</span>
         </div>
         <div className="settingsRows">
@@ -1960,7 +1964,7 @@ function SettingsPage({
               <span>Members &amp; access</span>
               <small>创建子用户，并为既有会话授予或撤销访问权限。</small>
             </div>
-            <button className="ghostButton" type="button" onClick={onOpenMembers}>Open</button>
+            <button className="ghostButton" type="button" onClick={onOpenMembers}>管理成员</button>
           </div>
         </div>
       </section>
@@ -2038,6 +2042,15 @@ function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void 
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingGrants, setLoadingGrants] = useState(true);
+  const grantRequestRef = useRef<AbortController | null>(null);
+  const [grantSearch, setGrantSearch] = useState("");
+  const [grantVisibleCount, setGrantVisibleCount] = useState(30);
+  const filteredGrants = useMemo(() => {
+    const term = grantSearch.trim().toLocaleLowerCase();
+    return sessions.filter((item) => !term || `${item.title} ${item.workspace}`.toLocaleLowerCase().includes(term));
+  }, [sessions, grantSearch]);
+  useEffect(() => setGrantVisibleCount(30), [grantSearch]);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedGrantIds, setSelectedGrantIds] = useState<string[]>([]);
@@ -2054,9 +2067,8 @@ function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void 
     setLoading(true);
     setError(null);
     try {
-      const [memberResponse, sessionResponse] = await Promise.all([getCollaborators(), getSessions()]);
+      const memberResponse = await getCollaborators();
       setCollaborators(memberResponse.collaborators);
-      setSessions(sessionResponse.sessions);
       setSelectedId((current) => current && memberResponse.collaborators.some((item) => item.id === current)
         ? current
         : memberResponse.collaborators[0]?.id ?? null);
@@ -2067,8 +2079,23 @@ function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void 
     }
   }
 
+  async function loadGrantSessions() {
+    grantRequestRef.current?.abort();
+    const controller = new AbortController();
+    grantRequestRef.current = controller;
+    setLoadingGrants(true);
+    try {
+      const response = await getSessions(undefined, { signal: controller.signal });
+      if (!controller.signal.aborted) setSessions(response.sessions);
+    } catch (caught) {
+      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : "会话加载失败");
+    } finally { if (!controller.signal.aborted) setLoadingGrants(false); }
+  }
+
   useEffect(() => {
     void loadMembers();
+    void loadGrantSessions();
+    return () => grantRequestRef.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -2139,24 +2166,24 @@ function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void 
             <span aria-hidden="true">←</span>
           </button>
           <div>
-            <p className="detailEyebrow">Access &amp; collaboration</p>
-            <h2>Members &amp; access</h2>
+            <p className="detailEyebrow">访问与协作</p>
+            <h2>成员与访问权限</h2>
           </div>
         </div>
         <button className="primaryButton" type="button" onClick={() => { setFormError(null); setCreateOpen(true); }}>
-          Add child user
+          添加子用户
         </button>
       </section>
 
-      {error ? <div className="errorBanner">{error}</div> : null}
+      {error ? <div className="errorBanner" role="alert">{error}<button className="ghostButton" type="button" onClick={() => { void loadMembers(); void loadGrantSessions(); }}>重新加载</button></div> : null}
       {createdCredential ? (
         <section className="credentialNotice" role="status">
           <div>
             <strong>{createdCredential.displayName} 已创建</strong>
-            <span>请安全地把 initial password 交给该用户；关闭此提示后不会再次显示。</span>
+            <span>请安全地把 初始密码 交给该用户；关闭此提示后不会再次显示。</span>
           </div>
           <code>{createdCredential.password}</code>
-          <button className="ghostButton" type="button" onClick={() => void copyTextToClipboard(createdCredential.password)}>Copy</button>
+          <button className="ghostButton" type="button" onClick={() => void copyTextToClipboard(createdCredential.password)}>复制</button>
           <button className="iconButton" type="button" aria-label="关闭初始密码提示" onClick={() => setCreatedCredential(null)}>×</button>
         </section>
       ) : null}
@@ -2164,12 +2191,12 @@ function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void 
       <div className="membersLayout">
         <section className="membersListPanel" aria-labelledby="members-list-title">
           <div className="membersPanelHeader">
-            <div><h3 id="members-list-title">Members</h3><span>{loading ? "载入中" : `${collaborators.length + 1} 个账号`}</span></div>
+            <div><h3 id="members-list-title">成员</h3><span>{loading ? "载入中" : `${collaborators.length + 1} 个账号`}</span></div>
           </div>
           <button className="memberRow ownerMemberRow" type="button">
             <span className="memberAvatar">{user.displayName.slice(0, 2).toUpperCase()}</span>
-            <span className="memberRowCopy"><strong>{user.displayName}</strong><small>{user.localEmail ?? "未设置邮箱"} · Owner</small></span>
-            <span className="memberStatus active">Owner</span>
+            <span className="memberRowCopy"><strong>{user.displayName}</strong><small>{user.localEmail ?? "未设置邮箱"} · 主用户</small></span>
+            <span className="memberStatus active">主用户</span>
           </button>
           {collaborators.map((member) => (
             <button
@@ -2179,8 +2206,8 @@ function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void 
               onClick={() => setSelectedId(member.id)}
             >
               <span className="memberAvatar">{member.displayName.slice(0, 2).toUpperCase()}</span>
-              <span className="memberRowCopy"><strong>{member.displayName}</strong><small>{member.localEmail} · Child user</small></span>
-              <span className={`memberStatus ${member.active ? "active" : "inactive"}`}>{member.active ? "Active" : "Disabled"}</span>
+              <span className="memberRowCopy"><strong>{member.displayName}</strong><small>{member.localEmail} · 子用户</small></span>
+              <span className={`memberStatus ${member.active ? "active" : "inactive"}`}>{member.active ? "已启用" : "已停用"}</span>
             </button>
           ))}
           {!loading && collaborators.length === 0 ? <div className="emptyState">还没有子用户。</div> : null}
@@ -2191,32 +2218,35 @@ function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void 
             <>
               <div className="memberDetailHeader">
                 <div>
-                  <p className="detailEyebrow">Child user</p>
+                  <p className="detailEyebrow">子用户</p>
                   <h3 id="member-detail-title">{selected.displayName}</h3>
                   <span>{selected.localEmail}</span>
                 </div>
                 <button className="ghostButton" type="button" onClick={() => void handleStatusChange(selected)} disabled={updatingStatus === selected.id}>
-                  {updatingStatus === selected.id ? "Updating" : selected.active ? "Disable" : "Enable"}
+                  {updatingStatus === selected.id ? "更新中" : selected.active ? "停用" : "启用"}
                 </button>
               </div>
-              <div className="memberPolicyNotice"><strong>受控访问</strong><span>该用户不能访问 Settings、切换 workspace 或使用 full access。</span></div>
-              <div className="grantHeader"><div><h4>Session access</h4><span>选择该用户可以打开的既有会话。</span></div><strong>{selectedGrantIds.length} selected</strong></div>
+              <div className="memberPolicyNotice"><strong>受控访问</strong><span>该用户仅可访问已授权会话，不能修改系统设置、切换工作目录或使用完全访问权限。</span></div>
+              <div className="grantHeader"><div><h4>会话授权</h4><span>选择该用户可以打开的既有会话。</span></div><strong>{selectedGrantIds.length} 个已选</strong></div>
+              <input className="grantSearch" type="search" aria-label="搜索可授权会话" placeholder="搜索会话标题或工作目录…" value={grantSearch} onChange={(event) => setGrantSearch(event.target.value)} />
+              {loadingGrants ? <p role="status">正在加载可授权会话…</p> : null}
               <div className="grantList">
-                {sessions.map((session) => (
+                {filteredGrants.slice(0, grantVisibleCount).map((session) => (
                   <label className="grantRow" key={session.id}>
                     <input type="checkbox" checked={selectedGrantIds.includes(session.id)} onChange={() => toggleGrant(session.id)} />
                     <span><strong>{session.title}</strong><small>{workspaceDisplayName(session.workspace)} · {formatDateTime(session.updatedAt)}</small></span>
                   </label>
                 ))}
-                {sessions.length === 0 ? <div className="emptyState">当前没有可授权的既有 session。</div> : null}
+                {!loadingGrants && filteredGrants.length === 0 ? <div className="emptyState">没有匹配的会话</div> : null}
+                {filteredGrants.length > grantVisibleCount ? <button className="ghostButton sessionLoadMore" type="button" onClick={() => setGrantVisibleCount((count) => count + 30)}>显示更多会话（剩余 {filteredGrants.length - grantVisibleCount} 个）</button> : null}
               </div>
               <div className="memberDetailActions">
                 <span>授权变更会立即影响下一次访问。</span>
-                <button className="primaryButton" type="button" onClick={() => void handleSaveGrants()} disabled={savingGrants}>{savingGrants ? "Saving" : "Save access"}</button>
+                <button className="primaryButton" type="button" onClick={() => void handleSaveGrants()} disabled={savingGrants}>{savingGrants ? "保存中" : "保存授权"}</button>
               </div>
             </>
           ) : (
-            <div className="memberEmptyDetail"><strong>选择一个 child user</strong><span>管理其状态和 session access。</span></div>
+            <div className="memberEmptyDetail"><strong>选择一个子用户</strong><span>管理其状态和会话访问权限。</span></div>
           )}
         </section>
       </div>
@@ -2224,13 +2254,13 @@ function MembersPage({ user, onBack }: { user: UserIdentity; onBack: () => void 
       {createOpen ? (
         <div className="modalBackdrop" role="presentation" onClick={creating ? undefined : () => setCreateOpen(false)}>
           <section className="messageDialog collaboratorDialog" role="dialog" aria-modal="true" aria-labelledby="create-child-title" onClick={(event) => event.stopPropagation()}>
-            <div className="dialogHeader"><div><h2 id="create-child-title">Add child user</h2><p className="muted">创建后可为该用户授权既有 session。</p></div><button className="iconButton" type="button" aria-label="关闭" onClick={() => setCreateOpen(false)}>×</button></div>
+            <div className="dialogHeader"><div><h2 id="create-child-title">添加子用户</h2><p className="muted">创建后可为该用户授权既有会话。</p></div><button className="iconButton" type="button" aria-label="关闭" onClick={() => setCreateOpen(false)}>×</button></div>
             <form className="dialogBody collaboratorForm" onSubmit={(event) => void handleCreate(event)}>
-              <label>Display name<input name="displayName" required maxLength={80} placeholder="例如 Alex" /></label>
-              <label>Local email<input name="localEmail" required type="email" maxLength={160} placeholder="alex@local" /></label>
-              <label>Password <span className="muted">（留空自动生成）</span><input name="password" minLength={8} maxLength={200} type="password" autoComplete="new-password" placeholder="至少 8 位" /></label>
+              <label>显示名称<input name="displayName" required maxLength={80} placeholder="例如 Alex" /></label>
+              <label>本地邮箱<input name="localEmail" required type="email" maxLength={160} placeholder="alex@local" /></label>
+              <label>密码 <span className="muted">（留空自动生成）</span><input name="password" minLength={8} maxLength={200} type="password" autoComplete="new-password" placeholder="至少 8 位" /></label>
               {formError ? <div className="errorBanner">{formError}</div> : null}
-              <div className="dialogActions"><button className="ghostButton" type="button" onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</button><button className="primaryButton" type="submit" disabled={creating}>{creating ? "Creating" : "Create user"}</button></div>
+              <div className="dialogActions"><button className="ghostButton" type="button" onClick={() => setCreateOpen(false)} disabled={creating}>取消</button><button className="primaryButton" type="submit" disabled={creating}>{creating ? "创建中" : "创建用户"}</button></div>
             </form>
           </section>
         </div>
@@ -3156,10 +3186,11 @@ function MessageItem({
   );
 }
 
-function CreateSessionDialog({ workspaces, initialWorkspace, submitting, error, onClose, onSubmit }: { workspaces: string[]; initialWorkspace: string; submitting: boolean; error: string | null; onClose: () => void; onSubmit: (workspace: string) => Promise<void> }) {
+function CreateSessionDialog({ workspaces, loadingDirectories, initialWorkspace, submitting, error, onClose, onSubmit }: { loadingDirectories: boolean; workspaces: string[]; initialWorkspace: string; submitting: boolean; error: string | null; onClose: () => void; onSubmit: (workspace: string) => Promise<void> }) {
   const [workspace, setWorkspace] = useState(workspaces.includes(initialWorkspace) ? initialWorkspace : workspaces[0] ?? "");
   return (
     <BottomSheet title="选择工作目录" description="从已有会话的工作目录中选择，创建后再输入要求。" onClose={onClose} busy={submitting} actions={<button type="button" disabled={!workspace || submitting} onClick={() => void onSubmit(workspace)}>{submitting ? "创建中…" : "在此目录新建会话"}</button>}>
+      {loadingDirectories ? <p className="muted" role="status">正在补充历史工作目录，已显示的目录可直接使用。</p> : null}
       <label className="sheetField">工作目录<select value={workspace} onChange={(event) => setWorkspace(event.target.value)}>{workspaces.map((path) => <option key={path} value={path}>{workspaceDisplayName(path)}</option>)}</select></label>
       <div className="workspacePath"><span>Codex 服务所在机器上的路径（不是手机目录）</span><code>{workspace}</code></div>
       {error ? <p className="errorText" role="alert">{error}</p> : null}
@@ -3304,6 +3335,7 @@ function ResizableWorkspaceLayout({
 
 function TaskPanel({
   tasks,
+  loading,
   sessions,
   error,
   onCreate,
@@ -3313,6 +3345,7 @@ function TaskPanel({
   onSelectSession
 }: {
   tasks: TaskSummary[];
+  loading: boolean;
   sessions: SessionSummary[];
   error: string | null;
   onCreate: () => Promise<void>;
@@ -3369,16 +3402,17 @@ function TaskPanel({
         <button className="primaryButton" type="button" onClick={() => void onCreate()}>新建任务</button>
       </div>
       {error || actionError ? <div className="errorBanner" role="alert">{error ?? actionError}</div> : null}
-      {tasks.length === 0 ? <p className="muted">创建任务后，可聚合多个相关会话并共享上下文。</p> : (
+      {loading ? <p className="muted" role="status">正在加载任务…</p> : null}
+      {!loading && tasks.length === 0 ? <p className="muted">创建任务后，可聚合多个相关会话并共享上下文。</p> : (
         <div className="taskGrid">
           {tasks.map((task) => {
             const recent = task.recentSessionId ? sessionMap.get(task.recentSessionId) : null;
             return <article className={`taskCard${task.pinned ? " pinned" : ""}`} key={task.id}>
               <div className="taskCardTitle"><button className="taskNameButton" type="button" onClick={() => void toggleTask(task)}><strong>{task.name}</strong></button><button className="iconButton" type="button" title={task.pinned ? "取消置顶" : "置顶任务"} aria-label={task.pinned ? "取消置顶" : "置顶任务"} onClick={() => void onTogglePin(task)}>{task.pinned ? "★" : "☆"}</button></div>
-              <small>{task.sessionCount} 个会话{recent ? ` · 最近：${recent.title}` : ""}</small>
+              <small>{task.sessionCount} 个会话{task.recentSessionTitle ? ` · 最近：${task.recentSessionTitle}` : ""}</small>
               {expandedTaskId === task.id ? <div className="taskSessionDetails">{loadingTaskId === task.id ? <span className="muted">正在加载任务会话…</span> : taskDetail?.sessions.map((session) => <button className="taskSessionLink" type="button" key={session.id} onClick={() => onSelectSession(session)}>{session.title}<small>{session.updatedAt}</small></button>)}</div> : null}
               <div className="taskCardActions">
-                {recent ? <button className="taskRecentButton" type="button" onClick={() => void openTaskSession(task, recent)}><span>{task.sessionCount > 1 ? "选择会话打开" : "打开会话"}</span><small>{task.sessionCount > 1 ? `共 ${task.sessionCount} 个会话` : recent.title}</small></button> : null}
+                {task.recentSessionId ? <button className="taskRecentButton" type="button" onClick={() => void openTaskSession(task, recent ?? null)}><span>{task.sessionCount > 1 ? "选择会话打开" : "打开会话"}</span><small>{task.sessionCount > 1 ? `共 ${task.sessionCount} 个会话` : task.recentSessionTitle}</small></button> : null}
                 <button className="ghostButton" type="button" onClick={() => { setAttachTask(task); setAttachSessionId(""); }} disabled={!sessions.length}>选择会话归入</button>
                 <button className="ghostButton" type="button" onClick={() => void onCreateSession(task)}>新建任务会话</button>
               </div>
@@ -3473,177 +3507,15 @@ function CreateTaskSessionDialog({ task, history, loading, onCancel, onSubmit }:
   );
 }
 
-function DesktopWorkspaceHome({
-  taskPanel,
-  sessions,
-  tasks,
-  search,
-  loadingSessions,
-  sessionError,
-  selectedSessionId,
-  onSearchChange,
-  onSearchSubmit,
-  onSelect,
-  mode,
-  onModeChange,
-  onMetadataSaved,
-  onCreateSession,
-  creatingSessionWorkspace,
-  createSessionError
-}: {
-  taskPanel?: ReactNode;
-  sessions: SessionSummary[];
-  tasks: TaskSummary[];
-  search: string;
-  loadingSessions: boolean;
-  sessionError: string | null;
-  selectedSessionId: string | null;
-  onSearchChange: (value: string) => void;
-  onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onSelect: (session: SessionSummary) => void;
-  mode: SessionListMode;
-  onModeChange: (mode: SessionListMode) => void;
-  onMetadataSaved: (session: SessionSummary) => void;
-  onCreateSession?: (workspace: string) => Promise<void>;
-  creatingSessionWorkspace?: string | null;
-  createSessionError?: string | null;
-}) {
-  return (
-    <ResizableWorkspaceLayout
-      className="desktopWorkspaceHome"
-      sidebar={(
-        <>
-          <div className="workspaceSidebarHeading">
-            <strong>Codex</strong>
-            <span>{sessions.length > 0 ? `最近会话 · ${sessions.length}` : "最近会话"}</span>
-          </div>
-          <SessionBrowser
-            taskPanel={taskPanel}
-            sessions={sessions}
-            tasks={tasks}
-            search={search}
-            loadingSessions={loadingSessions}
-            sessionError={sessionError}
-            selectedSessionId={selectedSessionId}
-            showHeading={false}
-            onSearchChange={onSearchChange}
-            onSearchSubmit={onSearchSubmit}
-            onSelect={onSelect}
-            mode={mode}
-            onModeChange={onModeChange}
-            onMetadataSaved={onMetadataSaved}
-            onCreateSession={onCreateSession}
-            creatingSessionWorkspace={creatingSessionWorkspace}
-            createSessionError={createSessionError}
-          />
-        </>
-      )}
-      main={(
-        <main className="workspaceConversation workspaceHomeMain">
-        <section className="workspaceWelcome" aria-labelledby="workspace-welcome-title">
-          <p className="workspaceWelcomeEyebrow">CODEX MANAGE</p>
-          <h2 id="workspace-welcome-title">选择一个会话开始工作</h2>
-          <p className="workspaceWelcomeDescription">从左侧浏览、搜索并继续本机 Codex 会话。打开后，任务进度与输入框会保留在此工作区。</p>
-
-          {loadingSessions ? <div className="workspaceWelcomeLoading" role="status">正在准备你的工作台…</div> : null}
-          {!loadingSessions && sessionError ? <div className="workspaceWelcomeHint">会话暂时无法加载，请在左侧重试。</div> : null}
-          {!loadingSessions && !sessionError && sessions.length === 0 ? (
-            <div className="workspaceWelcomeHint">还没有可显示的会话。请先在 Codex CLI 中创建会话，再返回这里刷新。</div>
-          ) : null}
-          {!loadingSessions && !sessionError ? <RecentSessions sessions={sessions} onSelect={onSelect} /> : null}
-        </section>
-        </main>
-      )}
-    />
-  );
-}
-
-function RecentSessions({
-  sessions,
-  onSelect,
-  onOpenDrawer,
-  onRefresh,
-  refreshing = false
-}: {
-  sessions: SessionSummary[];
-  onSelect: (session: SessionSummary) => void;
-  onOpenDrawer?: (trigger: HTMLButtonElement) => void;
-  onRefresh?: () => void;
-  refreshing?: boolean;
-}) {
-  const [recentExpanded, setRecentExpanded] = useState(false);
-  const recentSessions = useMemo(() => sortSessionsByUpdatedAt(sessions).slice(0, 10), [sessions]);
-  const visibleRecentSessions = recentExpanded ? recentSessions : recentSessions.slice(0, 5);
-
-  useEffect(() => {
-    if (recentSessions.length <= 5) setRecentExpanded(false);
-  }, [recentSessions.length]);
-
-  if (recentSessions.length === 0) return null;
-
-  return (
-    <section className="workspaceRecent" aria-label="最近会话">
-      <div className="workspaceRecentHeading">
-        <h3>最近使用</h3>
-        <div className="workspaceRecentHeadingActions">
-          {onOpenDrawer ? (
-            <button
-              className="workspaceRecentBrowse"
-              type="button"
-              onClick={(event) => onOpenDrawer(event.currentTarget)}
-            >
-              从侧边栏查看全部
-            </button>
-          ) : (
-            <span>从侧边栏查看全部</span>
-          )}
-          {onRefresh ? (
-            <button
-              className="iconButton workspaceRecentRefresh"
-              type="button"
-              aria-label="刷新最近会话"
-              title="刷新最近会话"
-              onClick={onRefresh}
-              disabled={refreshing}
-            >
-              <span aria-hidden="true">↻</span>
-            </button>
-          ) : null}
-        </div>
-      </div>
-      <div className={`workspaceRecentList${recentExpanded ? " expanded" : ""}`}>
-        {visibleRecentSessions.map((session) => (
-          <button
-            className="workspaceRecentSession"
-            key={session.id}
-            type="button"
-            onClick={() => onSelect(session)}
-            aria-label={`打开会话：${session.title}`}
-          >
-            <span className={`workspaceRecentStatus ${session.status}`} aria-hidden="true" />
-            <span className="workspaceRecentCopy">
-              <strong>{session.title}</strong>
-              <small>{workspaceDisplayName(session.workspace)} · {formatDateTime(session.updatedAt)}</small>
-            </span>
-            {session.status !== "history" ? <span className="workspaceRecentMeta">{statusLabel(session.status)}</span> : null}
-          </button>
-        ))}
-      </div>
-      {recentSessions.length > 5 ? (
-        <button className="workspaceRecentToggle" type="button" onClick={() => setRecentExpanded((current) => !current)}>
-          {recentExpanded ? "收起" : `显示全部 ${recentSessions.length} 个`}
-        </button>
-      ) : null}
-    </section>
-  );
-}
-
 function SessionBrowser({
   taskPanel,
   sessions,
   tasks,
   search,
   loadingSessions,
+  hasMoreSessions,
+  loadingMoreSessions,
+  onLoadMoreSessions,
   sessionError,
   selectedSessionId,
   showHeading = true,
@@ -3662,6 +3534,9 @@ function SessionBrowser({
   tasks: TaskSummary[];
   search: string;
   loadingSessions: boolean;
+  hasMoreSessions: boolean;
+  loadingMoreSessions: boolean;
+  onLoadMoreSessions: () => Promise<void>;
   sessionError: string | null;
   selectedSessionId: string | null;
   showHeading?: boolean;
@@ -3676,47 +3551,59 @@ function SessionBrowser({
   createSessionError?: string | null;
 }) {
   const workspaceFilterId = useId();
-
+  const [visibleCount, setVisibleCount] = useState(10);
+  useEffect(() => setVisibleCount(10), [search, mode]);
+  const hasMore = sessions.length > visibleCount || hasMoreSessions;
+  async function showMore() {
+    if (visibleCount >= sessions.length && hasMoreSessions) await onLoadMoreSessions();
+    setVisibleCount((count) => count + 10);
+  }
+  const createButton = onCreateSession && mode !== "task" ? (
+    <button className="primaryButton newSessionButton" type="button" aria-label="新建会话" onClick={() => void onCreateSession("")} disabled={Boolean(creatingSessionWorkspace) || !sessions.some((item) => item.workspace.trim())}><UiIcon name="plus" /><span>新建会话</span></button>
+  ) : null;
 
   return (
     <>
-      <div className={`sectionHeader${showHeading ? "" : " noHeading"}`}>
-        {showHeading ? (
+      {showHeading ? (
+        <div className="sessionLibraryHeading">
           <div>
-            <h2>我的会话</h2>
-            <p className="muted">共 {sessions.length} 个会话</p>
+            <h2>会话</h2>
+            <p className="muted">{loadingSessions && sessions.length === 0 ? "正在载入会话…" : hasMoreSessions ? `已载入 ${sessions.length} 个会话 · 更多记录按需加载` : `共 ${sessions.length} 个会话`}</p>
           </div>
-        ) : null}
+          {createButton}
+        </div>
+      ) : null}
+      <div className={`sessionBrowserControls${showHeading ? "" : " compact"}`}>
         <form className="searchForm" onSubmit={onSearchSubmit}>
+          <UiIcon name="search" />
           <input
             aria-label="搜索会话"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="搜索标题、备注或工作目录"
+            placeholder="搜索会话…"
           />
           <button className="iconButton" type="submit" aria-label="搜索" title="搜索">
-            <span aria-hidden="true">⌕</span>
+            <span aria-hidden="true">↵</span>
           </button>
         </form>
-      </div>
-
-      <div className="sessionViewTabs" role="tablist" aria-label="会话列表视图">
+        <div className="sessionViewTabs" role="tablist" aria-label="会话列表视图">
         {([["recent", "最近会话"], ["workspace", "按工作目录"], ["task", "按任务"]] as const).map(([value, label]) => (
           <button key={value} className={mode === value ? "active" : ""} type="button" role="tab" aria-selected={mode === value} onClick={() => onModeChange(value)}>{label}</button>
         ))}
+        </div>
       </div>
       {mode === "task" ? taskPanel : null}
-      {onCreateSession && mode !== "task" ? (
-        <button className="primaryButton newSessionButton" type="button" onClick={() => void onCreateSession("")} disabled={Boolean(creatingSessionWorkspace) || !sessions.some((item) => item.workspace.trim())}>＋ 新建会话</button>
-      ) : null}
+      {!showHeading ? createButton : null}
 
       {sessionError ? <div className="errorBanner">{sessionError}</div> : null}
       {createSessionError ? <div className="errorBanner">{createSessionError}</div> : null}
-      {loadingSessions ? <div className="emptyState">正在加载会话...</div> : null}
+      {loadingSessions && sessions.length === 0 ? <div className="sessionSkeleton" role="status" aria-label="正在加载会话"><span /><span /><span /></div> : null}
+      {loadingSessions && sessions.length > 0 ? <p className="listLoadingStatus" role="status">正在更新会话…</p> : null}
       {!loadingSessions && sessions.length === 0 ? <div className="emptyState">没有匹配的会话</div> : null}
-      {!loadingSessions && sessions.length > 0 ? (
+      {sessions.length > 0 ? (
         <SessionList
           sessions={sessions}
+          visibleCount={visibleCount}
           selectedSessionId={selectedSessionId}
           workspaceFilterId={workspaceFilterId}
           mode={mode}
@@ -3727,6 +3614,7 @@ function SessionBrowser({
           creatingSessionWorkspace={creatingSessionWorkspace}
         />
       ) : null}
+      {mode === "recent" && hasMore ? <button className="ghostButton sessionLoadMore" type="button" disabled={loadingMoreSessions || loadingSessions} onClick={() => void showMore()}>{loadingMoreSessions ? "正在加载…" : "显示更多会话"}</button> : null}
     </>
   );
 }
@@ -3739,6 +3627,9 @@ function MobileSessionDrawer({
   selectedSessionId,
   search,
   loading,
+  hasMoreSessions,
+  loadingMoreSessions,
+  onLoadMoreSessions,
   error,
   closeButtonRef,
   onClose,
@@ -3761,6 +3652,9 @@ function MobileSessionDrawer({
   selectedSessionId: string | null;
   search: string;
   loading: boolean;
+  hasMoreSessions: boolean;
+  loadingMoreSessions: boolean;
+  onLoadMoreSessions: () => Promise<void>;
   error: string | null;
   closeButtonRef: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
@@ -3793,7 +3687,7 @@ function MobileSessionDrawer({
             </button>
           ) : null}
           <button ref={closeButtonRef} className="iconButton" type="button" aria-label="关闭会话列表" title="关闭" onClick={onClose}>
-            <span aria-hidden="true">×</span>
+            <UiIcon name="close" />
           </button>
         </div>
       </header>
@@ -3805,6 +3699,9 @@ function MobileSessionDrawer({
           tasks={tasks}
           search={search}
           loadingSessions={loading}
+          hasMoreSessions={hasMoreSessions}
+          loadingMoreSessions={loadingMoreSessions}
+          onLoadMoreSessions={onLoadMoreSessions}
           sessionError={error}
           selectedSessionId={selectedSessionId}
           showHeading={false}
@@ -3823,7 +3720,7 @@ function MobileSessionDrawer({
       {isOwner ? (
         <footer className="drawerUtility">
           <button type="button" aria-label="打开设置和诊断" onClick={onOpenSettings}>
-            <span aria-hidden="true">⚙</span>
+            <UiIcon name="settings" />
             <span>设置与诊断</span>
           </button>
         </footer>
@@ -3872,6 +3769,7 @@ function sortSessionsByWorkspace(sessions: SessionSummary[]): SessionSummary[] {
 
 function SessionList({
   sessions,
+  visibleCount,
   tasks,
   selectedSessionId,
   workspaceFilterId,
@@ -3882,6 +3780,7 @@ function SessionList({
   creatingSessionWorkspace
 }: {
   sessions: SessionSummary[];
+  visibleCount: number;
   tasks: TaskSummary[];
   selectedSessionId: string | null;
   workspaceFilterId: string;
@@ -3891,12 +3790,14 @@ function SessionList({
   onCreateSession?: (workspace: string) => Promise<void>;
   creatingSessionWorkspace?: string | null;
 }) {
-  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(() => new Set());
+  const [workspaceVisibleCount, setWorkspaceVisibleCount] = useState(DEFAULT_VISIBLE_GROUP_SESSIONS);
+  const [unassignedOpen, setUnassignedOpen] = useState(false);
+  const [unassignedVisibleCount, setUnassignedVisibleCount] = useState(10);
   const [copiedWorkspace, setCopiedWorkspace] = useState<string | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState("");
   const orderedSessions = useMemo(() => sortSessionsByWorkspace(sessions), [sessions]);
   const groups = useMemo(() => groupSessionsByWorkspace(orderedSessions), [orderedSessions]);
-  const recentSessions = useMemo(() => sortSessionsByUpdatedAt(sessions).slice(0, 10), [sessions]);
+  const recentSessions = useMemo(() => sortSessionsByUpdatedAt(sessions).slice(0, visibleCount), [sessions, visibleCount]);
   const taskGroups = useMemo(() => {
     const sessionMap = new Map(sessions.map((session) => [session.id, session]));
     const assigned = new Set<string>();
@@ -3912,7 +3813,7 @@ function SessionList({
   }, [sessions, tasks]);
   const activeWorkspace = groups.some((group) => group.workspace === selectedWorkspace)
     ? selectedWorkspace
-    : groups[0]?.workspace ?? "";
+    : sortSessionsByUpdatedAt(sessions)[0]?.workspace.trim() || groups[0]?.workspace || "";
   const activeGroup = groups.find((group) => group.workspace === activeWorkspace) ?? null;
 
   useEffect(() => {
@@ -3936,17 +3837,7 @@ function SessionList({
     }, 1500);
   }
 
-  function toggleWorkspace(workspace: string) {
-    setExpandedWorkspaces((current) => {
-      const next = new Set(current);
-      if (next.has(workspace)) {
-        next.delete(workspace);
-      } else {
-        next.add(workspace);
-      }
-      return next;
-    });
-  }
+  useEffect(() => setWorkspaceVisibleCount(DEFAULT_VISIBLE_GROUP_SESSIONS), [activeWorkspace]);
 
   return (
     <div className="sessionList">
@@ -3993,17 +3884,14 @@ function SessionList({
       ) : null}
 
       {mode === "workspace" && activeGroup ? (() => {
-        const expanded = expandedWorkspaces.has(activeGroup.workspace);
-        const visibleSessions = expanded
-          ? activeGroup.sessions
-          : activeGroup.sessions.slice(0, DEFAULT_VISIBLE_GROUP_SESSIONS);
+        const visibleSessions = activeGroup.sessions.slice(0, workspaceVisibleCount);
         const hiddenCount = activeGroup.sessions.length - visibleSessions.length;
 
         return (
           <section className="sessionWorkspaceGroup" aria-label={`${activeGroup.workspace} 的会话`}>
             <div className="workspaceGroupSummary">
               <p className="muted">
-                {activeGroup.sessions.length} 个会话，默认显示最近 {Math.min(activeGroup.sessions.length, DEFAULT_VISIBLE_GROUP_SESSIONS)} 个
+                {activeGroup.sessions.length} 个会话 · 已显示 {visibleSessions.length} 个
               </p>
             </div>
             <div className="workspaceGroupList">
@@ -4018,8 +3906,8 @@ function SessionList({
               ))}
             </div>
             {activeGroup.sessions.length > DEFAULT_VISIBLE_GROUP_SESSIONS ? (
-              <button className="ghostButton workspaceToggleButton" type="button" onClick={() => toggleWorkspace(activeGroup.workspace)}>
-                {expanded ? "收起" : `展开更多 ${hiddenCount} 个会话`}
+              <button className="ghostButton workspaceToggleButton" type="button" onClick={() => setWorkspaceVisibleCount((count) => hiddenCount > 0 ? count + 20 : DEFAULT_VISIBLE_GROUP_SESSIONS)}>
+                {hiddenCount > 0 ? `显示更多会话（剩余 ${hiddenCount} 个）` : "收起会话"}
               </button>
             ) : null}
           </section>
@@ -4029,7 +3917,7 @@ function SessionList({
       {mode === "recent" ? (
         <section className="sessionWorkspaceGroup recentSessionGroup" aria-label="最近修改的会话">
           <div className="workspaceGroupSummary">
-            <p className="muted">最近修改的 {recentSessions.length} 个会话，按时间倒序排列</p>
+            <p className="muted">最近更新 · {recentSessions.length} 个会话</p>
           </div>
           <div className="workspaceGroupList recentSessionList">
             {recentSessions.map((session) => (
@@ -4047,27 +3935,15 @@ function SessionList({
 
       {mode === "task" ? (
         <section className="taskSessionGroups" aria-label="按任务查看会话">
-          {taskGroups.groups.map(({ task, sessions: taskSessions }) => (
-            <section className="sessionWorkspaceGroup" key={task.id} aria-label={`${task.name} 的会话`}>
-              <div className="workspaceGroupHeader taskGroupHeader">
-                <h3>{task.name}</h3>
-                <span className="muted">{taskSessions.length} 个会话</span>
-              </div>
-              <div className="workspaceGroupList">
-                {taskSessions.map((session) => (
-                  <SessionItem key={session.id} session={session} selected={isSameSession(session, selectedSessionId)} onSelect={onSelect} onMetadataSaved={onMetadataSaved} />
-                ))}
-              </div>
-            </section>
-          ))}
           {taskGroups.unassigned.length > 0 ? (
-            <section className="sessionWorkspaceGroup" aria-label="未归类会话">
-              <div className="workspaceGroupHeader taskGroupHeader"><h3>未归类会话</h3><span className="muted">{taskGroups.unassigned.length} 个会话</span></div>
-              <div className="workspaceGroupList">
-                {taskGroups.unassigned.map((session) => (
+            <section className="sessionWorkspaceGroup unassignedGroup" aria-label="未归类会话">
+              <button className="unassignedToggle" type="button" aria-expanded={unassignedOpen} onClick={() => setUnassignedOpen((value) => !value)}><span>未归类会话 <small>{taskGroups.unassigned.length} 个</small></span><span>{unassignedOpen ? "收起 ↑" : "展开 ↓"}</span></button>
+              {unassignedOpen ? <div className="workspaceGroupList">
+                {taskGroups.unassigned.slice(0, unassignedVisibleCount).map((session) => (
                   <SessionItem key={session.id} session={session} selected={isSameSession(session, selectedSessionId)} onSelect={onSelect} onMetadataSaved={onMetadataSaved} />
                 ))}
-              </div>
+              </div> : null}
+              {unassignedOpen && unassignedVisibleCount < taskGroups.unassigned.length ? <button className="ghostButton sessionLoadMore" type="button" onClick={() => setUnassignedVisibleCount((count) => count + 20)}>显示更多未归类会话</button> : null}
             </section>
           ) : null}
           {taskGroups.groups.length === 0 && taskGroups.unassigned.length === 0 ? <div className="emptyState">暂无任务会话</div> : null}
@@ -4179,7 +4055,6 @@ function SessionItem({
       className={`sessionItem${selected ? " selected" : ""}`}
     >
       <div className="sessionMain">
-        <div className="sessionTitleRow">
           {editingTitle ? (
             <input
               className="titleEditInput"
@@ -4199,21 +4074,18 @@ function SessionItem({
               title={session.title}
               onClick={() => onSelect(session)}
             >
-              <span title={session.title}>{session.title}</span>
+              <span className="sessionTitleRow"><span className="sessionTitleText">{session.title}</span>{session.status !== "history" ? <StatusBadge status={session.status} /> : null}</span>
+              <span className="sessionSummary">{session.summary}</span>
+              <span className="sessionMeta">
+                <span title={session.workspace}><UiIcon name="folder" />{workspaceDisplayName(session.workspace)}</span>
+                <time dateTime={session.updatedAt}>{formatDateTime(session.updatedAt)}</time>
+              </span>
             </button>
           )}
-          {session.status !== "history" ? <StatusBadge status={session.status} /> : null}
-        </div>
-        {session.remarkTitle ? <p className="remarkHint">默认标题：{session.defaultTitle}</p> : null}
-        <p className="sessionSummary">{session.summary}</p>
-        <div className="sessionMeta">
-          <span title={session.workspace}>{workspaceDisplayName(session.workspace)}</span>
-          <span>{formatDateTime(session.updatedAt)}</span>
-        </div>
         {error ? <div className="errorText">{error}</div> : null}
       </div>
       <div className="sessionActions">
-        <button className="iconButton titleEditButton" type="button" aria-label={`编辑 ${session.title} 的备注标题`} title="修改备注标题" onClick={beginTitleEdit} disabled={saving}>{saving ? "…" : "✎"}</button>
+        <button className="iconButton titleEditButton" type="button" aria-label={`编辑 ${session.title} 的备注标题`} title="修改备注标题" onClick={beginTitleEdit} disabled={saving}>{saving ? "…" : <UiIcon name="pencil" />}</button>
         <div className="sessionId" title={session.id}>
           {session.id}
         </div>
@@ -4404,14 +4276,12 @@ function StatusBadge({ status }: { status: SessionStatus }) {
 
 function Shell({
   title,
-  leadingAction,
   action,
   children,
   reserveFloatingStatus = false,
   desktopWorkspace = false
 }: {
   title: string;
-  leadingAction?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
   reserveFloatingStatus?: boolean;
@@ -4421,7 +4291,7 @@ function Shell({
     <main className={`appShell${reserveFloatingStatus ? " reserveFloatingStatus" : ""}${desktopWorkspace ? " desktopWorkspaceShell" : ""}`}>
       <header className="topbar">
         <div className="topbarLeading">
-          {leadingAction}
+          <span className="brandMark"><UiIcon name="terminal" /></span>
           <h1>{title}</h1>
         </div>
         {action}
