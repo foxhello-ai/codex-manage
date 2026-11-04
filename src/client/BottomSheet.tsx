@@ -1,5 +1,6 @@
 import { type ReactNode, useId, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { UiIcon } from "./UiIcon";
 
 /** Shared modal shell: only the body scrolls; dismissing never commits an action. */
 export function BottomSheet({ title, description, children, actions, onClose, busy = false, className = "" }: {
@@ -58,7 +59,7 @@ export function BottomSheet({ title, description, children, actions, onClose, bu
       <section className={`bottomSheet ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} aria-busy={busy}>
         <header className="sheetHeader">
           <div><h2 id={titleId}>{title}</h2>{description ? <p id={descriptionId}>{description}</p> : null}</div>
-          <button ref={closeRef} className="iconButton" type="button" aria-label="关闭面板" onClick={onClose} disabled={busy}>×</button>
+          <button ref={closeRef} className="iconButton" type="button" aria-label="关闭面板" onClick={onClose} disabled={busy}><UiIcon name="close" /></button>
         </header>
         <div className="sheetBody">{children}</div>
         {actions ? <footer className="sheetActions">{actions}</footer> : null}

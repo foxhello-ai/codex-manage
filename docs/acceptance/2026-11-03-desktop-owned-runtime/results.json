@@ -1,0 +1,386 @@
+{
+  "item": "SRF-02",
+  "date": "2026-11-03T04:26:01.630Z",
+  "experimentDirectory": "/tmp/cdo-L10zHk",
+  "checks": [
+    {
+      "id": "empty-daemon-precondition",
+      "criterion": "No daemon or shared listener is pre-started",
+      "outcome": "pass",
+      "evidence": {
+        "controlSocket": "/tmp/cdo-L10zHk/flag-only-home/app-server-control/app-server-control.sock"
+      }
+    },
+    {
+      "id": "daemon-flag-autostart",
+      "criterion": "Daemon flag alone makes Desktop launch a reusable daemon",
+      "outcome": "fail",
+      "evidence": {
+        "daemonSocketExists": false,
+        "desktopPid": 35999,
+        "privateChild": {
+          "pid": 36489,
+          "ppid": 35999,
+          "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+        }
+      }
+    },
+    {
+      "id": "adapter-no-prestarted-service",
+      "criterion": "Before starting Desktop the reusable service does not exist",
+      "outcome": "pass",
+      "evidence": {
+        "socketPath": "/tmp/cdo-L10zHk/server.sock"
+      }
+    },
+    {
+      "id": "desktop-owns-server",
+      "criterion": "Desktop starts adapter which starts the sole official reusable app-server",
+      "outcome": "pass",
+      "evidence": {
+        "desktopPid": 36649,
+        "adapter": {
+          "pid": 37225,
+          "ppid": 36649,
+          "command": "/usr/local/bin/node /Volumes/T7/project/project_fmzh/2026/codex-manage/scripts/research/desktop-owned-cli-adapter.mjs --config /tmp/cdo-L10zHk/adapter-config.json -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+        },
+        "server": {
+          "pid": 37227,
+          "ppid": 37225,
+          "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/../CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true --listen unix:///tmp/cdo-L10zHk/server.sock"
+        },
+        "serverArgs": [
+          "-c",
+          "features.code_mode_host=true",
+          "app-server",
+          "--analytics-default-enabled",
+          "-c",
+          "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true",
+          "-c",
+          "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true",
+          "--listen",
+          "unix:///tmp/cdo-L10zHk/server.sock"
+        ]
+      }
+    },
+    {
+      "id": "desktop-first-turn",
+      "criterion": "Official Desktop talks using its own newly launched reusable backend",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13",
+        "serverPid": 37227
+      }
+    },
+    {
+      "id": "one-official-server",
+      "criterion": "Both future clients will reuse one official app-server process",
+      "outcome": "pass",
+      "evidence": {
+        "servers": [
+          {
+            "pid": 37227,
+            "ppid": 37225,
+            "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/../CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true --listen unix:///tmp/cdo-L10zHk/server.sock"
+          }
+        ]
+      }
+    },
+    {
+      "id": "manage-attaches-original",
+      "criterion": "Actual Manage attaches to Desktop-owned backend and original thread",
+      "outcome": "pass",
+      "evidence": {
+        "status": 200,
+        "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13",
+        "serverPid": 37227
+      }
+    },
+    {
+      "id": "manage-is-client-only",
+      "criterion": "Manage starts only an attachment bridge, never another official app-server",
+      "outcome": "pass",
+      "evidence": {
+        "children": [
+          {
+            "pid": 38106,
+            "ppid": 38096,
+            "command": "/usr/local/bin/node /tmp/cdo-L10zHk/manage-bridge.mjs /tmp/cdo-L10zHk/server.sock"
+          }
+        ]
+      }
+    },
+    {
+      "id": "manage-to-desktop",
+      "criterion": "Manage input and reply appear in official Desktop without reload",
+      "outcome": "pass",
+      "evidence": {}
+    },
+    {
+      "id": "desktop-to-manage",
+      "criterion": "Desktop input and completed reply appear in Manage without reload",
+      "outcome": "pass",
+      "evidence": {}
+    },
+    {
+      "id": "no-duplicate-messages",
+      "criterion": "Alternating input displays exactly one user and one assistant message",
+      "outcome": "pass",
+      "evidence": {
+        "desktop:DOR-MANAGE-TWO": {
+          "user": 1,
+          "assistant": 1
+        },
+        "manage:DOR-MANAGE-TWO": {
+          "user": 1,
+          "assistant": 1
+        },
+        "desktop:DOR-DESKTOP-THREE": {
+          "user": 1,
+          "assistant": 1
+        },
+        "manage:DOR-DESKTOP-THREE": {
+          "user": 1,
+          "assistant": 1
+        }
+      }
+    },
+    {
+      "id": "context-preserved",
+      "criterion": "Next local model request contains both clients previous user and assistant messages",
+      "outcome": "pass",
+      "evidence": {
+        "index": 4,
+        "path": "/v1/responses",
+        "marker": "DOR-DESKTOP-THREE",
+        "userMarkers": [
+          "DOR-DESKTOP-ONE",
+          "DOR-MANAGE-TWO",
+          "DOR-DESKTOP-THREE"
+        ],
+        "assistantMarkers": [
+          "DOR-DESKTOP-ONE",
+          "DOR-MANAGE-TWO"
+        ]
+      }
+    },
+    {
+      "id": "running-status",
+      "criterion": "Manage receives Desktop running status and active turn",
+      "outcome": "pass",
+      "evidence": {
+        "status": "running",
+        "activeTurnId": "01a19fa9-f692-7b62-aa3a-9a3a6fb586ae"
+      }
+    },
+    {
+      "id": "manage-exit-keeps-backend",
+      "criterion": "Stopping Manage leaves Desktop-owned backend and Desktop conversation working",
+      "outcome": "pass",
+      "evidence": {
+        "serverPid": 37227
+      }
+    },
+    {
+      "id": "manage-reconnect",
+      "criterion": "Restarted Manage reconnects to original Desktop-owned service/thread",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13",
+        "serverPid": 37227
+      }
+    },
+    {
+      "id": "desktop-exit-owns-lifecycle",
+      "criterion": "Exiting Desktop stops the backend it started",
+      "outcome": "pass",
+      "evidence": {
+        "desktopPid": 36649,
+        "adapterPid": 37225,
+        "serverPid": 37227
+      }
+    },
+    {
+      "id": "manage-observes-desktop-exit",
+      "criterion": "Manage loses its live backend when Desktop exits",
+      "outcome": "pass",
+      "evidence": {
+        "status": "failed",
+        "activeTurnId": null
+      }
+    },
+    {
+      "id": "listener-cleanup",
+      "criterion": "Desktop-owned backend removes its listener on exit",
+      "outcome": "pass",
+      "evidence": {
+        "socketStillExists": false
+      }
+    },
+    {
+      "id": "desktop-restart-original-history",
+      "criterion": "Restarted Desktop starts a new backend and loads original thread history",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13",
+        "oldServerPid": 37227,
+        "newServerPid": 39240
+      }
+    },
+    {
+      "id": "manage-reattach-new-owned-server",
+      "criterion": "After explicit reload/resume Manage reconnects to Desktop new backend",
+      "outcome": "pass",
+      "evidence": {
+        "reloadStatus": 200,
+        "resumeStatus": 200,
+        "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13",
+        "serverPid": 39240
+      }
+    },
+    {
+      "id": "desktop-restart-live-subscription",
+      "criterion": "Restarted Desktop shows Manage new reply within 10s without its own input",
+      "outcome": "fail",
+      "evidence": {
+        "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13",
+        "manageShowsReply": true,
+        "desktopShowsReply": false
+      }
+    },
+    {
+      "id": "continued-after-both-restarts",
+      "criterion": "Both clients submit to original backend thread with preserved context after explicit reattach",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13",
+        "serverPid": 39240,
+        "input": {
+          "index": 9,
+          "path": "/v1/responses",
+          "marker": "DOR-MANAGE-AFTER-ACTIVATION",
+          "userMarkers": [
+            "DOR-DESKTOP-ONE",
+            "DOR-MANAGE-TWO",
+            "DOR-DESKTOP-THREE",
+            "DOR-DESKTOP-SLOW",
+            "DOR-AFTER-MANAGE-EXIT",
+            "DOR-MANAGE-AFTER-DESKTOP-RESTART",
+            "DOR-DESKTOP-AFTER-RESTART",
+            "DOR-MANAGE-AFTER-ACTIVATION"
+          ],
+          "assistantMarkers": [
+            "DOR-DESKTOP-ONE",
+            "DOR-MANAGE-TWO",
+            "DOR-DESKTOP-THREE",
+            "DOR-DESKTOP-SLOW",
+            "DOR-AFTER-MANAGE-EXIT",
+            "DOR-MANAGE-AFTER-DESKTOP-RESTART",
+            "DOR-DESKTOP-AFTER-RESTART"
+          ]
+        }
+      }
+    },
+    {
+      "id": "desktop-restart-ui-recovery",
+      "criterion": "After its own input restarted Desktop shows both new replies within 10s",
+      "outcome": "pass",
+      "evidence": {
+        "desktopOwnReply": true,
+        "desktopExternalReply": true,
+        "manageShowsBothReplies": true
+      }
+    },
+    {
+      "id": "real-desktop-preserved",
+      "criterion": "Previously running official Desktop/backends remain alive",
+      "outcome": "pass",
+      "evidence": {
+        "protectedPids": [
+          16597,
+          44531,
+          47026,
+          67946
+        ]
+      }
+    }
+  ],
+  "environment": {
+    "desktopVersion": "26.1002.52244",
+    "cliVersion": "codex-cli 0.162.0-alpha.2",
+    "nodeVersion": "v22.22.0"
+  },
+  "scope": "Desktop-owned app-server launch chain, actual official Desktop + unchanged Manage",
+  "isolation": {
+    "realHomeUsed": false,
+    "realInferenceUsed": false,
+    "desktopPackageModified": false,
+    "productionCodeChanged": false
+  },
+  "protectedRealProcesses": [
+    {
+      "pid": 16597,
+      "ppid": 13849,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex app-server --listen stdio://"
+    },
+    {
+      "pid": 44531,
+      "ppid": 1,
+      "command": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
+    },
+    {
+      "pid": 47026,
+      "ppid": 44531,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+    },
+    {
+      "pid": 67946,
+      "ppid": 60037,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex app-server --listen stdio://"
+    }
+  ],
+  "firstOwner": {
+    "adapterPid": 37225,
+    "desktopPid": 36649,
+    "serverPid": 37227,
+    "socketPath": "/tmp/cdo-L10zHk/server.sock",
+    "serverArgs": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled",
+      "-c",
+      "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true",
+      "-c",
+      "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true",
+      "--listen",
+      "unix:///tmp/cdo-L10zHk/server.sock"
+    ],
+    "startedAt": 1793680009120
+  },
+  "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13",
+  "secondOwner": {
+    "adapterPid": 39239,
+    "desktopPid": 38749,
+    "serverPid": 39240,
+    "socketPath": "/tmp/cdo-L10zHk/server.sock",
+    "serverArgs": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled",
+      "-c",
+      "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true",
+      "-c",
+      "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true",
+      "--listen",
+      "unix:///tmp/cdo-L10zHk/server.sock"
+    ],
+    "startedAt": 1793680099480
+  },
+  "summary": {
+    "pass": 22,
+    "fail": 2,
+    "blocked": 0
+  }
+}

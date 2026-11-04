@@ -1,0 +1,7 @@
+{
+  "binary": "/tmp/codex-version-audit-hhcyozir/codex-0.146.0",
+  "version": "codex-cli 0.146.0",
+  "source": "https://registry.npmjs.org/@openai/codex/-/codex-0.146.0-darwin-x64.tgz",
+  "integrityVerified": true,
+  "sha256": "544e2df9e6f09b3f1ceb0405879c83dd099ec015aeed942bb091ff0f29f60dc2"
+}

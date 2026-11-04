@@ -5,8 +5,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#151719",
+  "theme_color": "#151719",
   "icons": [
     {
       "src": "/branding/fmzh/icon-192.png",

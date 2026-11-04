@@ -1,0 +1,637 @@
+{
+  "at": "2026-11-03T07:04:19.062Z",
+  "root": "/tmp/mdh-kEWzMC",
+  "checks": [
+    {
+      "id": "manage-first-completed-but-loaded",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+        "runtime": {
+          "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+          "status": "waiting_input",
+          "permissionMode": "default",
+          "activeTurnId": null,
+          "startedAt": "2026-11-03T07:04:19.582Z",
+          "updatedAt": "2026-11-03T07:04:19.698Z",
+          "lastError": null,
+          "model": "research-local-stub",
+          "modelProvider": "research",
+          "reasoningEffort": null,
+          "modelSelection": {
+            "mode": "follow_session",
+            "preferredModel": null,
+            "preferredReasoningEffort": null,
+            "actualModel": "research-local-stub",
+            "actualModelProvider": "research",
+            "actualReasoningEffort": null,
+            "actualModelSupported": null,
+            "applied": false,
+            "confirmationPending": false,
+            "updatedAt": null,
+            "lastError": null
+          },
+          "modelChangeStatus": "idle",
+          "modelChangeError": null,
+          "pendingApprovalCount": 0,
+          "eventSeq": 12
+        },
+        "backend": {
+          "status": "ready",
+          "pid": 18102,
+          "lastError": null,
+          "initialized": true
+        }
+      }
+    },
+    {
+      "id": "desktop-encounters-manage-writer",
+      "outcome": "fail",
+      "evidence": {
+        "composerAbsent": false,
+        "uiText": "跳转到内容\n首页\n定时任务\n插件\n探索\n代码审查\nCodex\n新聊天\n项目\nManage Desktop Handoff Research\nMDH-MANAGE-FIRST\nMDH-OTHER-THREAD\n最近\nMDH-MANAGE-FIRST\nMDH-OTHER-THREAD\nMDH-MANAGE-FIRST\n你说：\n\nMDH-MANAGE-FIRST\n\n15:04\nChatGPT 说：\n\nLocal stub completed MDH-MANAGE-FIRST\n\n15:04\n最新一条回复\n\n\n\n\n自定义",
+        "writerErrors": []
+      }
+    },
+    {
+      "id": "manage-unsubscribes",
+      "outcome": "pass",
+      "evidence": {
+        "result": {
+          "status": "unsubscribed"
+        }
+      }
+    },
+    {
+      "id": "default-delay-releases-one-thread",
+      "outcome": "pass",
+      "evidence": {
+        "elapsedMs": 60099,
+        "remainingLoadedThreads": [
+          "01a1a039-1c27-7d93-a7bc-2c068ec62b3f"
+        ],
+        "backend": {
+          "status": "ready",
+          "pid": 18102,
+          "lastError": null,
+          "initialized": true
+        },
+        "runtimeAfterUnload": {
+          "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+          "status": "history",
+          "permissionMode": "default",
+          "activeTurnId": null,
+          "startedAt": "2026-11-03T07:04:19.582Z",
+          "updatedAt": "2026-11-03T07:05:56.775Z",
+          "lastError": null,
+          "model": "research-local-stub",
+          "modelProvider": "research",
+          "reasoningEffort": null,
+          "modelSelection": {
+            "mode": "follow_session",
+            "preferredModel": null,
+            "preferredReasoningEffort": null,
+            "actualModel": "research-local-stub",
+            "actualModelProvider": "research",
+            "actualReasoningEffort": null,
+            "actualModelSupported": null,
+            "applied": false,
+            "confirmationPending": false,
+            "updatedAt": null,
+            "lastError": null
+          },
+          "modelChangeStatus": "idle",
+          "modelChangeError": null,
+          "pendingApprovalCount": 0,
+          "eventSeq": 14
+        },
+        "closedNotification": {
+          "at": 1793689556775,
+          "method": "thread/closed",
+          "params": {
+            "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb"
+          }
+        }
+      }
+    },
+    {
+      "id": "desktop-continues-original-after-release",
+      "outcome": "fail",
+      "evidence": {
+        "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+        "desktopReplied": true,
+        "input": {
+          "at": 1793689603580,
+          "marker": "MDH-DESKTOP-AFTER-RELEASE",
+          "userMarkers": [
+            "MDH-DESKTOP-WHILE-LOCKED",
+            "MDH-DESKTOP-AFTER-RELEASE"
+          ],
+          "assistantMarkers": [
+            "MDH-DESKTOP-WHILE-LOCKED"
+          ]
+        }
+      }
+    },
+    {
+      "id": "other-manage-chat-keeps-working",
+      "outcome": "pass",
+      "evidence": {
+        "otherId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+        "backend": {
+          "status": "ready",
+          "pid": 18102,
+          "lastError": null,
+          "initialized": true
+        }
+      }
+    },
+    {
+      "id": "real-desktop-preserved",
+      "outcome": "pass",
+      "evidence": {
+        "pids": [
+          44531,
+          47026,
+          68095
+        ]
+      }
+    }
+  ],
+  "modelRequests": [
+    {
+      "at": 1793689459676,
+      "marker": "MDH-MANAGE-FIRST",
+      "userMarkers": [
+        "MDH-MANAGE-FIRST"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "at": 1793689459847,
+      "marker": "MDH-OTHER-THREAD",
+      "userMarkers": [
+        "MDH-OTHER-THREAD"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "at": 1793689597669,
+      "marker": "MDH-DESKTOP-WHILE-LOCKED",
+      "userMarkers": [
+        "MDH-DESKTOP-WHILE-LOCKED"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "at": 1793689598898,
+      "marker": "MDH-DESKTOP-WHILE-LOCKED",
+      "userMarkers": [
+        "MDH-DESKTOP-WHILE-LOCKED"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "at": 1793689603580,
+      "marker": "MDH-DESKTOP-AFTER-RELEASE",
+      "userMarkers": [
+        "MDH-DESKTOP-WHILE-LOCKED",
+        "MDH-DESKTOP-AFTER-RELEASE"
+      ],
+      "assistantMarkers": [
+        "MDH-DESKTOP-WHILE-LOCKED"
+      ]
+    },
+    {
+      "at": 1793689605068,
+      "marker": "MDH-OTHER-STILL-WORKS",
+      "userMarkers": [
+        "MDH-OTHER-THREAD",
+        "MDH-OTHER-STILL-WORKS"
+      ],
+      "assistantMarkers": [
+        "MDH-OTHER-THREAD"
+      ]
+    }
+  ],
+  "rpcNotifications": [
+    {
+      "at": 1793689459583,
+      "method": "thread/started",
+      "params": {
+        "thread": {
+          "id": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+          "environments": [
+            {
+              "environmentId": "local",
+              "cwd": "/tmp/mdh-kEWzMC/workspace",
+              "runtimeWorkspaceRoots": [
+                "/tmp/mdh-kEWzMC/workspace"
+              ]
+            }
+          ],
+          "extra": null,
+          "sessionId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+          "forkedFromId": null,
+          "parentThreadId": null,
+          "preview": "",
+          "ephemeral": false,
+          "section": null,
+          "sectionEnteredAt": null,
+          "projectId": null,
+          "historyMode": "paginated",
+          "modelProvider": "research",
+          "model": "research-local-stub",
+          "reasoningEffort": null,
+          "createdAt": 1793689459,
+          "updatedAt": 1793689459,
+          "recencyAt": 1793689459,
+          "status": {
+            "type": "idle"
+          },
+          "path": "/private/tmp/mdh-kEWzMC/home/sessions/2026/11/03/rollout-2026-11-03T15-04-19-01a1a039-1b53-7df2-9417-8cb7a79c89bb.jsonl",
+          "cwd": "/tmp/mdh-kEWzMC/workspace",
+          "cliVersion": "0.162.0-alpha.2",
+          "originator": "Codex Desktop",
+          "source": "vscode",
+          "canAcceptDirectInput": true,
+          "threadSource": null,
+          "agentNickname": null,
+          "agentRole": null,
+          "gitInfo": null,
+          "name": null,
+          "daybreakEnabled": null,
+          "turns": []
+        }
+      }
+    },
+    {
+      "at": 1793689459627,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+        "status": {
+          "type": "active",
+          "activeFlags": []
+        }
+      }
+    },
+    {
+      "at": 1793689459692,
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+        "turnId": "01a1a039-1b82-7353-9d24-af4a2277f149",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 2,
+            "inputTokens": 1,
+            "cachedInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 1,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 2,
+            "inputTokens": 1,
+            "cachedInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 1,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "at": 1793689459697,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+        "status": {
+          "type": "idle"
+        }
+      }
+    },
+    {
+      "at": 1793689459698,
+      "method": "turn/completed",
+      "params": {
+        "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+        "turn": {
+          "id": "01a1a039-1b82-7353-9d24-af4a2277f149",
+          "items": [
+            {
+              "type": "agentMessage",
+              "id": "msg_mdh_1",
+              "text": "Local stub completed MDH-MANAGE-FIRST",
+              "phase": null,
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            }
+          ],
+          "itemsView": "summary",
+          "status": "completed",
+          "error": null,
+          "startedAt": 1793689459,
+          "completedAt": 1793689459,
+          "durationMs": 101
+        }
+      }
+    },
+    {
+      "at": 1793689459788,
+      "method": "thread/started",
+      "params": {
+        "thread": {
+          "id": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+          "environments": [
+            {
+              "environmentId": "local",
+              "cwd": "/tmp/mdh-kEWzMC/workspace",
+              "runtimeWorkspaceRoots": [
+                "/tmp/mdh-kEWzMC/workspace"
+              ]
+            }
+          ],
+          "extra": null,
+          "sessionId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+          "forkedFromId": null,
+          "parentThreadId": null,
+          "preview": "",
+          "ephemeral": false,
+          "section": null,
+          "sectionEnteredAt": null,
+          "projectId": null,
+          "historyMode": "paginated",
+          "modelProvider": "research",
+          "model": "research-local-stub",
+          "reasoningEffort": null,
+          "createdAt": 1793689459,
+          "updatedAt": 1793689459,
+          "recencyAt": 1793689459,
+          "status": {
+            "type": "idle"
+          },
+          "path": "/private/tmp/mdh-kEWzMC/home/sessions/2026/11/03/rollout-2026-11-03T15-04-19-01a1a039-1c27-7d93-a7bc-2c068ec62b3f.jsonl",
+          "cwd": "/tmp/mdh-kEWzMC/workspace",
+          "cliVersion": "0.162.0-alpha.2",
+          "originator": "Codex Desktop",
+          "source": "vscode",
+          "canAcceptDirectInput": true,
+          "threadSource": null,
+          "agentNickname": null,
+          "agentRole": null,
+          "gitInfo": null,
+          "name": null,
+          "daybreakEnabled": null,
+          "turns": []
+        }
+      }
+    },
+    {
+      "at": 1793689459808,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+        "status": {
+          "type": "active",
+          "activeFlags": []
+        }
+      }
+    },
+    {
+      "at": 1793689459861,
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+        "turnId": "01a1a039-1c4e-7d61-8950-ce8979d55066",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 2,
+            "inputTokens": 1,
+            "cachedInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 1,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 2,
+            "inputTokens": 1,
+            "cachedInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 1,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "at": 1793689459865,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+        "status": {
+          "type": "idle"
+        }
+      }
+    },
+    {
+      "at": 1793689459865,
+      "method": "turn/completed",
+      "params": {
+        "threadId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+        "turn": {
+          "id": "01a1a039-1c4e-7d61-8950-ce8979d55066",
+          "items": [
+            {
+              "type": "agentMessage",
+              "id": "msg_mdh_2",
+              "text": "Local stub completed MDH-OTHER-THREAD",
+              "phase": null,
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            }
+          ],
+          "itemsView": "summary",
+          "status": "completed",
+          "error": null,
+          "startedAt": 1793689459,
+          "completedAt": 1793689459,
+          "durationMs": 68
+        }
+      }
+    },
+    {
+      "at": 1793689556775,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+        "status": {
+          "type": "notLoaded"
+        }
+      }
+    },
+    {
+      "at": 1793689556775,
+      "method": "thread/closed",
+      "params": {
+        "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb"
+      }
+    },
+    {
+      "at": 1793689604999,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+        "status": {
+          "type": "active",
+          "activeFlags": []
+        }
+      }
+    },
+    {
+      "at": 1793689605085,
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+        "turnId": "01a1a03b-5370-7340-915b-1e3fe0826d28",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 4,
+            "inputTokens": 2,
+            "cachedInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 2,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 2,
+            "inputTokens": 1,
+            "cachedInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 1,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "at": 1793689605092,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+        "status": {
+          "type": "idle"
+        }
+      }
+    },
+    {
+      "at": 1793689605092,
+      "method": "turn/completed",
+      "params": {
+        "threadId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+        "turn": {
+          "id": "01a1a03b-5370-7340-915b-1e3fe0826d28",
+          "items": [
+            {
+              "type": "agentMessage",
+              "id": "msg_mdh_6",
+              "text": "Local stub completed MDH-OTHER-STILL-WORKS",
+              "phase": null,
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            }
+          ],
+          "itemsView": "summary",
+          "status": "completed",
+          "error": null,
+          "startedAt": 1793689604,
+          "completedAt": 1793689605,
+          "durationMs": 102
+        }
+      }
+    }
+  ],
+  "isolation": {
+    "realSessionsUsed": false,
+    "realCredentialsUsed": false,
+    "realInferenceUsed": false,
+    "desktopPackageModified": false,
+    "sharedServerConfigured": false
+  },
+  "protectedProcesses": [
+    {
+      "pid": 44531,
+      "ppid": 1,
+      "command": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
+    },
+    {
+      "pid": 47026,
+      "ppid": 44531,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+    },
+    {
+      "pid": 68095,
+      "ppid": 78230,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex app-server --listen stdio://"
+    }
+  ],
+  "versions": {
+    "desktop": "26.1002.52244",
+    "cli": "codex-cli 0.162.0-alpha.2"
+  },
+  "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+  "otherThreadId": "01a1a039-1c27-7d93-a7bc-2c068ec62b3f",
+  "manageBackend": {
+    "status": "ready",
+    "pid": 18102,
+    "lastError": null,
+    "initialized": true
+  },
+  "lockedUI": "跳转到内容\n首页\n定时任务\n插件\n探索\n代码审查\nCodex\n新聊天\n项目\nManage Desktop Handoff Research\nMDH-MANAGE-FIRST\nMDH-OTHER-THREAD\n最近\nMDH-MANAGE-FIRST\nMDH-OTHER-THREAD\nMDH-MANAGE-FIRST\n你说：\n\nMDH-MANAGE-FIRST\n\n15:04\nChatGPT 说：\n\nLocal stub completed MDH-MANAGE-FIRST\n\n15:04\n最新一条回复\n\n\n\n\n自定义",
+  "desktopInitialComposerAbsent": false,
+  "unsubscribeAt": 1793689496763,
+  "unsubscribe": {
+    "status": "unsubscribed"
+  },
+  "unloadedAt": 1793689556862,
+  "afterUnloadRuntime": {
+    "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+    "status": "history",
+    "permissionMode": "default",
+    "activeTurnId": null,
+    "startedAt": "2026-11-03T07:04:19.582Z",
+    "updatedAt": "2026-11-03T07:05:56.775Z",
+    "lastError": null,
+    "model": "research-local-stub",
+    "modelProvider": "research",
+    "reasoningEffort": null,
+    "modelSelection": {
+      "mode": "follow_session",
+      "preferredModel": null,
+      "preferredReasoningEffort": null,
+      "actualModel": "research-local-stub",
+      "actualModelProvider": "research",
+      "actualReasoningEffort": null,
+      "actualModelSupported": null,
+      "applied": false,
+      "confirmationPending": false,
+      "updatedAt": null,
+      "lastError": null
+    },
+    "modelChangeStatus": "idle",
+    "modelChangeError": null,
+    "pendingApprovalCount": 0,
+    "eventSeq": 14
+  },
+  "summary": {
+    "pass": 5,
+    "fail": 2
+  }
+}

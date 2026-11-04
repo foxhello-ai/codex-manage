@@ -1,0 +1,25 @@
+{
+  "scope": "Supplemental startup logs only; the local model did not invoke tools. Not included in the 24 checks.",
+  "experimentDirectory": "/tmp/cdo-L10zHk",
+  "observations": [
+    {
+      "source": "flag-only-desktop.log",
+      "lines": []
+    },
+    {
+      "source": "desktop.log",
+      "lines": [
+        "[electron-message-handler] mcp_extension_tool_discovery_failed authStatus=unsupported error=\"MCP startup failed: handshaking with MCP server failed: connection closed: initialize response: connection closed: initialize response\" hostId=local pluginId=codex-app-tools@openai-bundled rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true server=codex_app",
+        "[dynamic-app-tools-native-pipe] dynamic_app_tools_peer_rejected reason=untrusted-code-signing-identity",
+        "[electron-message-handler] mcp_extension_tool_discovery_failed authStatus=unsupported error=\"MCP startup failed: Mcp error: -32603: Codex app tools pipe closed\" hostId=local pluginId=codex-app-tools@openai-bundled rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true server=codex_app"
+      ]
+    },
+    {
+      "source": "desktop-restart.log",
+      "lines": [
+        "[dynamic-app-tools-native-pipe] dynamic_app_tools_peer_rejected reason=untrusted-code-signing-identity",
+        "[electron-message-handler] mcp_extension_tool_discovery_failed authStatus=unsupported error=\"MCP startup failed: Mcp error: -32603: Codex app tools pipe closed\" hostId=local pluginId=codex-app-tools@openai-bundled rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true server=codex_app"
+      ]
+    }
+  ]
+}

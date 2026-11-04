@@ -1,0 +1,459 @@
+{
+  "date": "2026-11-03T06:13:41.667Z",
+  "root": "/tmp/cdn-VusPMW",
+  "checks": [
+    {
+      "id": "normal-private-backend",
+      "outcome": "pass",
+      "evidence": {
+        "backend": {
+          "pid": 81064,
+          "ppid": 80466,
+          "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+        }
+      }
+    },
+    {
+      "id": "desktop-existing-thread",
+      "outcome": "pass",
+      "evidence": {
+        "path": "/tmp/cdn-VusPMW/home/sessions/2026/11/03/rollout-2026-11-03T14-14-53-01a1a00b-d812-75b1-b6ae-d6f6763ed3ce.jsonl",
+        "id": "01a1a00b-d812-75b1-b6ae-d6f6763ed3ce"
+      }
+    },
+    {
+      "id": "native-queue-continues-desktop-thread",
+      "outcome": "pass",
+      "evidence": {
+        "code": 0,
+        "output": "Queued message 01a1a00c-1178-7a01-99c8-a7468f4055f8 for thread 01a1a00b-d812-75b1-b6ae-d6f6763ed3ce.\n",
+        "desktopReplyCount": 1,
+        "replyObservedAfterMs": 7831,
+        "modelRequests": [
+          {
+            "at": 1793686497748,
+            "path": "/v1/responses",
+            "marker": "DEX-DESKTOP-ONE",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE"
+            ],
+            "assistantMarkers": []
+          },
+          {
+            "at": 1793686501568,
+            "path": "/v1/responses",
+            "marker": "DEX-DESKTOP-ONE",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE"
+            ],
+            "assistantMarkers": []
+          },
+          {
+            "at": 1793686514675,
+            "path": "/v1/responses",
+            "marker": "DEX-EXTERNAL-QUEUE",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE"
+            ],
+            "assistantMarkers": [
+              "DEX-DESKTOP-ONE"
+            ]
+          },
+          {
+            "at": 1793686518444,
+            "path": "/v1/responses",
+            "marker": "DEX-DESKTOP-THREE",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE"
+            ],
+            "assistantMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE"
+            ]
+          },
+          {
+            "at": 1793686520473,
+            "path": "/v1/responses",
+            "marker": "DEX-DESKTOP-SLOW",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE",
+              "DEX-DESKTOP-SLOW"
+            ],
+            "assistantMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE"
+            ]
+          },
+          {
+            "at": 1793686528778,
+            "path": "/v1/responses",
+            "marker": "DEX-EXTERNAL-AFTER-BUSY",
+            "previousMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE",
+              "DEX-DESKTOP-SLOW",
+              "DEX-EXTERNAL-AFTER-BUSY"
+            ],
+            "assistantMarkers": [
+              "DEX-DESKTOP-ONE",
+              "DEX-EXTERNAL-QUEUE",
+              "DEX-DESKTOP-THREE",
+              "DEX-DESKTOP-SLOW"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "queue-reuses-desktop-backend",
+      "outcome": "pass",
+      "evidence": {
+        "processes": [
+          {
+            "pid": 81064,
+            "ppid": 80466,
+            "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+          }
+        ],
+        "controlSocketExists": false
+      }
+    },
+    {
+      "id": "desktop-continues-after-external-message",
+      "outcome": "pass",
+      "evidence": {
+        "at": 1793686518444,
+        "path": "/v1/responses",
+        "marker": "DEX-DESKTOP-THREE",
+        "previousMarkers": [
+          "DEX-DESKTOP-ONE",
+          "DEX-EXTERNAL-QUEUE",
+          "DEX-DESKTOP-THREE"
+        ],
+        "assistantMarkers": [
+          "DEX-DESKTOP-ONE",
+          "DEX-EXTERNAL-QUEUE"
+        ]
+      }
+    },
+    {
+      "id": "queue-during-active-desktop-turn",
+      "outcome": "pass",
+      "evidence": {
+        "code": 0,
+        "output": "Queued message 01a1a00c-449d-7cb3-aa19-5f630258a421 for thread 01a1a00b-d812-75b1-b6ae-d6f6763ed3ce.\n",
+        "request": {
+          "at": 1793686528778,
+          "path": "/v1/responses",
+          "marker": "DEX-EXTERNAL-AFTER-BUSY",
+          "previousMarkers": [
+            "DEX-DESKTOP-ONE",
+            "DEX-EXTERNAL-QUEUE",
+            "DEX-DESKTOP-THREE",
+            "DEX-DESKTOP-SLOW",
+            "DEX-EXTERNAL-AFTER-BUSY"
+          ],
+          "assistantMarkers": [
+            "DEX-DESKTOP-ONE",
+            "DEX-EXTERNAL-QUEUE",
+            "DEX-DESKTOP-THREE",
+            "DEX-DESKTOP-SLOW"
+          ]
+        }
+      }
+    },
+    {
+      "id": "same-thread-and-no-duplicates",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a1a00b-d812-75b1-b6ae-d6f6763ed3ce",
+        "counts": {
+          "DEX-DESKTOP-ONE": {
+            "user": 1,
+            "assistant": 1
+          },
+          "DEX-EXTERNAL-QUEUE": {
+            "user": 1,
+            "assistant": 1
+          },
+          "DEX-DESKTOP-THREE": {
+            "user": 1,
+            "assistant": 1
+          },
+          "DEX-DESKTOP-SLOW": {
+            "user": 1,
+            "assistant": 1
+          },
+          "DEX-EXTERNAL-AFTER-BUSY": {
+            "user": 1,
+            "assistant": 1
+          }
+        },
+        "source": "thread-records.jsonl response_item message records"
+      }
+    },
+    {
+      "id": "real-desktop-preserved",
+      "outcome": "pass",
+      "evidence": {
+        "pids": [
+          44531,
+          47026,
+          68095
+        ]
+      }
+    }
+  ],
+  "modelRequests": [
+    {
+      "at": 1793686497748,
+      "path": "/v1/responses",
+      "marker": "DEX-DESKTOP-ONE",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "at": 1793686501568,
+      "path": "/v1/responses",
+      "marker": "DEX-DESKTOP-ONE",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "at": 1793686514675,
+      "path": "/v1/responses",
+      "marker": "DEX-EXTERNAL-QUEUE",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE"
+      ],
+      "assistantMarkers": [
+        "DEX-DESKTOP-ONE"
+      ]
+    },
+    {
+      "at": 1793686518444,
+      "path": "/v1/responses",
+      "marker": "DEX-DESKTOP-THREE",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE"
+      ],
+      "assistantMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE"
+      ]
+    },
+    {
+      "at": 1793686520473,
+      "path": "/v1/responses",
+      "marker": "DEX-DESKTOP-SLOW",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE",
+        "DEX-DESKTOP-SLOW"
+      ],
+      "assistantMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE"
+      ]
+    },
+    {
+      "at": 1793686528778,
+      "path": "/v1/responses",
+      "marker": "DEX-EXTERNAL-AFTER-BUSY",
+      "previousMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE",
+        "DEX-DESKTOP-SLOW",
+        "DEX-EXTERNAL-AFTER-BUSY"
+      ],
+      "assistantMarkers": [
+        "DEX-DESKTOP-ONE",
+        "DEX-EXTERNAL-QUEUE",
+        "DEX-DESKTOP-THREE",
+        "DEX-DESKTOP-SLOW"
+      ]
+    }
+  ],
+  "isolation": {
+    "realSessionsUsed": false,
+    "realCredentialsUsed": false,
+    "realInferenceUsed": false,
+    "desktopPackageModified": false,
+    "backendReplaced": false,
+    "sharedServerConfigured": false
+  },
+  "protectedProcesses": [
+    {
+      "pid": 44531,
+      "ppid": 1,
+      "command": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"
+    },
+    {
+      "pid": 47026,
+      "ppid": 44531,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+    },
+    {
+      "pid": 68095,
+      "ppid": 78230,
+      "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex app-server --listen stdio://"
+    }
+  ],
+  "versions": {
+    "desktop": "26.1002.52244",
+    "cli": "codex-cli 0.162.0-alpha.2"
+  },
+  "desktopPid": 80466,
+  "desktopBackend": {
+    "pid": 81064,
+    "ppid": 80466,
+    "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+  },
+  "threadId": "01a1a00b-d812-75b1-b6ae-d6f6763ed3ce",
+  "beforeQueue": {
+    "processes": [
+      {
+        "pid": 80466,
+        "ppid": 80390,
+        "command": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT --user-data-dir=/tmp/cdn-VusPMW/profile --remote-debugging-port=0 --remote-debugging-address=127.0.0.1"
+      },
+      {
+        "pid": 80482,
+        "ppid": 80466,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service) --type=gpu-process --gpu-recent-crash-count=0 --user-data-dir=/tmp/cdn-VusPMW/profile --start-stack-profiler --gpu-preferences=WAAAAAAAAAAgAQAEAAAAAAAAAAAAAGAAQAAAAAAAAAADAAAAAAAAADgAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAKAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAADAAAAAEAAAAAAAAAAAAAAAgAAAAAAAAACAAAAAAAAAA= --shared-files --metrics-shmem-handle=1752395122,r,4664034568299402231,4596642434495744768,262144 --field-trial-handle=1718379636,r,17927430316145869888,3654724484087093938,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,1365945099899419013,7116996783530263627,4 --trace-process-track-uuid=3190708988185955192 --seatbelt-client=42"
+      },
+      {
+        "pid": 80483,
+        "ppid": 80466,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service) --type=utility --utility-sub-type=network.mojom.NetworkService --lang=zh-CN --service-sandbox-type=network --owl-scoped-user-agent-additional-hosts=openai.com,chatgpt.com,chatgpt.site,chatgpt-team.site --owl-scoped-user-agent-prefix=CodexBrowser --user-data-dir=/tmp/cdn-VusPMW/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --start-stack-profiler --shared-files --metrics-shmem-handle=1752395122,r,12257477041638689912,18367307972288205678,524288 --field-trial-handle=1718379636,r,17927430316145869888,3654724484087093938,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,1365945099899419013,7116996783530263627,4 --trace-process-track-uuid=3190708989122997041 --seatbelt-client=42"
+      },
+      {
+        "pid": 80489,
+        "ppid": 80466,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Service).app/Contents/MacOS/Codex (Service) --type=utility --utility-sub-type=storage.mojom.StorageService --lang=zh-CN --service-sandbox-type=service --user-data-dir=/tmp/cdn-VusPMW/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --shared-files --metrics-shmem-handle=1752395122,r,4717450082089944009,5765569726317147880,524288 --field-trial-handle=1718379636,r,17927430316145869888,3654724484087093938,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,1365945099899419013,7116996783530263627,4 --trace-process-track-uuid=3190708990060038890 --seatbelt-client=53"
+      },
+      {
+        "pid": 81048,
+        "ppid": 80466,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/native/bare-modifier-monitor --key DoubleCommand --immediate"
+      },
+      {
+        "pid": 81060,
+        "ppid": 80466,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer) --type=renderer --user-data-dir=/tmp/cdn-VusPMW/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --owl-scoped-user-agent-additional-hosts=openai.com,chatgpt.com,chatgpt.site,chatgpt-team.site --owl-scoped-user-agent-prefix=CodexBrowser --start-stack-profiler --remote-debugging-port=0 --enable-blink-features=WebMCP --disable-blink-features=ReplacedNormalFlowStackingInlinePaint --lang=zh-CN --num-raster-threads=4 --enable-zero-copy --enable-gpu-memory-buffer-compositor-resources --enable-main-frame-before-activation --renderer-client-id=7 --launch-time-ticks=606561931225 --shared-files --metrics-shmem-handle=1752395122,r,7052213792493758638,4586283246711095943,1572864 --field-trial-handle=1718379636,r,17927430316145869888,3654724484087093938,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,1365945099899419013,7116996783530263627,4 --trace-process-track-uuid=3190708992871164437 --seatbelt-client=144"
+      },
+      {
+        "pid": 81064,
+        "ppid": 80466,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+      },
+      {
+        "pid": 82254,
+        "ppid": 80466,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer) --type=renderer --user-data-dir=/tmp/cdn-VusPMW/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --owl-scoped-user-agent-additional-hosts=openai.com,chatgpt.com,chatgpt.site,chatgpt-team.site --owl-scoped-user-agent-prefix=CodexBrowser --remote-debugging-port=0 --enable-blink-features=WebMCP --disable-blink-features=ReplacedNormalFlowStackingInlinePaint --lang=zh-CN --num-raster-threads=4 --enable-zero-copy --enable-gpu-memory-buffer-compositor-resources --enable-main-frame-before-activation --renderer-client-id=9 --launch-time-ticks=606602980950 --shared-files --metrics-shmem-handle=1752395122,r,6574760263491683617,6512729294038628953,1572864 --field-trial-handle=1718379636,r,17927430316145869888,3654724484087093938,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,1365945099899419013,7116996783530263627,4 --trace-process-track-uuid=3190708994745248135 --seatbelt-client=207"
+      },
+      {
+        "pid": 82255,
+        "ppid": 80466,
+        "command": "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Versions/155.0.8059.27/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer) --type=renderer --user-data-dir=/tmp/cdn-VusPMW/profile --standard-schemes=app,codex-sandbox --service-worker-schemes=codex-sandbox --secure-schemes=app,codex-sandbox --fetch-schemes=app,codex-sandbox --cors-schemes=codex-sandbox --streaming-schemes=app,codex-sandbox --owl-scoped-user-agent-additional-hosts=openai.com,chatgpt.com,chatgpt.site,chatgpt-team.site --owl-scoped-user-agent-prefix=CodexBrowser --remote-debugging-port=0 --enable-blink-features=WebMCP --disable-blink-features=ReplacedNormalFlowStackingInlinePaint --lang=zh-CN --num-raster-threads=4 --enable-zero-copy --enable-gpu-memory-buffer-compositor-resources --enable-main-frame-before-activation --renderer-client-id=10 --launch-time-ticks=606602987227 --shared-files --metrics-shmem-handle=1752395122,r,17797300495306437202,15923852856028944638,1572864 --field-trial-handle=1718379636,r,17927430316145869888,3654724484087093938,262144 --enable-features=DevToolsWebMCPSupport,DocumentPolicyIncludeJSCallStacksInCrashReports,ReportStuckThrottle --disable-features=DropInputEventsWhilePaintHolding,WebUIOmniboxAimPopup,WebUIOmniboxPopup --variations-seed-version --pseudonymization-salt-handle=1935764596,r,1365945099899419013,7116996783530263627,4 --trace-process-track-uuid=3190708995682289984 --seatbelt-client=207"
+      },
+      {
+        "pid": 82728,
+        "ppid": 81064,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"
+      },
+      {
+        "pid": 82729,
+        "ppid": 81064,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node ./server.mjs"
+      },
+      {
+        "pid": 82730,
+        "ppid": 81064,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node ./server.mjs"
+      },
+      {
+        "pid": 82731,
+        "ppid": 81064,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node /Applications/ChatGPT.app/Contents/Resources/cua_node/lib/node_modules/@oai/cua-repl/bin/cua-repl.mjs"
+      },
+      {
+        "pid": 82791,
+        "ppid": 82731,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"
+      },
+      {
+        "pid": 83196,
+        "ppid": 81064,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"
+      }
+    ],
+    "controlSocketExists": false
+  },
+  "queue": {
+    "args": [
+      "queue",
+      "--thread",
+      "01a1a00b-d812-75b1-b6ae-d6f6763ed3ce",
+      "--message",
+      "DEX-EXTERNAL-QUEUE",
+      "-C",
+      "/tmp/cdn-VusPMW/workspace"
+    ],
+    "pid": 83817,
+    "start": 1793686507668,
+    "code": 0,
+    "signal": null,
+    "output": "Queued message 01a1a00c-1178-7a01-99c8-a7468f4055f8 for thread 01a1a00b-d812-75b1-b6ae-d6f6763ed3ce.\n",
+    "replyObservedAfterMs": 7831,
+    "afterProcesses": [
+      {
+        "pid": 81064,
+        "ppid": 80466,
+        "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+      }
+    ],
+    "controlSocketExists": false
+  },
+  "busyQueue": {
+    "args": [
+      "queue",
+      "--thread",
+      "01a1a00b-d812-75b1-b6ae-d6f6763ed3ce",
+      "--message",
+      "DEX-EXTERNAL-AFTER-BUSY",
+      "-C",
+      "/tmp/cdn-VusPMW/workspace"
+    ],
+    "pid": 84143,
+    "start": 1793686520620,
+    "code": 0,
+    "signal": null,
+    "output": "Queued message 01a1a00c-449d-7cb3-aa19-5f630258a421 for thread 01a1a00b-d812-75b1-b6ae-d6f6763ed3ce.\n"
+  },
+  "summary": {
+    "pass": 8,
+    "fail": 0
+  },
+  "postRunVerification": {
+    "reason": "Initial prompt is also the desktop sidebar and title label; original whole-page text assertion counted those labels as messages. Corrected assertion counts persisted user/assistant messages and trims the composer newline. No conversation rerun or runtime changes.",
+    "originalReport": "results-original-ui-count.json"
+  }
+}

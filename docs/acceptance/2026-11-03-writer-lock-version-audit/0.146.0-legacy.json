@@ -1,0 +1,91 @@
+{
+  "at": "2026-11-03T06:45:38.171Z",
+  "root": "/tmp/writer-version-UdCUzV",
+  "isolation": {
+    "manageCodeLoaded": false,
+    "realSessionsUsed": false,
+    "realCredentialsUsed": false,
+    "realInferenceUsed": false
+  },
+  "versions": [
+    {
+      "binary": "/tmp/codex-version-audit-hhcyozir/codex-0.146.0",
+      "version": "codex-cli 0.146.0",
+      "home": "/tmp/writer-version-UdCUzV/home-0",
+      "observations": [
+        {
+          "name": "owner_completed_turn",
+          "ok": true,
+          "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e",
+          "turnId": "01a1a028-05ec-7b32-9458-cd14d0bb1f46",
+          "status": "completed"
+        },
+        {
+          "name": "same_server_resume",
+          "ok": true,
+          "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e",
+          "sameId": true
+        },
+        {
+          "name": "different_server_read",
+          "ok": true,
+          "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e"
+        },
+        {
+          "name": "different_server_resume_while_owner_alive",
+          "ok": true,
+          "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e",
+          "sameId": true
+        },
+        {
+          "name": "different_server_turn_while_owner_alive",
+          "ok": true,
+          "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e",
+          "turnId": "01a1a028-0946-7043-8b03-7409e3f56f30",
+          "status": "completed"
+        },
+        {
+          "name": "different_server_resume_after_owner_exit",
+          "ok": true,
+          "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e",
+          "sameId": true
+        },
+        {
+          "name": "different_server_turn_after_owner_exit",
+          "ok": true,
+          "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e",
+          "turnId": "01a1a028-0a6c-7f60-97e0-114782766567",
+          "status": "completed"
+        }
+      ],
+      "pids": {
+        "a": 3463,
+        "b": 3470
+      },
+      "requestedHistoryMode": "legacy",
+      "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e",
+      "returnedHistoryMode": "legacy",
+      "stderr": {
+        "a": "{\"timestamp\":\"2026-11-03T06:45:39.282804Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"remote installed plugin bundle sync failed\",\"error\":\"chatgpt authentication required for remote plugin catalog; api key auth is not supported\"},\"target\":\"codex_core_plugins::remote::remote_installed_plugin_sync\"}\n{\"timestamp\":\"2026-11-03T06:45:39.852375Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:39.953598Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n",
+        "b": "{\"timestamp\":\"2026-11-03T06:45:39.834330Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"remote installed plugin bundle sync failed\",\"error\":\"chatgpt authentication required for remote plugin catalog; api key auth is not supported\"},\"target\":\"codex_core_plugins::remote::remote_installed_plugin_sync\"}\n{\"timestamp\":\"2026-11-03T06:45:40.568177Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:40.763800Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:40.807572Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:40.818689Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:41.101563Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:41.109871Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n"
+      }
+    }
+  ],
+  "mockRequests": [
+    {
+      "version": "codex-cli 0.146.0",
+      "marker": "VERSION-FIRST",
+      "inputContainsFirst": true
+    },
+    {
+      "version": "codex-cli 0.146.0",
+      "marker": "VERSION-SECOND",
+      "inputContainsFirst": true
+    },
+    {
+      "version": "codex-cli 0.146.0",
+      "marker": "VERSION-SECOND",
+      "inputContainsFirst": true
+    }
+  ]
+}

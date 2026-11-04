@@ -12,7 +12,11 @@ export class ApiRequestError extends Error {
   }
 }
 
-export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return requestApi<T>(path, init, true);
+}
+
+async function requestApi<T>(path: string, init: RequestInit | undefined, retryRuntimeRead: boolean): Promise<T> {
   const response = await fetch(path, {
     credentials: "include",
     headers: {
@@ -29,11 +33,20 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     } catch {
       body = undefined;
     }
+    // Config reload stops in-flight app-server reads. Retry only that known transient
+    // failure; writes and unrelated 503 responses must surface without replaying.
+    if (retryRuntimeRead && (init?.method ?? "GET").toUpperCase() === "GET" && response.status === 503
+      && ["CODEX_APP_SERVER_UNAVAILABLE", "TASK_LIST_FAILED", "TASK_DETAIL_FAILED"].includes(body?.error?.code ?? "")
+      && /^(?:app-server stopped|Codex app-server is not ready)$/i.test(body?.error?.message ?? "")
+      && !init?.signal?.aborted) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return requestApi<T>(path, init, false);
+    }
     throw new ApiRequestError(
-      body?.error.message ?? `Request failed: ${response.status}`,
+      body?.error?.message ?? `Request failed: ${response.status}`,
       response.status,
-      body?.error.code ?? "REQUEST_FAILED",
-      body?.error.details
+      body?.error?.code ?? "REQUEST_FAILED",
+      body?.error?.details
     );
   }
 
@@ -70,10 +83,14 @@ export function logout(): Promise<UserSession> {
   });
 }
 
-export function getSessions(search?: string): Promise<SessionsResponse> {
+export function getSessions(search?: string, options: { paginated?: boolean; limit?: number; cursor?: string; signal?: AbortSignal } = {}): Promise<SessionsResponse> {
   const params = new URLSearchParams();
   if (search?.trim()) params.set("search", search.trim());
-  return apiRequest<SessionsResponse>(`/api/sessions${params.size ? `?${params.toString()}` : ""}`);
+  params.set("compact", "true");
+  if (options.paginated) params.set("paginated", "true");
+  if (options.limit) params.set("limit", String(options.limit));
+  if (options.cursor) params.set("cursor", options.cursor);
+  return apiRequest<SessionsResponse>(`/api/sessions?${params.toString()}`, { signal: options.signal });
 }
 
 export function createSession(cwd: string): Promise<CreateSessionResponse> {

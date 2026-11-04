@@ -1,0 +1,102 @@
+[
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/",
+    "status": 200,
+    "ms": 21,
+    "bytes": 1072
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/src/client/App.tsx",
+    "status": 200,
+    "ms": 40,
+    "bytes": 781303
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/node_modules/.vite/deps/react-dom_client.js",
+    "status": 200,
+    "ms": 108,
+    "bytes": 1005207
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/me",
+    "status": 200,
+    "ms": 9,
+    "bytes": 169
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/config",
+    "status": 200,
+    "ms": 6,
+    "bytes": 525
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/sessions",
+    "status": 200,
+    "ms": 7349,
+    "bytes": 267911,
+    "count": 357
+  },
+  {
+    "base": "http://127.0.0.1:4310",
+    "path": "/api/tasks",
+    "status": 503,
+    "ms": 4100,
+    "bytes": 68
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/",
+    "status": 200,
+    "ms": 1434,
+    "bytes": 1072
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/src/client/App.tsx",
+    "status": 200,
+    "ms": 8265,
+    "bytes": 781303
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/node_modules/.vite/deps/react-dom_client.js",
+    "status": 200,
+    "ms": 9575,
+    "bytes": 1005207
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/me",
+    "status": 200,
+    "ms": 639,
+    "bytes": 169
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/config",
+    "status": 200,
+    "ms": 1079,
+    "bytes": 525
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/sessions",
+    "status": 200,
+    "ms": 9165,
+    "bytes": 267911,
+    "count": 357
+  },
+  {
+    "base": "https://codex.foxhello.cn",
+    "path": "/api/tasks",
+    "status": 200,
+    "ms": 5484,
+    "bytes": 1308
+  }
+]

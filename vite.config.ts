@@ -22,8 +22,16 @@ export default defineConfig(({ mode }) => {
         }
       }
     },
+    preview: {
+      host: "0.0.0.0",
+      port: 4310,
+      strictPort: true,
+      allowedHosts: ["codex.example.com", "codex.example.cn", "codex.foxhello.cn"],
+      proxy: { "/api": { target: "http://127.0.0.1:" + apiPort, ws: true } }
+    },
     build: {
-      outDir: "dist/client"
+      outDir: "dist/client",
+      rollupOptions: { output: { manualChunks: { react: ["react", "react-dom/client"] } } }
     }
   };
 });

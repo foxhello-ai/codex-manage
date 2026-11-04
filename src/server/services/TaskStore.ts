@@ -19,6 +19,10 @@ export class TaskStore {
 
   constructor(private readonly filePath: string) {}
 
+  async sessionIds(): Promise<string[]> {
+    return [...new Set(Object.values((await this.read()).tasks ?? {}).flatMap((task) => task.sessionIds))];
+  }
+
   async list(sessions: SessionSummary[]): Promise<TaskSummary[]> {
     const data = await this.read();
     return Object.values(data.tasks ?? {})

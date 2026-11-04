@@ -1,0 +1,97 @@
+Codex Manage
+⚙
+登出
+Codex
+最近会话
+⌕
+按项目目录
+按任务
+最近 10 个
+项目路径
+/tmp/cdo-L10zHk/owned-workspace · 1 个会话
+⧉
++
+
+1 个会话，默认显示最近 1 个
+
+DOR-DESKTOP-ONE
+11/03 12:29
+已选择
+
+当前会话
+
+DOR-DESKTOP-ONE
+刷新
+当前会话详情
+当前项目
+owned-workspace
+更新时间
+11/03 12:29
+会话 ID
+01a19fa9...2e13
+⧉
+加载更早 3 轮
+Turn 4
+completed
+11/03 12:27
+用户
+
+DOR-DESKTOP-SLOW
+
+Codex
+
+Local stub completed DOR-DESKTOP-SLOW
+
+Turn 5
+completed
+11/03 12:28
+用户
+
+DOR-AFTER-MANAGE-EXIT
+
+Codex
+
+Local stub completed DOR-AFTER-MANAGE-EXIT
+
+Turn 6
+completed
+11/03 12:28
+用户
+
+DOR-MANAGE-AFTER-DESKTOP-RESTART
+
+Codex
+
+Local stub completed DOR-MANAGE-AFTER-DESKTOP-RESTART
+
+Turn 7
+completed
+11/03 12:29
+用户
+
+DOR-DESKTOP-AFTER-RESTART
+
+Codex
+
+Local stub completed DOR-DESKTOP-AFTER-RESTART
+
+Turn 8
+completed
+11/03 12:29
+用户
+
+DOR-MANAGE-AFTER-ACTIVATION
+
+Codex
+
+Local stub completed DOR-MANAGE-AFTER-ACTIVATION
+
+↑
+↓
++
+状态
+已完成 · 等待输入
+research-local-stub
+low
+需审批
+›

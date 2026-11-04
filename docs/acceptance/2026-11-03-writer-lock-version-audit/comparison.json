@@ -1,0 +1,102 @@
+{
+  "cases": [
+    {
+      "version": "codex-cli 0.144.3",
+      "historyMode": "legacy",
+      "returnedHistoryMode": "legacy",
+      "crossProcessResume": {
+        "name": "different_server_resume_while_owner_alive",
+        "ok": true,
+        "threadId": "01a1a027-b3a4-7803-b53c-f1146bbf7d96",
+        "sameId": true
+      },
+      "resumeAfterOwnerExit": {
+        "name": "different_server_resume_after_owner_exit",
+        "ok": true,
+        "threadId": "01a1a027-b3a4-7803-b53c-f1146bbf7d96",
+        "sameId": true
+      },
+      "matchedExpectedBehavior": true,
+      "source": "legacy-matrix.json"
+    },
+    {
+      "version": "codex-cli 0.147.0",
+      "historyMode": "legacy",
+      "returnedHistoryMode": "legacy",
+      "crossProcessResume": {
+        "name": "different_server_resume_while_owner_alive",
+        "ok": false,
+        "error": "thread 01a1a027-ba4b-7bd2-917f-e985f70433b1 already has an active writer",
+        "rpcCode": -32600
+      },
+      "resumeAfterOwnerExit": {
+        "name": "different_server_resume_after_owner_exit",
+        "ok": true,
+        "threadId": "01a1a027-ba4b-7bd2-917f-e985f70433b1",
+        "sameId": true
+      },
+      "matchedExpectedBehavior": true,
+      "source": "legacy-matrix.json"
+    },
+    {
+      "version": "codex-cli 0.162.0-alpha.2",
+      "historyMode": "legacy",
+      "returnedHistoryMode": "legacy",
+      "crossProcessResume": {
+        "name": "different_server_resume_while_owner_alive",
+        "ok": false,
+        "error": "thread 01a1a027-c0bf-70c1-9505-d107e8b69967 already has an active writer",
+        "rpcCode": -32600
+      },
+      "resumeAfterOwnerExit": {
+        "name": "different_server_resume_after_owner_exit",
+        "ok": true,
+        "threadId": "01a1a027-c0bf-70c1-9505-d107e8b69967",
+        "sameId": true
+      },
+      "matchedExpectedBehavior": true,
+      "source": "legacy-matrix.json"
+    },
+    {
+      "version": "codex-cli 0.146.0",
+      "historyMode": "legacy",
+      "returnedHistoryMode": "legacy",
+      "crossProcessResume": {
+        "name": "different_server_resume_while_owner_alive",
+        "ok": true,
+        "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e",
+        "sameId": true
+      },
+      "resumeAfterOwnerExit": {
+        "name": "different_server_resume_after_owner_exit",
+        "ok": true,
+        "threadId": "01a1a028-058d-71a1-8925-11b3d033ef7e",
+        "sameId": true
+      },
+      "matchedExpectedBehavior": true,
+      "source": "0.146.0-legacy.json"
+    },
+    {
+      "version": "codex-cli 0.146.0",
+      "historyMode": "paginated",
+      "returnedHistoryMode": "paginated",
+      "crossProcessResume": {
+        "name": "different_server_resume_while_owner_alive",
+        "ok": false,
+        "error": "thread 01a1a028-057c-7691-813d-c8aae42fe62f already has an active writer",
+        "rpcCode": -32600
+      },
+      "resumeAfterOwnerExit": {
+        "name": "different_server_resume_after_owner_exit",
+        "ok": true,
+        "threadId": "01a1a028-057c-7691-813d-c8aae42fe62f",
+        "sameId": true
+      },
+      "matchedExpectedBehavior": true,
+      "source": "0.146.0-paginated.json"
+    }
+  ],
+  "matchedExpectedCases": 5,
+  "unexpectedResults": 0,
+  "scope": "Native CLI processes only, isolated homes and localhost model stub. Manage implementation is not loaded."
+}

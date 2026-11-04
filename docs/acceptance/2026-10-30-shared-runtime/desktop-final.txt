@@ -1,0 +1,100 @@
+跳转到内容
+首页
+定时任务
+插件
+探索
+代码审查
+Codex
+新聊天
+项目
+Shared Runtime Research
+未读
+SRF-DESKTOP-ONE
+最近
+未读
+SRF-DESKTOP-ONE
+SRF-DESKTOP-ONE
+你说：
+
+SRF-DESKTOP-SLOW-FOUR
+
+12:33
+ChatGPT 说：
+
+Local stub completed SRF-DESKTOP-SLOW-FOUR
+
+12:34
+你说：
+
+SRF-MANAGE-SLOW-INTERRUPT
+
+12:34
+你说：
+
+SRF-DESKTOP-SLOW-REATTACH
+
+12:34
+ChatGPT 说：
+
+Local stub completed SRF-DESKTOP-SLOW-REATTACH
+
+12:34
+你说：
+
+SRF-APPROVAL-DESKTOP
+
+12:34
+已运行 printf SRF-APPROVAL-DESKTOP
+ChatGPT 说：
+
+Local stub completed SRF-APPROVAL-DESKTOP
+
+12:34
+你说：
+
+SRF-DESKTOP-AFTER-MANAGE-EXIT
+
+12:34
+ChatGPT 说：
+
+Local stub completed SRF-DESKTOP-AFTER-MANAGE-EXIT
+
+12:34
+你说：
+
+SRF-APPROVAL-MANAGE
+
+12:34
+已运行 printf SRF-APPROVAL-MANAGE
+ChatGPT 说：
+
+Local stub completed SRF-APPROVAL-MANAGE
+
+12:34
+你说：
+
+SRF-DESKTOP-RECONNECTED
+
+12:35
+ChatGPT 说：
+
+Local stub completed SRF-DESKTOP-RECONNECTED
+
+12:35
+最新一条回复
+
+
+
+
+请求批准
+自定义
+轻度
+无
+极低
+轻度
+中
+高
+极高
+Max
+Ultra
+持续

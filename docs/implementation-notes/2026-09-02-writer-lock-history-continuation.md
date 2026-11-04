@@ -1,5 +1,7 @@
 # Writer lock 冲突下的历史续聊方案
 
+> 2026-10-30 补充：本文记录早期实现背景。“持锁时 Fork 也不可用”不能作为所有版本的结论；本次在 CLI `0.163.0` 和桌面内置 `0.162.0-alpha.2` 上，已验证源回合结束但仍持锁时可以原生 Fork 并继承已保存文本历史。能力范围、实验结果和后续建议见[接续技术预研](2026-10-30-session-continuation-research.md)。
+
 Linear：[`FOX-25`](https://linear.app/foxhello/issue/FOX-25/修复-active-writer-下无法-fork新建会话读取-jsonl-历史后续聊)
 
 ## 说明原因

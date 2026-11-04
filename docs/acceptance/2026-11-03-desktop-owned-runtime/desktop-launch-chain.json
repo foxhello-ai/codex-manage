@@ -1,0 +1,289 @@
+[
+  {
+    "at": 1793680004861,
+    "event": "cli_invocation",
+    "pid": 37175,
+    "ppid": 36649,
+    "args": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled"
+    ]
+  },
+  {
+    "at": 1793680004891,
+    "event": "server_spawned",
+    "pid": 37175,
+    "ppid": 36649,
+    "adapterPid": 37175,
+    "desktopPid": 36649,
+    "serverPid": 37194,
+    "socketPath": "/tmp/cdo-L10zHk/server.sock",
+    "serverArgs": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled",
+      "--listen",
+      "unix:///tmp/cdo-L10zHk/server.sock"
+    ],
+    "startedAt": 1793680004880
+  },
+  {
+    "at": 1793680004906,
+    "event": "desktop_request",
+    "pid": 37175,
+    "ppid": 36649,
+    "method": "initialize",
+    "client": "codex_desktop"
+  },
+  {
+    "at": 1793680005404,
+    "event": "desktop_bridge_connected",
+    "pid": 37175,
+    "ppid": 36649
+  },
+  {
+    "at": 1793680005441,
+    "event": "adapter_shutdown",
+    "pid": 37175,
+    "ppid": 36649,
+    "reason": "desktop_sigterm"
+  },
+  {
+    "at": 1793680009109,
+    "event": "cli_invocation",
+    "pid": 37225,
+    "ppid": 36649,
+    "args": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled",
+      "-c",
+      "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true",
+      "-c",
+      "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+    ]
+  },
+  {
+    "at": 1793680009122,
+    "event": "server_spawned",
+    "pid": 37225,
+    "ppid": 36649,
+    "adapterPid": 37225,
+    "desktopPid": 36649,
+    "serverPid": 37227,
+    "socketPath": "/tmp/cdo-L10zHk/server.sock",
+    "serverArgs": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled",
+      "-c",
+      "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true",
+      "-c",
+      "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true",
+      "--listen",
+      "unix:///tmp/cdo-L10zHk/server.sock"
+    ],
+    "startedAt": 1793680009120
+  },
+  {
+    "at": 1793680009125,
+    "event": "desktop_request",
+    "pid": 37225,
+    "ppid": 36649,
+    "method": "initialize",
+    "client": "Codex Desktop"
+  },
+  {
+    "at": 1793680009420,
+    "event": "desktop_bridge_connected",
+    "pid": 37225,
+    "ppid": 36649
+  },
+  {
+    "at": 1793680052454,
+    "event": "desktop_request",
+    "pid": 37225,
+    "ppid": 36649,
+    "method": "thread/start"
+  },
+  {
+    "at": 1793680054815,
+    "event": "desktop_request",
+    "pid": 37225,
+    "ppid": 36649,
+    "method": "thread/start"
+  },
+  {
+    "at": 1793680054877,
+    "event": "desktop_request",
+    "pid": 37225,
+    "ppid": 36649,
+    "method": "turn/start",
+    "threadId": "01a19fa9-9a33-7810-9344-39fede5db7c3"
+  },
+  {
+    "at": 1793680057168,
+    "event": "desktop_request",
+    "pid": 37225,
+    "ppid": 36649,
+    "method": "turn/start",
+    "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13"
+  },
+  {
+    "at": 1793680072846,
+    "event": "desktop_request",
+    "pid": 37225,
+    "ppid": 36649,
+    "method": "turn/start",
+    "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13"
+  },
+  {
+    "at": 1793680078479,
+    "event": "desktop_request",
+    "pid": 37225,
+    "ppid": 36649,
+    "method": "turn/start",
+    "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13"
+  },
+  {
+    "at": 1793680087966,
+    "event": "desktop_request",
+    "pid": 37225,
+    "ppid": 36649,
+    "method": "turn/start",
+    "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13"
+  },
+  {
+    "at": 1793680090390,
+    "event": "adapter_shutdown",
+    "pid": 37225,
+    "ppid": 1,
+    "reason": "desktop_stdin_closed"
+  },
+  {
+    "at": 1793680096143,
+    "event": "cli_invocation",
+    "pid": 39217,
+    "ppid": 38749,
+    "args": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled"
+    ]
+  },
+  {
+    "at": 1793680096156,
+    "event": "server_spawned",
+    "pid": 39217,
+    "ppid": 38749,
+    "adapterPid": 39217,
+    "desktopPid": 38749,
+    "serverPid": 39218,
+    "socketPath": "/tmp/cdo-L10zHk/server.sock",
+    "serverArgs": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled",
+      "--listen",
+      "unix:///tmp/cdo-L10zHk/server.sock"
+    ],
+    "startedAt": 1793680096155
+  },
+  {
+    "at": 1793680096160,
+    "event": "desktop_request",
+    "pid": 39217,
+    "ppid": 38749,
+    "method": "initialize",
+    "client": "codex_desktop"
+  },
+  {
+    "at": 1793680096273,
+    "event": "desktop_bridge_connected",
+    "pid": 39217,
+    "ppid": 38749
+  },
+  {
+    "at": 1793680096299,
+    "event": "adapter_shutdown",
+    "pid": 39217,
+    "ppid": 38749,
+    "reason": "desktop_sigterm"
+  },
+  {
+    "at": 1793680099468,
+    "event": "cli_invocation",
+    "pid": 39239,
+    "ppid": 38749,
+    "args": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled",
+      "-c",
+      "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true",
+      "-c",
+      "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+    ]
+  },
+  {
+    "at": 1793680099486,
+    "event": "server_spawned",
+    "pid": 39239,
+    "ppid": 38749,
+    "adapterPid": 39239,
+    "desktopPid": 38749,
+    "serverPid": 39240,
+    "socketPath": "/tmp/cdo-L10zHk/server.sock",
+    "serverArgs": [
+      "-c",
+      "features.code_mode_host=true",
+      "app-server",
+      "--analytics-default-enabled",
+      "-c",
+      "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true",
+      "-c",
+      "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true",
+      "--listen",
+      "unix:///tmp/cdo-L10zHk/server.sock"
+    ],
+    "startedAt": 1793680099480
+  },
+  {
+    "at": 1793680099493,
+    "event": "desktop_request",
+    "pid": 39239,
+    "ppid": 38749,
+    "method": "initialize",
+    "client": "Codex Desktop"
+  },
+  {
+    "at": 1793680099659,
+    "event": "desktop_bridge_connected",
+    "pid": 39239,
+    "ppid": 38749
+  },
+  {
+    "at": 1793680146544,
+    "event": "desktop_request",
+    "pid": 39239,
+    "ppid": 38749,
+    "method": "thread/resume",
+    "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13"
+  },
+  {
+    "at": 1793680149502,
+    "event": "desktop_request",
+    "pid": 39239,
+    "ppid": 38749,
+    "method": "turn/start",
+    "threadId": "01a19fa9-90f5-77e0-bcf9-794d911d2e13"
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "desktopPid": 35999,
+  "child": {
+    "pid": 36489,
+    "ppid": 35999,
+    "command": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex -c features.code_mode_host=true app-server --analytics-default-enabled -c plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled=true -c plugins.code-review@openai-bundled.mcp_servers.code-review.enabled=true"
+  },
+  "controlSocketExists": false
+}

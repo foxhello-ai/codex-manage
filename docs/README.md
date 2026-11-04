@@ -25,6 +25,13 @@
 
 - [`implementation-notes/2026-11-03-desktop-session-handoff.md`](implementation-notes/2026-11-03-desktop-session-handoff.md)：桌面原会话文字投递、双端持久消息同步、Manage 空闲释放的实现、兼容边界和隔离验收方式。
 - [`implementation-notes/`](implementation-notes/)：按日期的调研、实现和问题修复记录。若项目级状态与笔记冲突，以日期更晚、且包含实现和验证记录的笔记为准，并在项目级文档中回写确认结论。
+- [`implementation-notes/2026-10-30-session-continuation-research.md`](implementation-notes/2026-10-30-session-continuation-research.md)：持锁会话接续预研；验证同服务恢复、跨服务原生 Fork 与历史继承，提出逻辑会话恢复链和共享运行时方案，修正早期笔记的版本范围。
+- [`implementation-notes/2026-10-30-shared-runtime-feasibility.md`](implementation-notes/2026-10-30-shared-runtime-feasibility.md)：独立验证项 SRF-01；真实官方桌面与当前 Manage 接入同一服务，验证双向消息、运行状态、中断、审批及重连，记录产品同步缺口与复现证据。
+- [`implementation-notes/2026-11-03-desktop-owned-runtime-feasibility.md`](implementation-notes/2026-11-03-desktop-owned-runtime-feasibility.md)：独立验证项 SRF-02；验证官方桌面通过启动适配器创建唯一后台、Manage 随后接入，以及双方退出、重启与原会话恢复的边界。
+- [`implementation-notes/2026-11-03-desktop-native-continuation.md`](implementation-notes/2026-11-03-desktop-native-continuation.md)：保持桌面原有启动方式和后台，实测内置 `codex queue` 从外部续聊桌面既有 thread；覆盖空闲投递、运行中排队与上下文保留，区分原生发送能力和 Manage 尚待实现的接入。
+- [`implementation-notes/2026-11-03-writer-lock-upgrade-history.md`](implementation-notes/2026-11-03-writer-lock-upgrade-history.md)：走查 Git 与官方版本变更，实测 `0.144.3`、`0.146.0`、`0.147.0` 和桌面内置版，确认升级引入单写入者限制及 Manage 的接入适配缺口。
+- [`implementation-notes/2026-11-03-manage-writer-release.md`](implementation-notes/2026-11-03-manage-writer-release.md)：验证 Manage 先持有写入权时桌面的冲突，以及取消订阅后按 thread 释放、保留后台和上下文的可行性；明确当前产品尚未自动释放、桌面界面自动恢复尚未验收。
+- [`implementation-notes/2026-11-03-desktop-service-and-session-release-proposal.md`](implementation-notes/2026-11-03-desktop-service-and-session-release-proposal.md)：待审核方案；整合桌面原后台的 queue 续聊、被动消息同步和 Manage 空闲释放写入权，列出能力边界、改造范围及验收门禁。
 - [`implementation-notes/2026-09-02-writer-lock-history-continuation.md`](implementation-notes/2026-09-02-writer-lock-history-continuation.md)：记录 active writer 下 Fork 失败的原因，以及不等待源 thread 锁、通过新会话读取 JSONL 历史后继续的实现方案。
 - [`incidents/`](incidents/)：故障记录索引。
 - [`acceptance/`](acceptance/)：Web/H5 与模型切换的验收截图。

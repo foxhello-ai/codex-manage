@@ -1,0 +1,93 @@
+{
+  "originalReportPreserved": true,
+  "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+  "desktopWriterConflict": {
+    "confirmed": true,
+    "matches": [
+      {
+        "line": 472,
+        "text": "[electron-message-handler] Request failed conversationId=01a1a039-1b53-7df2-9417-8cb7a79c89bb durationMs=62 error={\"code\":-32600,\"message\":\"thread 01a1a039-1b53-7df2-9417-8cb7a79c89bb already has an active writer\"} failureReason=null id=thread/resume:a108fd3e-a08a-4166-841b-b86b556d33e7 method=thread/resume pendingCountAfter=0 priority=critical queueWaitMs=1 rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true source=thread_hydration spanId=null timeoutMs=120000 traceId=null"
+      },
+      {
+        "line": 477,
+        "text": "[electron-message-handler] Failed to resume conversation conversationId=01a1a039-1b53-7df2-9417-8cb7a79c89bb errorCode=-32600 errorMessage=\"thread 01a1a039-1b53-7df2-9417-8cb7a79c89bb already has an active writer\" errorName=Error errorStack=\"Error: thread 01a1a039-1b53-7df2-9417-8cb7a79c89bb already has an active writer\\n    at e.evaluateImpl (app://-/assets/app-shared-6c00c2afcf84.js:422:43060)\\n    at e.evaluateWithDepth (app://-/assets/app-shared-6c00c2afcf84.js:422:40788)\\n    at e.evaluate (app://-/assets/app-shared-6c00c2afcf84.js:422:40671)\\n    at WFt.readLoop (app://-/assets/app-shared-6c00c2afcf84.js:422:57524)\" rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true"
+      },
+      {
+        "line": 488,
+        "text": "[electron-message-handler] Request failed conversationId=01a1a039-1b53-7df2-9417-8cb7a79c89bb durationMs=46 error={\"code\":-32600,\"message\":\"thread 01a1a039-1b53-7df2-9417-8cb7a79c89bb already has an active writer\"} failureReason=null id=thread/resume:f310c28f-869d-4b8c-8079-6264c913d999 method=thread/resume pendingCountAfter=0 priority=critical queueWaitMs=1 rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true source=thread_hydration spanId=null timeoutMs=120000 traceId=null"
+      },
+      {
+        "line": 490,
+        "text": "[electron-message-handler] Failed to load older thread history conversationId=01a1a039-1b53-7df2-9417-8cb7a79c89bb errorCode=-32600 errorMessage=\"thread 01a1a039-1b53-7df2-9417-8cb7a79c89bb already has an active writer\" errorName=Error errorStack=\"Error: thread 01a1a039-1b53-7df2-9417-8cb7a79c89bb already has an active writer\\n    at e.evaluateImpl (app://-/assets/app-shared-6c00c2afcf84.js:422:43060)\\n    at e.evaluateWithDepth (app://-/assets/app-shared-6c00c2afcf84.js:422:40788)\\n    at e.evaluate (app://-/assets/app-shared-6c00c2afcf84.js:422:40671)\\n    at WFt.readLoop (app://-/assets/app-shared-6c00c2afcf84.js:422:57524)\" rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true"
+      },
+      {
+        "line": 652,
+        "text": "[electron-message-handler] remote_connections.connection_state_changed error={\"code\":\"connection-failed\",\"message\":\"{\\\"timestamp\\\":\\\"2026-11-03T07:05:08.239584Z\\\",\\\"level\\\":\\\"ERROR\\\",\\\"fields\\\":{\\\"message\\\":\\\"Failed to create session: thread-store conflict: thread 01a1a039-1b53-7df2-9417-8cb7a79c89bb already has an active writer\\\"},\\\"target\\\":\\\"codex_core::session\\\"}\"} hostId=local progress=null rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true state=connected"
+      },
+      {
+        "line": 653,
+        "text": "[electron-message-handler] remote_connections.manager_state_set hostId=local nextError={\"code\":\"connection-failed\",\"message\":\"{\\\"timestamp\\\":\\\"2026-11-03T07:05:08.239584Z\\\",\\\"level\\\":\\\"ERROR\\\",\\\"fields\\\":{\\\"message\\\":\\\"Failed to create session: thread-store conflict: thread 01a1a039-1b53-7df2-9417-8cb7a79c89bb already has an active writer\\\"},\\\"target\\\":\\\"codex_core::session\\\"}\"} nextState=connected previousError=null previousState=disconnected rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true source=host_connection_state_changed"
+      },
+      {
+        "line": 763,
+        "text": "[electron-message-handler] remote_connections.manager_state_set hostId=local nextError={\"code\":\"connection-failed\",\"message\":\"{\\\"timestamp\\\":\\\"2026-11-03T07:06:07.236541Z\\\",\\\"level\\\":\\\"WARN\\\",\\\"fields\\\":{\\\"message\\\":\\\"remote installed plugin bundle sync failed\\\",\\\"error\\\":\\\"chatgpt authentication required for remote plugin catalog; api key auth is not supported\\\"},\\\"target\\\":\\\"codex_core_plugins::manager\\\"}\"} nextState=connected previousError={\"code\":\"connection-failed\",\"message\":\"{\\\"timestamp\\\":\\\"2026-11-03T07:05:08.239584Z\\\",\\\"level\\\":\\\"ERROR\\\",\\\"fields\\\":{\\\"message\\\":\\\"Failed to create session: thread-store conflict: thread 01a1a039-1b53-7df2-9417-8cb7a79c89bb already has an active writer\\\"},\\\"target\\\":\\\"codex_core::session\\\"}\"} previousState=connected rendererWebContentsId=1 rendererWindowAppearance=primary rendererWindowFocused=false rendererWindowId=1 rendererWindowVisible=true source=host_connection_state_changed"
+      }
+    ]
+  },
+  "originalAssertionNotes": {
+    "desktop-encounters-manage-writer": "Early 4.5s assertion ran before deferred hydration. Later same-run log confirms conflict on original ID.",
+    "desktop-continues-original-after-release": "Not verified. Visible response belonged to another new thread; its request lacked original context."
+  },
+  "defaultUnloadCheck": {
+    "id": "default-delay-releases-one-thread",
+    "outcome": "pass",
+    "evidence": {
+      "elapsedMs": 60099,
+      "remainingLoadedThreads": [
+        "01a1a039-1c27-7d93-a7bc-2c068ec62b3f"
+      ],
+      "backend": {
+        "status": "ready",
+        "pid": 18102,
+        "lastError": null,
+        "initialized": true
+      },
+      "runtimeAfterUnload": {
+        "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb",
+        "status": "history",
+        "permissionMode": "default",
+        "activeTurnId": null,
+        "startedAt": "2026-11-03T07:04:19.582Z",
+        "updatedAt": "2026-11-03T07:05:56.775Z",
+        "lastError": null,
+        "model": "research-local-stub",
+        "modelProvider": "research",
+        "reasoningEffort": null,
+        "modelSelection": {
+          "mode": "follow_session",
+          "preferredModel": null,
+          "preferredReasoningEffort": null,
+          "actualModel": "research-local-stub",
+          "actualModelProvider": "research",
+          "actualReasoningEffort": null,
+          "actualModelSupported": null,
+          "applied": false,
+          "confirmationPending": false,
+          "updatedAt": null,
+          "lastError": null
+        },
+        "modelChangeStatus": "idle",
+        "modelChangeError": null,
+        "pendingApprovalCount": 0,
+        "eventSeq": 14
+      },
+      "closedNotification": {
+        "at": 1793689556775,
+        "method": "thread/closed",
+        "params": {
+          "threadId": "01a1a039-1b53-7df2-9417-8cb7a79c89bb"
+        }
+      }
+    }
+  }
+}

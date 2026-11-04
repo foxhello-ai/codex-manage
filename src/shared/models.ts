@@ -124,6 +124,7 @@ export type CreateSessionResponse = {
 };
 
 export type SessionsResponse = {
+  nextCursor?: string | null;
   sessions: SessionSummary[];
 };
 

@@ -1,0 +1,1028 @@
+{
+  "config": {
+    "argv": [
+      "/Users/fumingzhen/.nvm/versions/node/v22.22.0/bin/node",
+      "/Volumes/T7/project/project_fmzh/2026/codex-manage/node_modules/.bin/playwright",
+      "test",
+      "--config",
+      "playwright.ui.config.ts",
+      "--project=landscape-736",
+      "--project=landscape-844"
+    ],
+    "configFile": "/Volumes/T7/project/project_fmzh/2026/codex-manage/playwright.ui.config.ts",
+    "rootDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-320",
+        "name": "mobile-320",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-375",
+        "name": "mobile-375",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-390",
+        "name": "mobile-390",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-430",
+        "name": "mobile-430",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "iphone-16-pro",
+        "name": "iphone-16-pro",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "landscape-736",
+        "name": "landscape-736",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "landscape-844",
+        "name": "landscape-844",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "desktop",
+        "name": "desktop",
+        "testDir": "/Volumes/T7/project/project_fmzh/2026/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report/ui",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "docs/acceptance/2026-11-03-h5-ui-refinement/playwright-landscape-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 2,
+    "webServer": {
+      "command": "npx vite preview --host 127.0.0.1 --port 4317 --strictPort",
+      "url": "http://127.0.0.1:4317",
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "h5-ui.e2e.ts",
+      "file": "h5-ui.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "three list views, search, rename and ordinary directory selection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7620,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:56:42.318Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-48c2306eda47be6ca11e",
+          "file": "h5-ui.e2e.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "task grouping, pin, attach, and recent/history/manual task directories",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5972,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:56:50.854Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-3c9d2b21f99ce2b30e59",
+          "file": "h5-ui.e2e.ts",
+          "line": 86,
+          "column": 1
+        },
+        {
+          "title": "full replies, local code scrolling, process collapse and stable history reading",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8083,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:56:56.900Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-eb74ae64cc54a4672879",
+          "file": "h5-ui.e2e.ts",
+          "line": 126,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9080,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:05.046Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-c678246656eb43309a19",
+          "file": "h5-ui.e2e.ts",
+          "line": 170,
+          "column": 1
+        },
+        {
+          "title": "approval accept preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6230,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:14.159Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-9ee83b63fe6324a81060",
+          "file": "h5-ui.e2e.ts",
+          "line": 229,
+          "column": 3
+        },
+        {
+          "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4464,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:20.525Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-c8f6ae843cd3cb5409fd",
+          "file": "h5-ui.e2e.ts",
+          "line": 229,
+          "column": 3
+        },
+        {
+          "title": "approval decline preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4747,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:25.148Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-dd5765126ba06cc5a347",
+          "file": "h5-ui.e2e.ts",
+          "line": 229,
+          "column": 3
+        },
+        {
+          "title": "approval cancel preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4133,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:29.945Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-fbe83c354c5e36b7bf56",
+          "file": "h5-ui.e2e.ts",
+          "line": 229,
+          "column": 3
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2678,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:34.122Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-247bb09a2b8dd429c969",
+          "file": "h5-ui.e2e.ts",
+          "line": 255,
+          "column": 1
+        },
+        {
+          "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3867,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:36.862Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-295b6e439ccd20749a54",
+          "file": "h5-ui.e2e.ts",
+          "line": 275,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3252,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:40.763Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-7f44d6287564a490be68",
+          "file": "h5-ui.e2e.ts",
+          "line": 323,
+          "column": 1
+        },
+        {
+          "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-736",
+              "projectName": "landscape-736",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1887,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:44.062Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-98765094d344fe8c5d8c",
+          "file": "h5-ui.e2e.ts",
+          "line": 340,
+          "column": 1
+        },
+        {
+          "title": "three list views, search, rename and ordinary directory selection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 7580,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:56:42.385Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-31bd437a798e3008f696",
+          "file": "h5-ui.e2e.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "task grouping, pin, attach, and recent/history/manual task directories",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 6090,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:56:50.812Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-38455aa48fcb31c5fe01",
+          "file": "h5-ui.e2e.ts",
+          "line": 86,
+          "column": 1
+        },
+        {
+          "title": "full replies, local code scrolling, process collapse and stable history reading",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 7835,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:56:56.991Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-15f71fa79999f65b9250",
+          "file": "h5-ui.e2e.ts",
+          "line": 126,
+          "column": 1
+        },
+        {
+          "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 8630,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:04.889Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-713a69b07b0b7b3a06a8",
+          "file": "h5-ui.e2e.ts",
+          "line": 170,
+          "column": 1
+        },
+        {
+          "title": "approval accept preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 6085,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:13.603Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-600fa7179e4da47530ac",
+          "file": "h5-ui.e2e.ts",
+          "line": 229,
+          "column": 3
+        },
+        {
+          "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4480,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:19.735Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-dc2c668e8106128db1cf",
+          "file": "h5-ui.e2e.ts",
+          "line": 229,
+          "column": 3
+        },
+        {
+          "title": "approval decline preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 4492,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:24.338Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-2fdb2a3d63b348c13c6a",
+          "file": "h5-ui.e2e.ts",
+          "line": 229,
+          "column": 3
+        },
+        {
+          "title": "approval cancel preserves its API meaning; closing submits nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 3883,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:28.914Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-21caad81628ad5f1e8b1",
+          "file": "h5-ui.e2e.ts",
+          "line": 229,
+          "column": 3
+        },
+        {
+          "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2735,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:32.945Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-d899cb18e24a90f76b3b",
+          "file": "h5-ui.e2e.ts",
+          "line": 255,
+          "column": 1
+        },
+        {
+          "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 3474,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:35.715Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-53589b8f239d65620b60",
+          "file": "h5-ui.e2e.ts",
+          "line": 275,
+          "column": 1
+        },
+        {
+          "title": "successful send clears the draft and attachments without adding reply action bars",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2931,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:39.221Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-f6579bdcddd494670003",
+          "file": "h5-ui.e2e.ts",
+          "line": 323,
+          "column": 1
+        },
+        {
+          "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "landscape-844",
+              "projectName": "landscape-844",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2153,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-03T09:57:42.245Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8f5624c2d1e3d282901b-8cbcd24976795e93586a",
+          "file": "h5-ui.e2e.ts",
+          "line": 340,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-03T09:56:33.920Z",
+    "duration": 72643.632,
+    "expected": 24,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

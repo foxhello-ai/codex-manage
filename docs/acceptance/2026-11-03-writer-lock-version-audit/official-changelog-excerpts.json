@@ -1,0 +1,12 @@
+[
+  {
+    "url": "https://developers.openai.com/codex/changelog",
+    "release": "2026-07-29 Codex CLI 0.146.0",
+    "excerpt": "leted agent config imports @copyberry #34986 Enforce single-writer ownership for paginated threads @copyberry #34989 Preserve timestamps when import"
+  },
+  {
+    "url": "https://developers.openai.com/codex/changelog",
+    "release": "2026-08-07 Codex CLI 0.147.0",
+    "excerpt": " details in turn analytics @copyberry #36389 Enforce single-writer ownership for all thread histories @copyberry #36393 Avoid redundant filesystem prob"
+  }
+]

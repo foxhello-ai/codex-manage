@@ -94,6 +94,73 @@ describe("SessionService", () => {
     ]);
   });
 
+  it("loads only one cursor page for the recent library", async () => {
+    const calls: unknown[] = [];
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready" as const, pid: 1, lastError: null, initialized: true }),
+      request: async <T = unknown>(_method: string, params?: unknown) => {
+        calls.push(params);
+        const cursor = (params as { cursor: string | null }).cursor;
+        return { data: [{ id: cursor ? "older" : "latest", preview: "title" }], nextCursor: cursor ? null : "page-2" } as T;
+      }
+    });
+    await expect(service.listSessionPage()).resolves.toMatchObject({ sessions: [{ id: "latest" }], nextCursor: "page-2" });
+    expect(calls).toHaveLength(1);
+    await expect(service.listSessionPage({ cursor: "page-2" })).resolves.toMatchObject({ sessions: [{ id: "older" }], nextCursor: null });
+    expect(calls).toMatchObject([{ limit: 30, cursor: null }, { limit: 30, cursor: "page-2" }]);
+  });
+
+  it("reads only task references and never scans unrelated sessions", async () => {
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready" as const, pid: 1, lastError: null, initialized: true }),
+      request: async <T = unknown>(method: string, params?: unknown) => {
+        calls.push({ method, params });
+        if (method !== "thread/read") throw new Error("must not scan history");
+        const id = (params as { threadId: string }).threadId;
+        if (id === "deleted") throw new Error("Thread not found");
+        return { thread: { id, preview: "task session" } } as T;
+      }
+    });
+    await expect(service.getSessionSummaries(["older", "deleted", "older", "another"])).resolves.toMatchObject([{ id: "older" }, { id: "another" }]);
+    expect(calls).toHaveLength(3);
+    expect(calls.every((call) => call.method === "thread/read" && (call.params as { includeTurns: boolean }).includeTurns === false)).toBe(true);
+  });
+
+  it("shares full scans, reuses search data, and reads current metadata", async () => {
+    let calls = 0;
+    const entries: Record<string, { remarkTitle: string | null }> = {};
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready" as const, pid: 1, lastError: null, initialized: true }),
+      request: async <T = unknown>() => { calls++; return { data: [{ id: "one", preview: "original" }] } as T; }
+    }, metadataStore(entries));
+    await Promise.all([service.listSessions(), service.listSessions({ limit: 1000 })]);
+    expect(calls).toBe(1);
+    entries.one = { remarkTitle: "new title" };
+    await expect(service.listSessions({ search: "new title" })).resolves.toMatchObject([{ id: "one", title: "new title" }]);
+    expect(calls).toBe(1);
+    service.invalidateList();
+    await service.listSessions();
+    expect(calls).toBe(2);
+  });
+
+  it("retries failed scans and does not reuse data after an app-server restart", async () => {
+    let calls = 0;
+    let pid = 1;
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready" as const, pid, lastError: null, initialized: true }),
+      request: async <T = unknown>() => {
+        if (++calls === 1) throw new Error("temporary failure");
+        return { data: [{ id: `thread-${pid}`, preview: "title" }] } as T;
+      }
+    });
+    await expect(service.listSessions()).rejects.toThrow("temporary failure");
+    await expect(service.listSessions()).resolves.toMatchObject([{ id: "thread-1" }]);
+    pid = 2;
+    await expect(service.listSessions()).resolves.toMatchObject([{ id: "thread-2" }]);
+    expect(calls).toBe(3);
+  });
+
   it("deduplicates continuation records for the same logical session", async () => {
     const service = new SessionService(
       readyClient({
@@ -216,7 +283,7 @@ describe("SessionService", () => {
     const store = metadataStore();
     const service = new SessionService(
       readyClient({
-        data: [{ id: "thread-1", sessionId: "session-1", preview: "default preview", cwd: "/a", createdAt: 1, updatedAt: 2 }]
+        thread: { id: "thread-1", sessionId: "session-1", preview: "default preview", cwd: "/a", createdAt: 1, updatedAt: 2 }
       }),
       store
     );
