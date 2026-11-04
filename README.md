@@ -1,10 +1,10 @@
 # Codex Manage
 
-`main` 分支提供单体 Web 版本：一个 Fastify 服务托管 React 页面，并在同一台 Linux 主机上启动宿主机的 `codex app-server`。它不包含桌面客户端、Cloudflare Tunnel、运营后台、支付或云端控制面。
+`main` 分支提供单体 Web 版本：一个 Fastify 服务托管 React 页面，并在同一台主机上启动宿主机的 `codex app-server`。安装器支持 Linux/systemd 和 macOS/launchd。它不包含桌面客户端、Cloudflare Tunnel、运营后台、支付或云端控制面。
 
 ## 产品全局架构与分支边界
 
-下图描述的是产品全貌，不表示所有组件已经合入当前 `main`。`main` 是 Linux Runtime 与 Web/H5 的稳定线；Desktop、Cloud Platform 及其支付、域名配置能力仍以各自的候选分支为实现来源，合并与发布必须经版本门禁确认。
+下图描述的是产品全貌，不表示所有组件已经合入当前 `main`。`main` 是 Web Runtime（Linux/macOS）与 Web/H5 的稳定线；Desktop、Cloud Platform 及其支付、域名配置能力仍以各自的候选分支为实现来源，合并与发布必须经版本门禁确认。
 
 ```mermaid
 flowchart TB

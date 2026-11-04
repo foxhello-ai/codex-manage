@@ -44,4 +44,8 @@ sudo bash ./install-runtime.sh --user <实际运行用户> --package ./codex-man
 
 自动验收使用 Ubuntu 24.04、Node.js 22 和官方 Codex CLI 0.163.0。它验证真实 systemd、安装包与 app-server 启动，使用新建的隔离 Linux 用户，不使用真实 ChatGPT/Codex 账号、不调用真实模型。会话目录保留检查使用专用标记文件，不代表对真实工程会话和工具副作用的验收。
 
-桌面续聊的双端验收仍以已记录的 macOS 官方桌面独立 profile 和模拟模型结果为准，不能由 Linux 安装通过推定真实账号续聊已验收。当前一键安装脚本只支持 Linux；macOS/Windows 原生安装包属于单独发布线。
+桌面续聊的双端验收仍以已记录的 macOS 官方桌面独立 profile 和模拟模型结果为准，不能由 Linux 安装通过推定真实账号续聊已验收。本次 Release 内附的一键安装脚本仅支持 Linux；macOS/Windows 原生桌面安装包属于单独发布线。
+
+## 发布后的安装器修订
+
+2026-11-04，`main` 安装器补充 macOS launchd 支持，可安装同一份 `v1.0.9` Web Runtime。macOS 使用当前用户执行，不使用 `sudo` 或 `--user deploy`。`v1.0.9` Release 内的旧安装器未修改，Mac 需从 `main` 获取新脚本；不能用本次修订推定旧 Release 已包含 macOS 安装器。具体命令及 Intel、Apple arm64、Linux 回归证据见 [macOS 安装验收](../acceptance/2026-11-04-macos-runtime-installation/README.md)。
