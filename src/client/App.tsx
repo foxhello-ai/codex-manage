@@ -2385,7 +2385,13 @@ function SessionDetailPanel({
   const pendingHistoryLoadRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
   const [timelineScrollState, setTimelineScrollState] = useState({ canScrollUp: false, canScrollDown: false });
   const hasVisibleHistory = Boolean(detail?.turns.some((turn) => turn.items.some((item) => item.type !== "unknown" && item.type !== "file_change")));
+  const desktopQueueErrorIds = new Set(runtime?.executionSource === "external_queue"
+    ? liveErrors.filter((notice) => notice.code === "DESKTOP_QUEUE_TEXT_ONLY" || notice.code === "SESSION_ACTIVE_WRITER").map((notice) => notice.id)
+    : []);
+  const visibleRuntimeError = liveErrors.some((notice) => desktopQueueErrorIds.has(notice.id) && notice.message === runtimeError)
+    ? null : runtimeError;
   const visibleLiveTimeline = liveTimeline.filter((entry) => {
+    if (entry.kind === "error") return !desktopQueueErrorIds.has(entry.id);
     if (entry.kind !== "command") return true;
     const command = liveCommands.find((item) => item.id === entry.id);
     const activeRuntime = runtime?.status === "starting" || runtime?.status === "running" || runtime?.status === "waiting_approval";
@@ -2610,7 +2616,7 @@ function SessionDetailPanel({
           : runtime?.leaseStatus === "released" ? <div className="composerWarning" role="status">已释放占用，可在桌面继续原会话。</div>
           : runtime?.leaseStatus === "blocked" ? <div className="composerWarning" role="status">暂未释放：{runtime.leaseReason}</div> : null}
         {sessionNotice ? <div className="successBanner composerWarning" role="status">{sessionNotice}</div> : null}
-        {runtimeError && !(timelineAtLatestRef.current && liveErrors.some((notice) => notice.message === runtimeError && visibleLiveTimeline.some((entry) => entry.kind === "error" && entry.id === notice.id))) ? <div className="errorBanner composerWarning" role="alert">{runtimeError}</div> : null}
+        {visibleRuntimeError && !(timelineAtLatestRef.current && liveErrors.some((notice) => notice.message === visibleRuntimeError && visibleLiveTimeline.some((entry) => entry.kind === "error" && entry.id === notice.id))) ? <div className="errorBanner composerWarning" role="alert">{visibleRuntimeError}</div> : null}
         {runtime?.permissionMode === "full_access" && pendingApprovals.length > 0 ? (
           <div className="errorBanner composerWarning" role="alert">完全权限模式收到未预期的审批请求，系统未自动处理；你仍可拒绝或取消该请求。</div>
         ) : null}
