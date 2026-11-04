@@ -1,0 +1,97 @@
+Codex Manage
+⚙
+登出
+Codex
+最近会话
+⌕
+按项目目录
+按任务
+最近 10 个
+项目路径
+/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/codex-shared-feasibility-Qze401/workspace · 1 个会话
+⧉
++
+
+1 个会话，默认显示最近 1 个
+
+SRF-DESKTOP-ONE
+10/30 12:35
+已选择
+
+当前会话
+
+SRF-DESKTOP-ONE
+刷新
+当前会话详情
+当前项目
+workspace
+更新时间
+10/30 12:35
+会话 ID
+01a18b15...d2ce
+⧉
+加载更早 5 轮
+Turn 6
+completed
+10/30 12:34
+用户
+
+SRF-DESKTOP-SLOW-REATTACH
+
+Codex
+
+Local stub completed SRF-DESKTOP-SLOW-REATTACH
+
+Turn 7
+completed
+10/30 12:34
+用户
+
+SRF-APPROVAL-DESKTOP
+
+Codex
+
+Local stub completed SRF-APPROVAL-DESKTOP
+
+Turn 8
+completed
+10/30 12:34
+用户
+
+SRF-DESKTOP-AFTER-MANAGE-EXIT
+
+Codex
+
+Local stub completed SRF-DESKTOP-AFTER-MANAGE-EXIT
+
+Turn 9
+completed
+10/30 12:34
+用户
+
+SRF-APPROVAL-MANAGE
+
+Codex
+
+Local stub completed SRF-APPROVAL-MANAGE
+
+Turn 10
+completed
+10/30 12:35
+用户
+
+SRF-DESKTOP-RECONNECTED
+
+Codex
+
+Local stub completed SRF-DESKTOP-RECONNECTED
+
+↑
+↓
++
+状态
+已完成 · 等待输入
+research-local-stub
+low
+需审批
+›

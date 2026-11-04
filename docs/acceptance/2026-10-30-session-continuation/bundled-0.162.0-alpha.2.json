@@ -1,0 +1,248 @@
+[
+  {
+    "name": "legacy_start",
+    "ok": true,
+    "threadId": "01a18aab-8323-7823-8399-9a5d1cb13d8d",
+    "path": "/private/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/codex-continuation-probe-eEHWsG/codex-home/sessions/2026/10/30/rollout-2026-10-30T10-37-38-01a18aab-8323-7823-8399-9a5d1cb13d8d.jsonl",
+    "historyMode": "legacy"
+  },
+  {
+    "name": "legacy_synthetic_completed_turn",
+    "ok": true,
+    "turnStatus": "completed",
+    "turnError": null
+  },
+  {
+    "name": "legacy_same_server_resume",
+    "ok": true,
+    "threadId": "01a18aab-8323-7823-8399-9a5d1cb13d8d",
+    "sameId": true
+  },
+  {
+    "name": "legacy_different_server_read",
+    "ok": true,
+    "threadId": "01a18aab-8323-7823-8399-9a5d1cb13d8d"
+  },
+  {
+    "name": "legacy_different_server_resume",
+    "ok": false,
+    "error": "thread 01a18aab-8323-7823-8399-9a5d1cb13d8d already has an active writer",
+    "rpcCode": -32600
+  },
+  {
+    "name": "legacy_different_server_fork",
+    "ok": true,
+    "threadId": "01a18aab-83f3-72e1-96b7-38766bddd1f0",
+    "sameId": false,
+    "forkedFromId": "01a18aab-8323-7823-8399-9a5d1cb13d8d"
+  },
+  {
+    "name": "legacy_fork_context_continuity",
+    "ok": true,
+    "newTurnId": "01a18aab-8438-7832-95b5-9ee0edcedcc6",
+    "requestContainsPreviousUser": true,
+    "requestContainsPreviousAssistant": true,
+    "requestContainsNewUser": true
+  },
+  {
+    "name": "legacy_unsubscribe_a2",
+    "ok": true,
+    "status": "unsubscribed"
+  },
+  {
+    "name": "legacy_unsubscribe_a1",
+    "ok": true,
+    "status": "unsubscribed"
+  },
+  {
+    "name": "legacy_different_server_resume_after_unsubscribe",
+    "ok": false,
+    "error": "thread 01a18aab-8323-7823-8399-9a5d1cb13d8d already has an active writer",
+    "rpcCode": -32600
+  },
+  {
+    "name": "paginated_start",
+    "ok": true,
+    "threadId": "01a18aab-84c5-74c0-bcf9-81e0fe8fde53",
+    "path": "/private/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/codex-continuation-probe-eEHWsG/codex-home/sessions/2026/10/30/rollout-2026-10-30T10-37-38-01a18aab-84c5-74c0-bcf9-81e0fe8fde53.jsonl",
+    "historyMode": "paginated"
+  },
+  {
+    "name": "paginated_synthetic_completed_turn",
+    "ok": true,
+    "turnStatus": "completed",
+    "turnError": null
+  },
+  {
+    "name": "paginated_same_server_resume",
+    "ok": true,
+    "threadId": "01a18aab-84c5-74c0-bcf9-81e0fe8fde53",
+    "sameId": true
+  },
+  {
+    "name": "paginated_different_server_read",
+    "ok": true,
+    "threadId": "01a18aab-84c5-74c0-bcf9-81e0fe8fde53"
+  },
+  {
+    "name": "paginated_different_server_resume",
+    "ok": false,
+    "error": "thread 01a18aab-84c5-74c0-bcf9-81e0fe8fde53 already has an active writer",
+    "rpcCode": -32600
+  },
+  {
+    "name": "paginated_different_server_fork",
+    "ok": true,
+    "threadId": "01a18aab-85bf-7620-b8f6-cb2e27fa649b",
+    "sameId": false,
+    "forkedFromId": "01a18aab-84c5-74c0-bcf9-81e0fe8fde53"
+  },
+  {
+    "name": "paginated_fork_context_continuity",
+    "ok": true,
+    "newTurnId": "01a18aab-85fb-77d1-bb47-fdb8375036ad",
+    "requestContainsPreviousUser": true,
+    "requestContainsPreviousAssistant": true,
+    "requestContainsNewUser": true
+  },
+  {
+    "name": "paginated_unsubscribe_a2",
+    "ok": true,
+    "status": "unsubscribed"
+  },
+  {
+    "name": "paginated_unsubscribe_a1",
+    "ok": true,
+    "status": "unsubscribed"
+  },
+  {
+    "name": "paginated_different_server_resume_after_unsubscribe",
+    "ok": false,
+    "error": "thread 01a18aab-84c5-74c0-bcf9-81e0fe8fde53 already has an active writer",
+    "rpcCode": -32600
+  },
+  {
+    "name": "legacy_different_server_resume_after_owner_exit",
+    "ok": true,
+    "threadId": "01a18aab-8323-7823-8399-9a5d1cb13d8d",
+    "sameId": true
+  },
+  {
+    "name": "paginated_different_server_resume_after_owner_exit",
+    "ok": true,
+    "threadId": "01a18aab-84c5-74c0-bcf9-81e0fe8fde53",
+    "sameId": true
+  },
+  {
+    "name": "verification",
+    "passed": true,
+    "checks": [
+      {
+        "name": "legacy_synthetic_completed_turn",
+        "passed": true
+      },
+      {
+        "name": "legacy_same_server_resume",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_read",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_fork",
+        "passed": true
+      },
+      {
+        "name": "legacy_fork_context_continuity",
+        "passed": true
+      },
+      {
+        "name": "legacy_unsubscribe_a1",
+        "passed": true
+      },
+      {
+        "name": "legacy_unsubscribe_a2",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_resume_after_owner_exit",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_resume",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_resume_after_unsubscribe",
+        "passed": true
+      },
+      {
+        "name": "legacy_context_preserved",
+        "passed": true
+      },
+      {
+        "name": "legacy_original_id_preserved",
+        "passed": true
+      },
+      {
+        "name": "paginated_synthetic_completed_turn",
+        "passed": true
+      },
+      {
+        "name": "paginated_same_server_resume",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_read",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_fork",
+        "passed": true
+      },
+      {
+        "name": "paginated_fork_context_continuity",
+        "passed": true
+      },
+      {
+        "name": "paginated_unsubscribe_a1",
+        "passed": true
+      },
+      {
+        "name": "paginated_unsubscribe_a2",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_resume_after_owner_exit",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_resume",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_resume_after_unsubscribe",
+        "passed": true
+      },
+      {
+        "name": "paginated_context_preserved",
+        "passed": true
+      },
+      {
+        "name": "paginated_original_id_preserved",
+        "passed": true
+      }
+    ]
+  },
+  {
+    "name": "scope",
+    "probeBinary": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+    "cliVersion": "codex-cli 0.162.0-alpha.2",
+    "startedAt": "2026-10-30T02:37:38.103Z",
+    "realUserSessionsAccessed": false,
+    "realModelRequests": 0,
+    "localMockRequests": 4,
+    "researchDir": "/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/codex-continuation-probe-eEHWsG"
+  }
+]

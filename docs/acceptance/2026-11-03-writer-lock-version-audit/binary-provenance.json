@@ -1,0 +1,8 @@
+{
+  "root": "/tmp/codex-version-audit-hhcyozir",
+  "binary": "/tmp/codex-version-audit-hhcyozir/codex-0.144.3",
+  "version": "codex-cli 0.144.3",
+  "source": "https://registry.npmjs.org/@openai/codex/-/codex-0.144.3-darwin-x64.tgz",
+  "integrityVerified": true,
+  "sha256": "f87097094edcbc98416c1ae3ff2ae2fb2f1c9ee2fe4744696f46524f23c9e37a"
+}

@@ -1,0 +1,248 @@
+[
+  {
+    "name": "legacy_start",
+    "ok": true,
+    "threadId": "01a18aab-467e-7080-99b0-7a3b6f2a876c",
+    "path": "/private/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/codex-continuation-probe-vaZXo3/codex-home/sessions/2026/10/30/rollout-2026-10-30T10-37-22-01a18aab-467e-7080-99b0-7a3b6f2a876c.jsonl",
+    "historyMode": "legacy"
+  },
+  {
+    "name": "legacy_synthetic_completed_turn",
+    "ok": true,
+    "turnStatus": "completed",
+    "turnError": null
+  },
+  {
+    "name": "legacy_same_server_resume",
+    "ok": true,
+    "threadId": "01a18aab-467e-7080-99b0-7a3b6f2a876c",
+    "sameId": true
+  },
+  {
+    "name": "legacy_different_server_read",
+    "ok": true,
+    "threadId": "01a18aab-467e-7080-99b0-7a3b6f2a876c"
+  },
+  {
+    "name": "legacy_different_server_resume",
+    "ok": false,
+    "error": "thread 01a18aab-467e-7080-99b0-7a3b6f2a876c already has an active writer",
+    "rpcCode": -32600
+  },
+  {
+    "name": "legacy_different_server_fork",
+    "ok": true,
+    "threadId": "01a18aab-4747-7642-b2ca-a194f11894b4",
+    "sameId": false,
+    "forkedFromId": "01a18aab-467e-7080-99b0-7a3b6f2a876c"
+  },
+  {
+    "name": "legacy_fork_context_continuity",
+    "ok": true,
+    "newTurnId": "01a18aab-4785-7243-a825-9fdc9fa37f3c",
+    "requestContainsPreviousUser": true,
+    "requestContainsPreviousAssistant": true,
+    "requestContainsNewUser": true
+  },
+  {
+    "name": "legacy_unsubscribe_a2",
+    "ok": true,
+    "status": "unsubscribed"
+  },
+  {
+    "name": "legacy_unsubscribe_a1",
+    "ok": true,
+    "status": "unsubscribed"
+  },
+  {
+    "name": "legacy_different_server_resume_after_unsubscribe",
+    "ok": false,
+    "error": "thread 01a18aab-467e-7080-99b0-7a3b6f2a876c already has an active writer",
+    "rpcCode": -32600
+  },
+  {
+    "name": "paginated_start",
+    "ok": true,
+    "threadId": "01a18aab-4810-7783-a5a2-6a4e6dc1a139",
+    "path": "/private/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/codex-continuation-probe-vaZXo3/codex-home/sessions/2026/10/30/rollout-2026-10-30T10-37-23-01a18aab-4810-7783-a5a2-6a4e6dc1a139.jsonl",
+    "historyMode": "paginated"
+  },
+  {
+    "name": "paginated_synthetic_completed_turn",
+    "ok": true,
+    "turnStatus": "completed",
+    "turnError": null
+  },
+  {
+    "name": "paginated_same_server_resume",
+    "ok": true,
+    "threadId": "01a18aab-4810-7783-a5a2-6a4e6dc1a139",
+    "sameId": true
+  },
+  {
+    "name": "paginated_different_server_read",
+    "ok": true,
+    "threadId": "01a18aab-4810-7783-a5a2-6a4e6dc1a139"
+  },
+  {
+    "name": "paginated_different_server_resume",
+    "ok": false,
+    "error": "thread 01a18aab-4810-7783-a5a2-6a4e6dc1a139 already has an active writer",
+    "rpcCode": -32600
+  },
+  {
+    "name": "paginated_different_server_fork",
+    "ok": true,
+    "threadId": "01a18aab-48fb-7d23-8880-3f2ef9d4b221",
+    "sameId": false,
+    "forkedFromId": "01a18aab-4810-7783-a5a2-6a4e6dc1a139"
+  },
+  {
+    "name": "paginated_fork_context_continuity",
+    "ok": true,
+    "newTurnId": "01a18aab-4930-7f43-b8cd-ba2aed91ed43",
+    "requestContainsPreviousUser": true,
+    "requestContainsPreviousAssistant": true,
+    "requestContainsNewUser": true
+  },
+  {
+    "name": "paginated_unsubscribe_a2",
+    "ok": true,
+    "status": "unsubscribed"
+  },
+  {
+    "name": "paginated_unsubscribe_a1",
+    "ok": true,
+    "status": "unsubscribed"
+  },
+  {
+    "name": "paginated_different_server_resume_after_unsubscribe",
+    "ok": false,
+    "error": "thread 01a18aab-4810-7783-a5a2-6a4e6dc1a139 already has an active writer",
+    "rpcCode": -32600
+  },
+  {
+    "name": "legacy_different_server_resume_after_owner_exit",
+    "ok": true,
+    "threadId": "01a18aab-467e-7080-99b0-7a3b6f2a876c",
+    "sameId": true
+  },
+  {
+    "name": "paginated_different_server_resume_after_owner_exit",
+    "ok": true,
+    "threadId": "01a18aab-4810-7783-a5a2-6a4e6dc1a139",
+    "sameId": true
+  },
+  {
+    "name": "verification",
+    "passed": true,
+    "checks": [
+      {
+        "name": "legacy_synthetic_completed_turn",
+        "passed": true
+      },
+      {
+        "name": "legacy_same_server_resume",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_read",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_fork",
+        "passed": true
+      },
+      {
+        "name": "legacy_fork_context_continuity",
+        "passed": true
+      },
+      {
+        "name": "legacy_unsubscribe_a1",
+        "passed": true
+      },
+      {
+        "name": "legacy_unsubscribe_a2",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_resume_after_owner_exit",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_resume",
+        "passed": true
+      },
+      {
+        "name": "legacy_different_server_resume_after_unsubscribe",
+        "passed": true
+      },
+      {
+        "name": "legacy_context_preserved",
+        "passed": true
+      },
+      {
+        "name": "legacy_original_id_preserved",
+        "passed": true
+      },
+      {
+        "name": "paginated_synthetic_completed_turn",
+        "passed": true
+      },
+      {
+        "name": "paginated_same_server_resume",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_read",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_fork",
+        "passed": true
+      },
+      {
+        "name": "paginated_fork_context_continuity",
+        "passed": true
+      },
+      {
+        "name": "paginated_unsubscribe_a1",
+        "passed": true
+      },
+      {
+        "name": "paginated_unsubscribe_a2",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_resume_after_owner_exit",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_resume",
+        "passed": true
+      },
+      {
+        "name": "paginated_different_server_resume_after_unsubscribe",
+        "passed": true
+      },
+      {
+        "name": "paginated_context_preserved",
+        "passed": true
+      },
+      {
+        "name": "paginated_original_id_preserved",
+        "passed": true
+      }
+    ]
+  },
+  {
+    "name": "scope",
+    "probeBinary": "codex",
+    "cliVersion": "codex-cli 0.163.0",
+    "startedAt": "2026-10-30T02:37:22.377Z",
+    "realUserSessionsAccessed": false,
+    "realModelRequests": 0,
+    "localMockRequests": 4,
+    "researchDir": "/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/codex-continuation-probe-vaZXo3"
+  }
+]

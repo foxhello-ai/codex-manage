@@ -1,0 +1,146 @@
+[
+  {
+    "index": 1,
+    "path": "/v1/responses",
+    "marker": "DOR-DESKTOP-ONE",
+    "userMarkers": [
+      "DOR-DESKTOP-ONE"
+    ],
+    "assistantMarkers": []
+  },
+  {
+    "index": 2,
+    "path": "/v1/responses",
+    "marker": "DOR-DESKTOP-ONE",
+    "userMarkers": [
+      "DOR-DESKTOP-ONE"
+    ],
+    "assistantMarkers": []
+  },
+  {
+    "index": 3,
+    "path": "/v1/responses",
+    "marker": "DOR-MANAGE-TWO",
+    "userMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO"
+    ],
+    "assistantMarkers": [
+      "DOR-DESKTOP-ONE"
+    ]
+  },
+  {
+    "index": 4,
+    "path": "/v1/responses",
+    "marker": "DOR-DESKTOP-THREE",
+    "userMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE"
+    ],
+    "assistantMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO"
+    ]
+  },
+  {
+    "index": 5,
+    "path": "/v1/responses",
+    "marker": "DOR-DESKTOP-SLOW",
+    "userMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE",
+      "DOR-DESKTOP-SLOW"
+    ],
+    "assistantMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE"
+    ]
+  },
+  {
+    "index": 6,
+    "path": "/v1/responses",
+    "marker": "DOR-AFTER-MANAGE-EXIT",
+    "userMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE",
+      "DOR-DESKTOP-SLOW",
+      "DOR-AFTER-MANAGE-EXIT"
+    ],
+    "assistantMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE",
+      "DOR-DESKTOP-SLOW"
+    ]
+  },
+  {
+    "index": 7,
+    "path": "/v1/responses",
+    "marker": "DOR-MANAGE-AFTER-DESKTOP-RESTART",
+    "userMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE",
+      "DOR-DESKTOP-SLOW",
+      "DOR-AFTER-MANAGE-EXIT",
+      "DOR-MANAGE-AFTER-DESKTOP-RESTART"
+    ],
+    "assistantMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE",
+      "DOR-DESKTOP-SLOW",
+      "DOR-AFTER-MANAGE-EXIT"
+    ]
+  },
+  {
+    "index": 8,
+    "path": "/v1/responses",
+    "marker": "DOR-DESKTOP-AFTER-RESTART",
+    "userMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE",
+      "DOR-DESKTOP-SLOW",
+      "DOR-AFTER-MANAGE-EXIT",
+      "DOR-MANAGE-AFTER-DESKTOP-RESTART",
+      "DOR-DESKTOP-AFTER-RESTART"
+    ],
+    "assistantMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE",
+      "DOR-DESKTOP-SLOW",
+      "DOR-AFTER-MANAGE-EXIT",
+      "DOR-MANAGE-AFTER-DESKTOP-RESTART"
+    ]
+  },
+  {
+    "index": 9,
+    "path": "/v1/responses",
+    "marker": "DOR-MANAGE-AFTER-ACTIVATION",
+    "userMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE",
+      "DOR-DESKTOP-SLOW",
+      "DOR-AFTER-MANAGE-EXIT",
+      "DOR-MANAGE-AFTER-DESKTOP-RESTART",
+      "DOR-DESKTOP-AFTER-RESTART",
+      "DOR-MANAGE-AFTER-ACTIVATION"
+    ],
+    "assistantMarkers": [
+      "DOR-DESKTOP-ONE",
+      "DOR-MANAGE-TWO",
+      "DOR-DESKTOP-THREE",
+      "DOR-DESKTOP-SLOW",
+      "DOR-AFTER-MANAGE-EXIT",
+      "DOR-MANAGE-AFTER-DESKTOP-RESTART",
+      "DOR-DESKTOP-AFTER-RESTART"
+    ]
+  }
+]

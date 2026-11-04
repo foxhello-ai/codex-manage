@@ -1,0 +1,80 @@
+{
+  "at": "2026-11-03T06:45:38.165Z",
+  "root": "/tmp/writer-version-J0E3g5",
+  "isolation": {
+    "manageCodeLoaded": false,
+    "realSessionsUsed": false,
+    "realCredentialsUsed": false,
+    "realInferenceUsed": false
+  },
+  "versions": [
+    {
+      "binary": "/tmp/codex-version-audit-hhcyozir/codex-0.146.0",
+      "version": "codex-cli 0.146.0",
+      "home": "/tmp/writer-version-J0E3g5/home-0",
+      "observations": [
+        {
+          "name": "owner_completed_turn",
+          "ok": true,
+          "threadId": "01a1a028-057c-7691-813d-c8aae42fe62f",
+          "turnId": "01a1a028-05ed-7b93-9d8f-cec98c2dedc2",
+          "status": "completed"
+        },
+        {
+          "name": "same_server_resume",
+          "ok": true,
+          "threadId": "01a1a028-057c-7691-813d-c8aae42fe62f",
+          "sameId": true
+        },
+        {
+          "name": "different_server_read",
+          "ok": false,
+          "error": "paginated threads do not support thread/read(includeTurns=true)",
+          "rpcCode": -32600
+        },
+        {
+          "name": "different_server_resume_while_owner_alive",
+          "ok": false,
+          "error": "thread 01a1a028-057c-7691-813d-c8aae42fe62f already has an active writer",
+          "rpcCode": -32600
+        },
+        {
+          "name": "different_server_resume_after_owner_exit",
+          "ok": true,
+          "threadId": "01a1a028-057c-7691-813d-c8aae42fe62f",
+          "sameId": true
+        },
+        {
+          "name": "different_server_turn_after_owner_exit",
+          "ok": true,
+          "threadId": "01a1a028-057c-7691-813d-c8aae42fe62f",
+          "turnId": "01a1a028-09a4-7622-9996-832526cb7d58",
+          "status": "completed"
+        }
+      ],
+      "pids": {
+        "a": 3464,
+        "b": 3469
+      },
+      "requestedHistoryMode": "paginated",
+      "threadId": "01a1a028-057c-7691-813d-c8aae42fe62f",
+      "returnedHistoryMode": "paginated",
+      "stderr": {
+        "a": "{\"timestamp\":\"2026-11-03T06:45:39.282846Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"remote installed plugin bundle sync failed\",\"error\":\"chatgpt authentication required for remote plugin catalog; api key auth is not supported\"},\"target\":\"codex_core_plugins::remote::remote_installed_plugin_sync\"}\n{\"timestamp\":\"2026-11-03T06:45:39.834575Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:39.953559Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n",
+        "b": "{\"timestamp\":\"2026-11-03T06:45:39.814990Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"remote installed plugin bundle sync failed\",\"error\":\"chatgpt authentication required for remote plugin catalog; api key auth is not supported\"},\"target\":\"codex_core_plugins::remote::remote_installed_plugin_sync\"}\n{\"timestamp\":\"2026-11-03T06:45:40.623605Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:40.625951Z\",\"level\":\"ERROR\",\"fields\":{\"message\":\"failed to initialize thread persistence: thread-store conflict: thread 01a1a028-057c-7691-813d-c8aae42fe62f already has an active writer\"},\"target\":\"codex_core::session::session\"}\n{\"timestamp\":\"2026-11-03T06:45:40.626629Z\",\"level\":\"ERROR\",\"fields\":{\"message\":\"Failed to create session: thread-store conflict: thread 01a1a028-057c-7691-813d-c8aae42fe62f already has an active writer\"},\"target\":\"codex_core::session\"}\n{\"timestamp\":\"2026-11-03T06:45:40.677336Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:40.844320Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:40.901621Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n{\"timestamp\":\"2026-11-03T06:45:40.931118Z\",\"level\":\"WARN\",\"fields\":{\"message\":\"Unknown model research-local-stub is used. This will use fallback model metadata.\"},\"target\":\"codex_models_manager::model_info\"}\n"
+      }
+    }
+  ],
+  "mockRequests": [
+    {
+      "version": "codex-cli 0.146.0",
+      "marker": "VERSION-FIRST",
+      "inputContainsFirst": true
+    },
+    {
+      "version": "codex-cli 0.146.0",
+      "marker": "VERSION-SECOND",
+      "inputContainsFirst": true
+    }
+  ]
+}

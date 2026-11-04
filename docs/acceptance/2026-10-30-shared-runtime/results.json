@@ -1,0 +1,239 @@
+{
+  "item": "SRF-01",
+  "date": "2026-10-30T04:33:00.622Z",
+  "scope": "official local Work/Codex desktop, shared app-server, actual codex-manage UI",
+  "isolation": {
+    "realHomeUsed": false,
+    "realInferenceUsed": false,
+    "productionCodeChanged": false
+  },
+  "checks": [
+    {
+      "id": "official-attach",
+      "criterion": "Official unmodified desktop initializes external shared app-server",
+      "outcome": "pass",
+      "evidence": {
+        "hook": "CODEX_APP_SERVER_WS_URL",
+        "support": "internal installed-app hook, not a public compatibility promise"
+      }
+    },
+    {
+      "id": "official-original-thread",
+      "criterion": "Official desktop creates and completes a real protocol turn",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a18b15-b535-7c42-8faf-57b017a5d2ce"
+      }
+    },
+    {
+      "id": "manage-resume",
+      "criterion": "Actual codex-manage resumes desktop original thread via temporary WS/stdin bridge",
+      "outcome": "pass",
+      "evidence": {
+        "status": 200,
+        "threadId": "01a18b15-b535-7c42-8faf-57b017a5d2ce"
+      }
+    },
+    {
+      "id": "shared-home-watcher",
+      "criterion": "Shared-home UI state writes preserve subscription and active runtime",
+      "outcome": "fail",
+      "evidence": {
+        "generationBefore": 0,
+        "generationAfter": 1,
+        "statusAfter": "history",
+        "workaroundForRemainingChecks": "separate manager watcher home; server and session directory stay shared"
+      }
+    },
+    {
+      "id": "manage-to-desktop",
+      "criterion": "Manage user+assistant appear in official desktop without reload",
+      "outcome": "pass",
+      "evidence": {}
+    },
+    {
+      "id": "desktop-to-manage",
+      "criterion": "Desktop completed user+assistant appear in Manage without reload",
+      "outcome": "pass",
+      "evidence": {}
+    },
+    {
+      "id": "no-visible-duplicates",
+      "criterion": "Alternating input keeps one user and one assistant message per marker",
+      "outcome": "pass",
+      "evidence": {
+        "desktop:SRF-MANAGE-TWO": {
+          "user": 1,
+          "assistant": 1
+        },
+        "manage:SRF-MANAGE-TWO": {
+          "user": 1,
+          "assistant": 1
+        },
+        "desktop:SRF-DESKTOP-THREE": {
+          "user": 1,
+          "assistant": 1
+        },
+        "manage:SRF-DESKTOP-THREE": {
+          "user": 1,
+          "assistant": 1
+        }
+      }
+    },
+    {
+      "id": "desktop-running",
+      "criterion": "Desktop turn updates Manage running status and active turn ID",
+      "outcome": "pass",
+      "evidence": {
+        "status": "running",
+        "activeTurnId": "01a18b16-06f1-7793-ac93-c78727bca532"
+      }
+    },
+    {
+      "id": "live-external-user",
+      "criterion": "Desktop user message appears in Manage while turn is still running",
+      "outcome": "fail",
+      "evidence": {
+        "userVisible": 0,
+        "status": "running"
+      }
+    },
+    {
+      "id": "desktop-idle",
+      "criterion": "Both clients complete the desktop turn and return to idle",
+      "outcome": "pass",
+      "evidence": {}
+    },
+    {
+      "id": "interrupt",
+      "criterion": "Official desktop stops a Manage-started active turn and Manage returns idle",
+      "outcome": "pass",
+      "evidence": {
+        "status": "waiting_input"
+      }
+    },
+    {
+      "id": "settings",
+      "criterion": "Shared thread effort update reconciles in Manage and reaches official desktop",
+      "outcome": "pass",
+      "evidence": {
+        "manageEffort": "high",
+        "desktopText": "GPT 说：\n\nLocal stub completed SRF-MANAGE-TWO\n\n12:33\n你说：\n\nSRF-DESKTOP-THREE\n\n12:33\nChatGPT 说：\n\nLocal stub completed SRF-DESKTOP-THREE\n\n12:33\n你说：\n\nSRF-DESKTOP-SLOW-FOUR\n\n12:33\nChatGPT 说：\n\nLocal stub completed SRF-DESKTOP-SLOW-FOUR\n\n12:33\n你说：\n\nSRF-MANAGE-SLOW-INTERRUPT\n\n12:34\n你在 0秒 后停止了\nChatGPT 说：\n12:34\n最新一条回复\n\n\n\n\n请求批准\n自定义\n高\n无\n极低\n轻度\n中\n高\n极高\nMax\nUltra\n持续"
+      }
+    },
+    {
+      "id": "active-reattach",
+      "criterion": "Resume during active desktop turn recovers running state and turn ID",
+      "outcome": "fail",
+      "evidence": {
+        "httpStatus": 200,
+        "status": "waiting_input",
+        "activeTurnId": null,
+        "serverTurnId": "01a18b16-317c-79f1-a3ad-be426914e0a9"
+      }
+    },
+    {
+      "id": "post-reconnect-events",
+      "criterion": "Reattached Manage receives desktop completion without a history fork",
+      "outcome": "pass",
+      "evidence": {}
+    },
+    {
+      "id": "approval-fanout",
+      "criterion": "Real command approval appears in official desktop and Manage",
+      "outcome": "pass",
+      "evidence": {
+        "connections": [
+          1,
+          7,
+          6
+        ],
+        "requestId": 0,
+        "managePending": 1
+      }
+    },
+    {
+      "id": "approval-cross-clear",
+      "criterion": "Desktop approval answer clears Manage pending approval",
+      "outcome": "fail",
+      "evidence": {
+        "pending": 1,
+        "status": "waiting_approval",
+        "resolved": [
+          {
+            "connection": 7,
+            "params": {
+              "threadId": "01a18b15-b535-7c42-8faf-57b017a5d2ce",
+              "requestId": 0
+            }
+          },
+          {
+            "connection": 6,
+            "params": {
+              "threadId": "01a18b15-b535-7c42-8faf-57b017a5d2ce",
+              "requestId": 0
+            }
+          },
+          {
+            "connection": 1,
+            "params": {
+              "threadId": "01a18b15-b535-7c42-8faf-57b017a5d2ce",
+              "requestId": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "manager-lifecycle",
+      "criterion": "Stopping Manage only disconnects its bridge; desktop keeps original service and thread",
+      "outcome": "pass",
+      "evidence": {
+        "serverAlive": true,
+        "desktopAlive": true,
+        "threadId": "01a18b15-b535-7c42-8faf-57b017a5d2ce"
+      }
+    },
+    {
+      "id": "manager-reconnect",
+      "criterion": "Restarted Manage resumes the same thread and full latest history",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a18b15-b535-7c42-8faf-57b017a5d2ce"
+      }
+    },
+    {
+      "id": "approval-manage-answer",
+      "criterion": "Manage answers approval; both clients clear pending state",
+      "outcome": "pass",
+      "evidence": {
+        "managePending": 0,
+        "manageStatus": "waiting_input",
+        "desktopPending": 0,
+        "desktopReceivedResolved": true
+      }
+    },
+    {
+      "id": "desktop-reconnect",
+      "criterion": "Restarted official desktop continues original thread and Manage receives new turn",
+      "outcome": "pass",
+      "evidence": {
+        "threadId": "01a18b15-b535-7c42-8faf-57b017a5d2ce",
+        "serverAlive": true
+      }
+    }
+  ],
+  "environment": {
+    "desktopVersion": "26.1002.52244",
+    "cliVersion": "codex-cli 0.162.0-alpha.2",
+    "nodeVersion": "v22.22.0",
+    "managePort": 54862
+  },
+  "experimentDirectory": "/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/codex-shared-feasibility-Qze401",
+  "threadId": "01a18b15-b535-7c42-8faf-57b017a5d2ce",
+  "summary": {
+    "pass": 16,
+    "fail": 4,
+    "blocked": 0
+  }
+}

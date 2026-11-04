@@ -1,0 +1,23 @@
+f75e3ea185507736c957db50214791cda72ddc80
+2026-07-13T20:25:06+00:00
+feat: add codex app server client
+
+7d1689e4e60729393a334df9a606d29f1fe97325
+2026-07-14T04:34:11+00:00
+feat: add session runtime and approvals
+
+d9ec26343f1ff4c9b8833cf9c1b26c5f5de1a1da
+2026-08-26T09:18:14+08:00
+fix: harden active session input and approval sync
+
+fb9d7965cac28c0c0de959ba22e2b1404f2d6c93
+2026-09-01T09:41:19+08:00
+feat: preserve session permissions and branch recovery
+
+1eb025fec8be23b3536e3eab6c47e94cacd1df99
+2026-09-01T09:40:13+08:00
+feat: validate Codex CLI path and version
+
+d04fd375b36a4631afd705f88da31d4dff0c6bf1
+2026-09-10T21:42:19+08:00
+feat: continue locked sessions from history

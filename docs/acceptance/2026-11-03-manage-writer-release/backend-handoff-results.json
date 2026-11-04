@@ -1,0 +1,366 @@
+{
+  "at": "2026-11-03T07:10:57.636Z",
+  "root": "/tmp/unsubscribe-handoff-aMi7N1",
+  "version": "codex-cli 0.162.0-alpha.2",
+  "isolation": {
+    "realSessionsUsed": false,
+    "realCredentialsUsed": false,
+    "realInferenceUsed": false,
+    "desktopModified": false
+  },
+  "ownerUnloadDelaySecs": 1,
+  "checks": [
+    {
+      "id": "completed-manage-thread-still-owns-writer",
+      "outcome": "pass",
+      "evidence": {
+        "conflict": "thread 01a1a03f-2fa1-73d1-8ed1-cc86deadecdf already has an active writer",
+        "runtime": {
+          "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+          "status": "waiting_input",
+          "permissionMode": "default",
+          "activeTurnId": null,
+          "startedAt": "2026-11-03T07:10:57.984Z",
+          "updatedAt": "2026-11-03T07:10:58.116Z",
+          "lastError": null,
+          "model": "research-local-stub",
+          "modelProvider": "research",
+          "reasoningEffort": null,
+          "modelSelection": {
+            "mode": "follow_session",
+            "preferredModel": null,
+            "preferredReasoningEffort": null,
+            "actualModel": "research-local-stub",
+            "actualModelProvider": "research",
+            "actualReasoningEffort": null,
+            "actualModelSupported": null,
+            "applied": false,
+            "confirmationPending": false,
+            "updatedAt": null,
+            "lastError": null
+          },
+          "modelChangeStatus": "idle",
+          "modelChangeError": null,
+          "pendingApprovalCount": 0,
+          "eventSeq": 12
+        }
+      }
+    },
+    {
+      "id": "unsubscribe-accepted",
+      "outcome": "pass",
+      "evidence": {
+        "status": "unsubscribed"
+      }
+    },
+    {
+      "id": "unload-preserves-backend-and-other-thread",
+      "outcome": "pass",
+      "evidence": {
+        "elapsedMs": 1066,
+        "loaded": [
+          "01a1a03f-2fc4-77c0-9b80-fcb53e26f132"
+        ],
+        "backend": {
+          "status": "ready",
+          "pid": 24127,
+          "lastError": null,
+          "initialized": true
+        },
+        "releasedRuntime": {
+          "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+          "status": "history",
+          "permissionMode": "default",
+          "activeTurnId": null,
+          "startedAt": "2026-11-03T07:10:57.984Z",
+          "updatedAt": "2026-11-03T07:10:59.265Z",
+          "lastError": null,
+          "model": "research-local-stub",
+          "modelProvider": "research",
+          "reasoningEffort": null,
+          "modelSelection": {
+            "mode": "follow_session",
+            "preferredModel": null,
+            "preferredReasoningEffort": null,
+            "actualModel": "research-local-stub",
+            "actualModelProvider": "research",
+            "actualReasoningEffort": null,
+            "actualModelSupported": null,
+            "applied": false,
+            "confirmationPending": false,
+            "updatedAt": null,
+            "lastError": null
+          },
+          "modelChangeStatus": "idle",
+          "modelChangeError": null,
+          "pendingApprovalCount": 0,
+          "eventSeq": 14
+        }
+      }
+    },
+    {
+      "id": "second-backend-resumes-same-original-thread",
+      "outcome": "pass",
+      "evidence": {
+        "returnedId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+        "originalOwnerStillAlive": true
+      }
+    },
+    {
+      "id": "original-context-preserved-after-handoff",
+      "outcome": "pass",
+      "evidence": {
+        "completion": {
+          "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+          "turn": {
+            "id": "01a1a03f-3571-7083-a0c4-151e57d17a52",
+            "items": [
+              {
+                "type": "agentMessage",
+                "id": "msg_uhf_3",
+                "text": "Local stub completed UHF-SECOND-BACKEND",
+                "phase": null,
+                "memoryCitation": null,
+                "delivery": null,
+                "questions": null
+              }
+            ],
+            "itemsView": "summary",
+            "status": "completed",
+            "error": null,
+            "startedAt": 1793689859,
+            "completedAt": 1793689859,
+            "durationMs": 68
+          }
+        },
+        "modelInput": {
+          "marker": "UHF-SECOND-BACKEND",
+          "userMarkers": [
+            "UHF-MANAGE-FIRST",
+            "UHF-SECOND-BACKEND"
+          ],
+          "assistantMarkers": [
+            "UHF-MANAGE-FIRST"
+          ]
+        }
+      }
+    },
+    {
+      "id": "other-manage-thread-continues",
+      "outcome": "pass",
+      "evidence": {
+        "pid": 24127,
+        "runtime": {
+          "threadId": "01a1a03f-2fc4-77c0-9b80-fcb53e26f132",
+          "status": "waiting_input",
+          "permissionMode": "default",
+          "activeTurnId": null,
+          "startedAt": "2026-11-03T07:10:57.998Z",
+          "updatedAt": "2026-11-03T07:10:59.623Z",
+          "lastError": null,
+          "model": "research-local-stub",
+          "modelProvider": "research",
+          "reasoningEffort": null,
+          "modelSelection": {
+            "mode": "follow_session",
+            "preferredModel": null,
+            "preferredReasoningEffort": null,
+            "actualModel": "research-local-stub",
+            "actualModelProvider": "research",
+            "actualReasoningEffort": null,
+            "actualModelSupported": null,
+            "applied": false,
+            "confirmationPending": false,
+            "updatedAt": null,
+            "lastError": null
+          },
+          "modelChangeStatus": "idle",
+          "modelChangeError": null,
+          "pendingApprovalCount": 0,
+          "eventSeq": 22
+        }
+      }
+    }
+  ],
+  "requests": [
+    {
+      "marker": "UHF-MANAGE-FIRST",
+      "userMarkers": [
+        "UHF-MANAGE-FIRST"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "marker": "UHF-OTHER-FIRST",
+      "userMarkers": [
+        "UHF-OTHER-FIRST"
+      ],
+      "assistantMarkers": []
+    },
+    {
+      "marker": "UHF-SECOND-BACKEND",
+      "userMarkers": [
+        "UHF-MANAGE-FIRST",
+        "UHF-SECOND-BACKEND"
+      ],
+      "assistantMarkers": [
+        "UHF-MANAGE-FIRST"
+      ]
+    },
+    {
+      "marker": "UHF-OTHER-STILL-WORKS",
+      "userMarkers": [
+        "UHF-OTHER-FIRST",
+        "UHF-OTHER-STILL-WORKS"
+      ],
+      "assistantMarkers": [
+        "UHF-OTHER-FIRST"
+      ]
+    }
+  ],
+  "notifications": [
+    {
+      "client": "a",
+      "at": 1793689858035,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+        "status": {
+          "type": "active",
+          "activeFlags": []
+        }
+      },
+      "emittedAtMs": 1793689858035
+    },
+    {
+      "client": "a",
+      "at": 1793689858116,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+        "status": {
+          "type": "idle"
+        }
+      },
+      "emittedAtMs": 1793689858115
+    },
+    {
+      "client": "a",
+      "at": 1793689858142,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fc4-77c0-9b80-fcb53e26f132",
+        "status": {
+          "type": "active",
+          "activeFlags": []
+        }
+      },
+      "emittedAtMs": 1793689858141
+    },
+    {
+      "client": "a",
+      "at": 1793689858203,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fc4-77c0-9b80-fcb53e26f132",
+        "status": {
+          "type": "idle"
+        }
+      },
+      "emittedAtMs": 1793689858203
+    },
+    {
+      "client": "a",
+      "at": 1793689859265,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+        "status": {
+          "type": "notLoaded"
+        }
+      },
+      "emittedAtMs": 1793689859264
+    },
+    {
+      "client": "a",
+      "at": 1793689859265,
+      "method": "thread/closed",
+      "params": {
+        "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf"
+      },
+      "emittedAtMs": 1793689859264
+    },
+    {
+      "client": "b",
+      "at": 1793689859429,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+        "status": {
+          "type": "idle"
+        }
+      },
+      "emittedAtMs": 1793689859428
+    },
+    {
+      "client": "b",
+      "at": 1793689859456,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+        "status": {
+          "type": "active",
+          "activeFlags": []
+        }
+      },
+      "emittedAtMs": 1793689859456
+    },
+    {
+      "client": "b",
+      "at": 1793689859522,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+        "status": {
+          "type": "idle"
+        }
+      },
+      "emittedAtMs": 1793689859522
+    },
+    {
+      "client": "a",
+      "at": 1793689859550,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fc4-77c0-9b80-fcb53e26f132",
+        "status": {
+          "type": "active",
+          "activeFlags": []
+        }
+      },
+      "emittedAtMs": 1793689859550
+    },
+    {
+      "client": "a",
+      "at": 1793689859623,
+      "method": "thread/status/changed",
+      "params": {
+        "threadId": "01a1a03f-2fc4-77c0-9b80-fcb53e26f132",
+        "status": {
+          "type": "idle"
+        }
+      },
+      "emittedAtMs": 1793689859622
+    }
+  ],
+  "threadId": "01a1a03f-2fa1-73d1-8ed1-cc86deadecdf",
+  "otherThreadId": "01a1a03f-2fc4-77c0-9b80-fcb53e26f132",
+  "pids": {
+    "a": 24127,
+    "b": 24132
+  },
+  "summary": {
+    "pass": 6,
+    "fail": 0
+  }
+}
