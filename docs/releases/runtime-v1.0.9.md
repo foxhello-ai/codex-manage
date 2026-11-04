@@ -1,6 +1,6 @@
 # Linux Runtime v1.0.9
 
-目标发布日期：2026-11-04。版本来自 `release/v1.0.9`；准确源码提交以发布包 `build-info.txt`、`runtime/v1.0.9` tag 和安装验收报告为准。
+已于 2026-11-04 发布：[GitHub Release v1.0.9](https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.9)。冻结源码为 `a921a7a86005b0f9d2b11d687011aab7fcee21e7`；`release/v1.0.9`、`v1.0.9` 和规范 annotated tag `runtime/v1.0.9` 均指向该提交。
 
 ## 范围
 
@@ -11,7 +11,7 @@
 
 ## 发布门禁
 
-本地已通过 165 项单元/路由测试、类型检查、生产构建和 8 项桌面/手机专项界面回归。发布流水线须进一步通过：
+本地已通过 165 项单元/路由测试、类型检查、生产构建和 8 项桌面/手机专项界面回归。发布流水线的以下检查也全部通过：
 
 1. 新安装 tgz、Actions 形态 zip 安装。
 2. Manage 登录、未登录拒绝访问、认证后 API、页面和全部入口静态资源。
@@ -19,7 +19,15 @@
 4. 通过 `current` 链接回滚上一版本并恢复本版本，验证 systemd 重启、停止和启动。
 5. 正式发布后重新下载，校验 SHA-256 并确认与已验收文件一致。
 
-安装验收通过后才正式发布。最终结果见 Release 的 `runtime-installation-verification.json` 资产；每次流水线的成功或失败状态同时写入 `verification/runtime-v1.0.9` 分支中的 `release-verification.json`。
+本次 [发布流水线](https://github.com/foxhello-ai/codex-manage/actions/runs/41762042449) 的测试、构建、安装、官网部署和正式发布均成功。8 个安装阶段为 fresh-install、artifact-zip、previous-release、upgrade、rollback、restore、restart、start；各阶段的登录、健康状态和静态资源均通过，配置权限为 `0600`。
+
+正式发布后重新下载的 tgz、SHA-256 和安装脚本与已验收文件一致。运行包 SHA-256：
+
+```text
+411833b711e1ff626f9923cc645b20aee4ab0e1c89ba5d87e5e51de4aade3489
+```
+
+完整结果见 Release 的 `runtime-installation-verification.json` 资产及本地 [验收记录](../acceptance/2026-11-04-runtime-v1.0.9/release-verification.json)。流水线运行状态同时写入 `verification/runtime-v1.0.9` 分支中的 `release-verification.json`，规范 Runtime tag 的注释也保存了对应安装报告。
 
 ## 安装
 
