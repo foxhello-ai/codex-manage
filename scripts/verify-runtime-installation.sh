@@ -52,6 +52,9 @@ install_release() {
   local package_dir="$1"
   local package_file="${2:-$package_dir/codex-manage-runtime.tgz}"
   systemctl stop "$VERIFY_SERVICE" >/dev/null 2>&1 || true
+  # These phases deliberately restart many times within systemd's rate-limit
+  # window. Reset only the verification unit before each manual lifecycle step.
+  systemctl reset-failed "$VERIFY_SERVICE" >/dev/null 2>&1 || true
   bash "$VERIFY_INSTALLER" --user "$VERIFY_USER" \
     --package "$package_file" \
     --checksum "$package_dir/codex-manage-runtime.tgz.sha256" \
@@ -131,12 +134,15 @@ grep -qx 'installation-verification-data' "$verify_user_home/.codex/sessions/ins
 
 systemctl stop "$VERIFY_SERVICE"
 ln -sfn "$verify_previous_dir" "$VERIFY_INSTALL_DIR/current"
+systemctl reset-failed "$VERIFY_SERVICE"
 systemctl start "$VERIFY_SERVICE"
 check_runtime rollback "$previous_version" "$previous_commit"
 systemctl stop "$VERIFY_SERVICE"
 ln -sfn "$verify_new_dir" "$VERIFY_INSTALL_DIR/current"
+systemctl reset-failed "$VERIFY_SERVICE"
 systemctl start "$VERIFY_SERVICE"
 check_runtime restore "$VERIFY_EXPECTED_VERSION" "$VERIFY_EXPECTED_COMMIT"
+systemctl reset-failed "$VERIFY_SERVICE"
 systemctl restart "$VERIFY_SERVICE"
 check_runtime restart "$VERIFY_EXPECTED_VERSION" "$VERIFY_EXPECTED_COMMIT"
 systemctl stop "$VERIFY_SERVICE"
@@ -148,6 +154,7 @@ if curl --silent --max-time 2 "http://127.0.0.1:$VERIFY_PORT/" >/dev/null; then
   echo "Test runtime is still listening after stop" >&2
   exit 1
 fi
+systemctl reset-failed "$VERIFY_SERVICE"
 systemctl start "$VERIFY_SERVICE"
 check_runtime start "$VERIFY_EXPECTED_VERSION" "$VERIFY_EXPECTED_COMMIT"
 test "$(sha256sum "$VERIFY_ENV_FILE" | cut -d' ' -f1)" = "$verify_env_hash"
