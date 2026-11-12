@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for version in 1.0.9 1.0.8; do
+          for version in 1.0.10 1.0.9; do
             mkdir -p "$RUNNER_TEMP/assets/$version"
             for asset in codex-manage-runtime.tgz codex-manage-runtime.tgz.sha256; do
               curl -fsSL --connect-timeout 20 --max-time 180 --retry 3 \
@@ -50,7 +50,7 @@ jobs:
                 -o "$RUNNER_TEMP/assets/$version/$asset"
             done
           done
-          cp scripts/install-runtime.sh "$RUNNER_TEMP/assets/1.0.9/install-runtime.sh"
+          cp scripts/install-runtime.sh "$RUNNER_TEMP/assets/1.0.10/install-runtime.sh"
       - name: Verify Linux systemd installation
         if: runner.os == 'Linux'
         shell: bash
@@ -58,18 +58,18 @@ jobs:
           set -euo pipefail
           sudo env "PATH=$PATH" \
             VERIFY_NODE="$(command -v node)" \
-            VERIFY_PACKAGE_DIR="$RUNNER_TEMP/assets/1.0.9" \
-            VERIFY_PREVIOUS_PACKAGE_DIR="$RUNNER_TEMP/assets/1.0.8" \
-            VERIFY_EXPECTED_VERSION=1.0.9 \
-            VERIFY_EXPECTED_COMMIT=a921a7a86005b0f9d2b11d687011aab7fcee21e7 \
+            VERIFY_PACKAGE_DIR="$RUNNER_TEMP/assets/1.0.10" \
+            VERIFY_PREVIOUS_PACKAGE_DIR="$RUNNER_TEMP/assets/1.0.9" \
+            VERIFY_EXPECTED_VERSION=1.0.10 \
+            VERIFY_EXPECTED_COMMIT=e375a3a5ae4fd438ff68f6012e3a64ebc7639d31 \
             VERIFY_REPORT_FILE="$RUNNER_TEMP/installation.json" \
             bash scripts/verify-runtime-installation.sh 2>&1 | tee "$RUNNER_TEMP/installation.log"
       - name: Verify macOS launchd installation
         if: runner.os == 'macOS'
         shell: bash
         env:
-          VERIFY_PACKAGE_DIR: ${{ runner.temp }}/assets/1.0.9
-          VERIFY_PREVIOUS_PACKAGE_DIR: ${{ runner.temp }}/assets/1.0.8
+          VERIFY_PACKAGE_DIR: ${{ runner.temp }}/assets/1.0.10
+          VERIFY_PREVIOUS_PACKAGE_DIR: ${{ runner.temp }}/assets/1.0.9
           VERIFY_REPORT_FILE: ${{ runner.temp }}/installation.json
         run: |
           set -euo pipefail
