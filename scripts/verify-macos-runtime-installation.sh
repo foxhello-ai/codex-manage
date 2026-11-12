@@ -86,11 +86,19 @@ assert.equal((await fetch(base+'/api/login',{method:'POST',headers:{'content-typ
 for(const path of ['/api/me','/api/sessions?paginated=true&limit=30']){
   const response=await fetch(base+path,{headers:{cookie}});assert.equal(response.status,200,path);await response.arrayBuffer();
 }
+let appVersion=null;
+const [major,minor,patch]=version.split('.').map(Number);
+if(major>1 || (major===1 && (minor>0 || patch>=11))){
+  const response=await fetch(base+'/api/config',{headers:{cookie}});
+  assert.equal(response.status,200,'Settings configuration must be accessible');
+  appVersion=(await response.json()).appVersion;
+  assert.equal(appVersion,`v${version}`,'Settings must identify the running installed release');
+}
 const html=await fetch(base+'/').then(r=>{assert.equal(r.status,200);return r.text();});
 const assets=[...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g)].map(match=>match[1]);
 assert.ok(assets.length>=2);
 for(const path of assets){const response=await fetch(base+path);assert.equal(response.status,200,path);assert.ok((await response.arrayBuffer()).byteLength>0,path);}
-const result={label,version,sourceCommit:commit,health:true,login:true,authenticationRequired:true,frontendAssets:assets.length,codexCliVersion:health.codexCli.version,environmentMode:'0600'};
+const result={label,version,sourceCommit:commit,appVersion,health:true,login:true,authenticationRequired:true,frontendAssets:assets.length,codexCliVersion:health.codexCli.version,environmentMode:'0600'};
 fs.appendFileSync(checksFile,JSON.stringify(result)+'\n');
 console.log(JSON.stringify(result));
 NODE
