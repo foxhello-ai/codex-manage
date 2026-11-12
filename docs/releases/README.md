@@ -16,8 +16,9 @@
 | --- | --- | --- | --- |
 | v1.0.1 | `runtime/v1.0.1`、`v1.0.1` → `7ee315b` | GitHub Actions 运行包构建、systemd 安装脚本、离线 Actions artifact 安装、运行包去 sourcemap | 冻结基线；规范 tag 为历史源码基线，仍需补回当时的 GitHub Release 资产和 SHA-256 后才可标为已验证发布 |
 | v1.0.9 | `release/v1.0.9`、`v1.0.9`、`runtime/v1.0.9` → `a921a7a` | 桌面原会话文字投递、空闲 writer 释放、工作台与性能改进、安装验收门禁 | 已验证发布：Ubuntu 24.04/systemd 的 tgz/zip 安装、升级/回滚、启停、配置保留及发布后下载复核均通过；真实账号与模型请求未测 |
+| v1.0.10 | `release/v1.0.10`、`v1.0.10`、`runtime/v1.0.10` → `e375a3a` | 历史分页、Web 审批恢复、原桌面异步问题的 Web 答复、instabox Linux CI、跨平台安装器 | 已验证发布：Linux / Intel macOS / Apple ARM macOS 正式发布包安装、升级/回滚和启停均通过 |
 
-详见 [`runtime-v1.0.1.md`](runtime-v1.0.1.md) 和 [`runtime-v1.0.9.md`](runtime-v1.0.9.md)。
+详见 [`runtime-v1.0.1.md`](runtime-v1.0.1.md)、[`runtime-v1.0.9.md`](runtime-v1.0.9.md) 和 [`runtime-v1.0.10.md`](runtime-v1.0.10.md)。
 
 ## Desktop
 

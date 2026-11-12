@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-12T05:11:51.420Z",
+  "checkedAt": "2026-11-12T06:04:53.803Z",
   "results": [
     {
       "name": "desktop",
@@ -90,12 +90,16 @@
         {
           "target": "#evidence",
           "exists": true
+        },
+        {
+          "target": "#release",
+          "exists": true
         }
       ],
       "pageErrors": [],
       "zoomVisible": true,
       "zoomClosed": true,
-      "sourceEvidence": 12,
+      "sourceEvidence": 13,
       "evidenceExpanded": true,
       "anchorWorked": true,
       "passed": true
@@ -189,12 +193,16 @@
         {
           "target": "#evidence",
           "exists": true
+        },
+        {
+          "target": "#release",
+          "exists": true
         }
       ],
       "pageErrors": [],
       "zoomVisible": true,
       "zoomClosed": true,
-      "sourceEvidence": 12,
+      "sourceEvidence": 13,
       "evidenceExpanded": true,
       "anchorWorked": true,
       "passed": true
@@ -211,6 +219,10 @@
     },
     {
       "link": "../../implementation-notes/2026-11-12-question-reply-alternatives.md",
+      "exists": true
+    },
+    {
+      "link": "../2026-11-12-runtime-v1.0.10/README.md",
       "exists": true
     }
   ],

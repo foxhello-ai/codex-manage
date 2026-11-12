@@ -1,6 +1,6 @@
 # 桌面会话性能、途中交互与 instabox 实施记录
 
-日期：2026-11-12。需求见 [批准范围](../desktop-interaction-sync-requirements.md)。基线 main@e3b4986，独立分支 codex/desktop-interaction-sync。本轮未合并、发布或重启原 Manage 服务。桌面原安装和启动保持原样。
+日期：2026-11-12。需求见 [批准范围](../desktop-interaction-sync-requirements.md)。基线 main@e3b4986，独立分支 codex/desktop-interaction-sync。功能验收阶段未合并发布；后续已按用户指令合并 main 并正式发布 v1.0.10，见文末发布记录。桌面原安装和启动保持原样。
 
 ## 说明原因
 
@@ -44,10 +44,14 @@
 
 历史性能同一活动会话 4 次交替采样：完整历史 7094/5237ms，最近 20 轮 1966/1582ms，平均下降约 71%；非浏览器公网耗时保证。writer 操作 0。[证据](../acceptance/2026-11-12-desktop-interaction-sync/history-performance.json)。
 
-真实目标仓库 [Instabox Pilot 43148957035](https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035)，源码 d3d6315：179 项测试、完整构建、8 项安装生命周期通过。Linux Ubuntu 24.04/systemd255，Node22.23.3。安装验证使用既有 v1.0.9/v1.0.8 包，不能声称本轮问答补丁已发布或已跑该 CI。未验证 OpenAI 账户重新登录/真实模型推理。[CI](../acceptance/2026-11-12-desktop-interaction-sync/instabox-actions.json)、[安装](../acceptance/2026-11-12-desktop-interaction-sync/actions-installation.json)。
+早期目标仓库 [Instabox Pilot 43148957035](https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035)，源码 d3d6315：179 项测试、完整构建、8 项安装生命周期通过。Linux Ubuntu 24.04/systemd255，Node22.23.3。安装验证使用既有 v1.0.9/v1.0.8 包，该次早期 CI 不含问答补丁；最新发布代码与安装验证见文末正式发布记录。未验证 OpenAI 账户重新登录/真实模型推理。[CI](../acceptance/2026-11-12-desktop-interaction-sync/instabox-actions.json)、[安装](../acceptance/2026-11-12-desktop-interaction-sync/actions-installation.json)。
 
 ## 能力边界与回滚
 
 桌面 IPC 是已安装版本的内部入口，尚无官方稳定兼容承诺；OpenAI Docs 页面前次抓取失败，不能把本机验证描述为官方支持。需同主机、同用户、保持原 thread 在桌面打开。桌面关闭或版本不兼容时明确显示不可用；不接管已失效同步 RPC、不新增桌面停止/模型/权限功能。
 
-回滚撤销本分支代码/workflow；无需修改桌面或回滚会话历史。提交未知状态时保留提交台账供核对，禁止删除后盲目重发。main 和原 4310/4311 服务未修改；独立 Web 验收使用 4330 端口。
+回滚撤销本分支代码/workflow；无需修改桌面或回滚会话历史。提交未知状态时保留提交台账供核对，禁止删除后盲目重发。功能验收使用独立 4330 端口；后续 main 已合并修复，未自动升级用户生产服务。
+
+## 正式发布记录
+
+修复源码 e375a3a 已合并 main，v1.0.10 正式发布。最新代码在 instabox 通过 189 项测试和构建；发布前 8 项 Linux 安装检查及发布后下载复核通过。发布后 Linux、Intel Mac、Apple ARM Mac 三平台检查和本机 Intel Mac 10 项检查均通过。[证据与校验和](../acceptance/2026-11-12-runtime-v1.0.10/README.md)。用户现有服务未自动升级；桌面启动方式未变更。

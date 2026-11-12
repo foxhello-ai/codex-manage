@@ -1,6 +1,6 @@
 # 桌面会话同步、途中交互与 CI 迁移需求
 
-批准日期：2026-11-12。用户已批准本会话中的问题分析与修复范围，并要求先记录需求，再实施。基线：`main@e3b4986`；实施分支：`codex/desktop-interaction-sync`。发布版本、tag、合并与发布记录另行登记，本文件不表示已发布。
+批准日期：2026-11-12。用户已批准本会话中的问题分析与修复范围，并要求先记录需求，再实施。基线：`main@e3b4986`；实施分支：`codex/desktop-interaction-sync`。已合并 main 并发布 v1.0.10，版本、tag 与安装记录见 [发布证据](acceptance/2026-11-12-runtime-v1.0.10/README.md)。
 
 ## 用户问题与目标
 
@@ -14,7 +14,7 @@
 ### 用户补充确认（2026-11-12）
 
 - 保留桌面原图标、原启动方式和当前私有后台；不采用改变启动连接的共享服务方案。
-- 第 2 项是 Web 自身审批面板的显示与恢复问题，按此口径标为“已实现”，尚未合并上线。
+- 第 2 项是 Web 自身审批面板的显示与恢复问题，按此口径标为“已实现”，已随 v1.0.10 合并发布。
 - 第 3 项确认是独立的问题/选项面板，需要点击提交；接受以文字作为答案，但不能把下一轮聊天入队当成当前问题已答复。已从真实桌面状态确认该卡属于异步问答。
 - Web 停止桌面任务、修改桌面执行模型或权限维持现状，不纳入新增修复。
 - [途中问答通道说明](implementation-notes/2026-11-12-question-reply-alternatives.md) 记录同步/异步区别及原桌面现有 IPC 方案；使用独立验收服务测试。
@@ -38,7 +38,7 @@
 - 请求类型需从真实协议记录辨认，区分权限审批、标准问答、MCP 表单与桌面专用交互。
 - 保留现有主/子用户授权与桌面文字投递限制，查看不得获取会话写锁。
 
-## 已确认的分析证据
+## 修复前确认的分析证据
 
 - 当前实现使用原生文字队列加持久历史读取，不共享桌面实时 RPC。此前验收明确把桌面审批等操作留在桌面。
 - 本地同一会话摘要约 116ms，完整历史约 2062ms，重复完整读取约 1976ms；运行态约 13ms。独立读取分解：`thread/read` 约 1033ms，`thread/turns/list` 约 781ms，模型记录解析约 65ms。更长时间卡顿尚未复现。
@@ -71,6 +71,6 @@
 
 无需新增账号授权、辅助程序或系统权限。
 
-[HTML 验收报告](acceptance/2026-11-12-desktop-interaction-sync/report.html) 包含真实桌面问题在 Web 的截图、375px/1440px 测试截图、原始证据及明确的完成状态。截图、协议桩测试与真实提交分别标注。CI 已通过目标仓库真实 [Instabox Linux Pilot](https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035)，先前 179 项测试和安装生命周期通过；最新问答代码的本地测试单独记录，不能冒充该 CI 已跑最新补丁。
+[HTML 验收报告](acceptance/2026-11-12-desktop-interaction-sync/report.html) 包含真实桌面问题在 Web 的截图、375px/1440px 测试截图、原始证据及明确的完成状态。截图、协议桩测试与真实提交分别标注。早期 [Instabox Linux Pilot](https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035) 的 179 项测试保留为历史记录；最新源码 e375a3a 已通过 [正式发布流水线](https://github.com/foxhello-ai/codex-manage/actions/runs/43164120666) 的 189 项测试、构建与 Linux 安装验收。
 
-实现与部署分别登记：工作分支 codex/desktop-interaction-sync，main 尚未合并；本次问答补丁未发布，现有 4310/4311 服务未重启。
+交付结果：修复已合并 main，并正式发布 v1.0.10。Linux、Intel macOS 和 Apple ARM macOS 对本次发布包的安装复验均通过；用户现有生产服务未自动升级。见 [发布证据](acceptance/2026-11-12-runtime-v1.0.10/README.md)。

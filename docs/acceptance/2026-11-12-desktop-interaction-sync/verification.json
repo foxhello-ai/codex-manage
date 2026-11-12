@@ -11,7 +11,8 @@
     "clientBuild": "passed",
     "serverBuild": "passed",
     "openaiAccountLoginTested": false,
-    "realModelInferenceTested": false
+    "realModelInferenceTested": false,
+    "scope": "Historical d3d6315 pilot, before the asynchronous question patch; latest 189-test release evidence is runtimeRelease."
   },
   "local": {
     "typecheck": "passed",
@@ -66,7 +67,7 @@
     "pilotImplemented": true,
     "firstTargetActionsRunVerified": true,
     "appAuthorizationVerified": true,
-    "linuxMigrationActivated": false,
+    "linuxMigrationActivated": true,
     "defaultRunner": "instabox-medium",
     "activationVariable": null,
     "macosRunners": [
@@ -79,11 +80,13 @@
     "repositoryAccessVerified": true,
     "appAuthorizationScope": "foxhello-ai/codex-manage job was accepted and completed successfully on instabox-medium.",
     "linuxMigrationImplemented": true,
-    "mainRunnerAtVerification": "ubuntu-24.04",
+    "mainRunnerAtVerification": "instabox-medium",
     "rollbackVariable": "LINUX_CI_RUNNER=ubuntu-24.04",
     "pilotRunUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035",
     "pilotSourceCommit": "d3d631558956475b7e6423c0a5d1b2c25edbdd38",
-    "scope": "Linux defaults changed in the implementation branch; main has not been merged or released."
+    "scope": "Linux defaults are active on main; runtime v1.0.10 was published successfully on instabox-medium and verified across Linux and macOS.",
+    "releaseRunUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43164120666",
+    "releaseSourceCommit": "e375a3a5ae4fd438ff68f6012e3a64ebc7639d31"
   },
   "installation": {
     "report": "instabox-installation.json",
@@ -92,10 +95,12 @@
       "1.0.8"
     ],
     "result": "passed",
-    "currentChangePublished": false
+    "currentChangePublished": true,
+    "currentVersion": "1.0.10",
+    "currentEvidence": "../2026-11-12-runtime-v1.0.10/release-summary.json"
   },
   "preservation": {
-    "mainUnchanged": true,
+    "mainUnchanged": false,
     "existingCanvasUntouched": true,
     "existingLocalServicePids": [
       75139,
@@ -133,5 +138,65 @@
   },
   "desktopAsyncQuestionEvidence": "desktop-async-questions.json",
   "priorLinuxVerifiedSourceArchiveSha256": "de4339bfac67878716d7eeb22c1b399a0feee9bcff356b4fee135f9f80cea17d",
-  "latestSourceScope": "Local uncommitted asynchronous question changes on codex/desktop-interaction-sync at f525e48; prior Linux archive hash and Actions run do not cover these changes."
+  "latestSourceScope": "Released source e375a3a includes the asynchronous question changes and passed 189 tests, typecheck and build on instabox. The earlier d3d6315 pilot remains historical evidence.",
+  "runtimeRelease": {
+    "version": "1.0.10",
+    "status": "published-and-installation-verified",
+    "checkedAt": "2026-11-12T14:01:38.592018+08:00",
+    "sourceCommit": "e375a3a5ae4fd438ff68f6012e3a64ebc7639d31",
+    "releaseUrl": "https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.10",
+    "releaseRunUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43164120666",
+    "postPublicationRunUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43164721926",
+    "postPublicationWorkflowCommit": "2b2c38722795e9331b9d3cfb5a35ed09c324119f",
+    "releasePublishedAt": "2026-11-12T05:54:31Z",
+    "packageSha256": "13ae8023610ad4d58eb8d0c6fc78575bf58052cc00974e430216146b6585fd98",
+    "installerSha256": "6970baf73fbc24d2aede91fc9e8bf030dde6756c2d1f4fafd80a3c54d8701549",
+    "tags": {
+      "v1.0.10": "e375a3a5ae4fd438ff68f6012e3a64ebc7639d31",
+      "runtime/v1.0.10": "e375a3a5ae4fd438ff68f6012e3a64ebc7639d31",
+      "runtimeTagAnnotated": true
+    },
+    "mergedIntoMain": true,
+    "tests": {
+      "latestSourceUnitPassed": 189,
+      "uiPassed": 14,
+      "typecheck": "passed",
+      "productionBuild": "passed"
+    },
+    "releaseLinuxChecks": 8,
+    "postPublicationPlatforms": [
+      {
+        "os": "ubuntu-24.04",
+        "platform": "linux",
+        "arch": "x64",
+        "status": "passed",
+        "checks": 8,
+        "evidence": "linux-ci.json"
+      },
+      {
+        "os": "macos-15-intel",
+        "platform": "darwin",
+        "arch": "x64",
+        "status": "passed",
+        "checks": 10,
+        "evidence": "macos-intel-ci.json"
+      },
+      {
+        "os": "macos-15",
+        "platform": "darwin",
+        "arch": "arm64",
+        "status": "passed",
+        "checks": 10,
+        "evidence": "macos-arm64-ci.json"
+      }
+    ],
+    "localMacChecks": 10,
+    "publishedDownloadVerified": true,
+    "websiteWorkflowDeployment": "passed",
+    "accountLoginTested": false,
+    "modelInferenceTested": false,
+    "localUserProductionServiceUpgraded": false,
+    "installationScope": "Isolated verification services; no upgrade of the user production service",
+    "desktopIntegrationEvidence": "../2026-11-12-desktop-interaction-sync/desktop-async-questions.json"
+  }
 }

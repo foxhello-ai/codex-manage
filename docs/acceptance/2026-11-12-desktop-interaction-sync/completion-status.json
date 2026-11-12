@@ -1,16 +1,16 @@
 {
-  "checkedAt": "2026-11-12T05:08:51.655476+00:00",
+  "checkedAt": "2026-11-12T14:01:38.592018+08:00",
   "acceptanceRule": "Only 已实现 / 没实现; evaluate complete original user scenarios. Implementation and deployment are separate.",
   "implemented": 4,
   "notImplemented": 0,
-  "deployed": 0,
   "requests": [
     {
       "id": 1,
       "status": "已实现",
       "name": "会话打开慢",
       "evidence": "history-performance.json",
-      "userHelpRequired": false
+      "userHelpRequired": false,
+      "deploymentScope": "main; runtime v1.0.10 published and installation verified"
     },
     {
       "id": 2,
@@ -23,7 +23,7 @@
       ],
       "userHelpRequired": false,
       "result": "HTTP 状态与 WebSocket 事件消费位置分开，恢复待审批内容并清理已解决请求；与桌面挂起审批无关。",
-      "deploymentScope": "implementation branch; not merged to main"
+      "deploymentScope": "main; runtime v1.0.10 published and installation verified"
     },
     {
       "id": 3,
@@ -37,25 +37,34 @@
       "userHelpRequired": false,
       "userHelpNote": "无需新增账号授权、辅助程序或系统权限。",
       "implementation": "Dedicated native IPC read/submit channel implemented; no ordinary queue fallback",
-      "deploymentScope": "implementation worktree; not merged, released or deployed"
+      "deploymentScope": "main; runtime v1.0.10 published and installation verified"
     },
     {
       "id": 4,
       "status": "已实现",
       "name": "instabox Linux CI",
-      "evidence": "instabox-actions.json",
-      "sourceCommit": "d3d631558956475b7e6423c0a5d1b2c25edbdd38",
-      "runUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035",
+      "evidence": [
+        "instabox-actions.json",
+        "../2026-11-12-runtime-v1.0.10/release-summary.json"
+      ],
+      "sourceCommit": "e375a3a5ae4fd438ff68f6012e3a64ebc7639d31",
+      "runUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43164120666",
       "userHelpRequired": false,
-      "result": "Target repository pilot succeeded: 179 tests, build and eight installation lifecycle checks. Implementation branch Linux installer and release defaults use instabox-medium; macOS retained.",
-      "deploymentScope": "implementation branch; not merged to main"
+      "result": "Linux defaults are active on main. Runtime v1.0.10 release succeeded on instabox-medium with 189 tests, build and eight Linux installation checks. Published-package Linux, Intel Mac and Apple ARM Mac installation verification passed.",
+      "deploymentScope": "main; runtime v1.0.10 published and installation verified",
+      "pilotSourceCommit": "d3d631558956475b7e6423c0a5d1b2c25edbdd38",
+      "pilotRunUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035"
     }
   ],
-  "deploymentNote": "先前 CI 改动已推送；本轮问答补丁仍在独立 worktree，尚未合并、发布或重启原服务。",
+  "deploymentNote": "已合并 main 并发布 v1.0.10；正式发布包的 Linux/Intel Mac/Apple ARM Mac 安装已验证。用户现有生产服务未自动升级。",
   "scopeClarification": {
     "approval": "Manage Web 自身审批面板需反复点击，不要求 Web 代答桌面权限审批。",
     "question": "用户确认是独立问题/选项面板，需要点击提交；可接受文字答案。",
     "desktop": "保持原图标、原启动及原后台；不采用共享后台启动。",
     "unchanged": "Web 停止桌面任务、修改桌面模型/权限维持现状。"
-  }
+  },
+  "merged": true,
+  "published": true,
+  "publishedVersion": "1.0.10",
+  "releaseUrl": "https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.10"
 }

@@ -39,3 +39,13 @@ curl -fsSL https://github.com/foxhello-ai/codex-manage/releases/download/v1.0.10
 ```
 
 GitHub Release：[v1.0.10](https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.10)。保留 v1.0.9 可用于回滚；安装升级保留既有配置与数据。
+
+## 正式发布结果
+
+已于 2026-11-12T13:54:31+08:00 正式发布。冻结源码 `e375a3a5ae4fd438ff68f6012e3a64ebc7639d31`；v1.0.10、runtime/v1.0.10 和 release/v1.0.10 指向同一提交。
+
+[发布流水线](https://github.com/foxhello-ai/codex-manage/actions/runs/43164120666) 全部通过，instabox 上 189 项测试、构建、8 项 Linux 安装生命周期及正式下载复核成功。[发布后安装矩阵](https://github.com/foxhello-ai/codex-manage/actions/runs/43164721926) 对 Linux、Intel macOS 和 Apple ARM macOS 的本次发布包复验均通过；Mac 各 10 项检查。本机 Intel Mac 同样 10 项通过。
+
+运行包 SHA-256：`13ae8023610ad4d58eb8d0c6fc78575bf58052cc00974e430216146b6585fd98`。
+
+[完整发布与安装证据](../acceptance/2026-11-12-runtime-v1.0.10/README.md)。安装验证均使用隔离服务，不代表用户现有服务已自动升级，也不代表真实账号登录或模型推理验收。
