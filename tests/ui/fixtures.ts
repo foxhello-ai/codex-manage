@@ -75,7 +75,7 @@ export async function installUiHarness(page: Page, options: { status?: SessionSt
     calls.push({ path, method, body });
     const json = async (data: unknown, status = 200) => route.fulfill({ status, json: data });
     if (path === "/api/me") return json({ authenticated: true, defaultPassword: false, user: { id: options.child ? "child-ui" : "owner", role: options.child ? "child" : "owner", displayName: "UI Test", localEmail: null, active: true, ownerUserId: null } });
-    if (path === "/api/config") return json({ host: "127.0.0.1", port: 4311, codexCliPath: "/usr/bin/codex", sessionsDir: "/test/sessions", defaultPassword: false, codexCliVersion: "test", codexVersionError: null, appServer: { status: "ready", pid: null, initialized: true, lastError: null }, runtimeReload: null });
+    if (path === "/api/config") return json({ appVersion: "v1.0.10", host: "127.0.0.1", port: 4311, codexCliPath: "/usr/bin/codex", sessionsDir: "/test/sessions", defaultPassword: false, codexCliVersion: "test", codexVersionError: null, appServer: { status: "ready", pid: null, initialized: true, lastError: null }, runtimeReload: null });
     if (path === "/api/models") return json(catalog);
     if (path === "/api/tasks" && method === "GET") return json({ tasks });
     if (path === "/api/tasks" && method === "POST") {

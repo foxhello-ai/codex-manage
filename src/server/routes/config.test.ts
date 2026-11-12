@@ -34,6 +34,7 @@ describe("config and health routes", () => {
 
     expect(configResponse.statusCode).toBe(200);
     expect(configResponse.json()).toMatchObject({
+      appVersion: expect.stringMatching(/^源码版（.+）$/),
       host: "0.0.0.0",
       port: 5902,
       defaultPassword: true,

@@ -1987,6 +1987,7 @@ function SettingsPage({
           <span>只读</span>
         </div>
         <div className="settingsRows">
+          <SettingsRow label="当前版本" value={config?.appVersion ?? (config ? "未读取" : "读取中")} />
           <SettingsRow label="监听地址" value={config?.host ?? "读取中"} />
           <SettingsRow label="监听端口" value={config ? String(config.port) : "读取中"} />
           <SettingsRow label="登录密码" value={config ? (config.defaultPassword ? "使用默认密码" : "环境变量已覆盖") : "读取中"} />

@@ -51,6 +51,7 @@ export type RuntimeReloadSnapshot = {
 };
 
 export type PublicConfig = {
+  appVersion: string;
   host: string;
   port: number;
   codexCliPath: string;

@@ -3,16 +3,20 @@ import type { AppConfig } from "../config";
 import type { RuntimeSnapshot } from "../services/AppRuntime";
 import { isOwner } from "../auth/session";
 import { sendError } from "../httpErrors";
+import { readAppVersion } from "../appVersion";
 
 export function registerConfigRoutes(
   app: FastifyInstance,
   config: AppConfig,
   getRuntimeSnapshot?: () => RuntimeSnapshot
 ) {
+  // Capture this process's version once, even if an upgrade later replaces files on disk.
+  const appVersion = readAppVersion();
   app.get("/api/config", async (request, reply) => {
     if (!isOwner(request)) return sendError(reply, 403, "OWNER_REQUIRED", "只有主用户可以查看系统配置");
     const runtime = getRuntimeSnapshot?.();
     return {
+      appVersion,
       host: config.host,
       port: config.port,
       codexCliPath: config.codexCliPath,

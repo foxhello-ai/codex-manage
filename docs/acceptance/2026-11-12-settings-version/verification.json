@@ -1,0 +1,26 @@
+{
+  "status": "已实现",
+  "merged": false,
+  "published": false,
+  "unitTests": {
+    "passed": 5,
+    "failed": 0
+  },
+  "typecheck": "passed",
+  "productionBuild": "passed",
+  "compiledRoute": {
+    "readInstalledMetadata": true,
+    "version": "v1.0.10",
+    "packageJsonVersion": "1.0.0",
+    "workingDirectory": "/private/tmp",
+    "runningVersionUnaffectedByMetadataReplacement": true
+  },
+  "ui": {
+    "desktop": "passed",
+    "mobile375": "passed",
+    "mobileDocumentWidth": 375,
+    "refresh": "passed",
+    "screenshotsAreIsolatedPreview": true
+  },
+  "existingMainServiceChanged": false
+}

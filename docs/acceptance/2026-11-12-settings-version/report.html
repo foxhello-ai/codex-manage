@@ -1,0 +1,26 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>设置页版本字段验收</title><style>body{font:16px/1.7 system-ui,sans-serif;background:#f4f6f5;color:#172d25;margin:0}main{max-width:1080px;margin:auto;padding:28px}h1{font-size:28px}.box{background:white;padding:22px;border:1px solid #d7e4de;border-radius:12px;margin:20px 0}.ok{color:#178449}img{display:block;max-width:100%;height:auto;border-radius:10px}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#167052}.mobile{max-width:375px}</style></head><body><main><h1>设置页“当前版本”字段</h1><p class="ok"><strong>已实现</strong></p><p>尚未合并 main、尚未发布；现有 v1.0.10 发布包不包含新字段。</p><div class="box"><p>位置：设置和诊断 → Web 服务 → 当前版本。</p><p>安装版读取正在运行包的版本，例如 v1.0.10；开发环境显示源码提交及本地修改状态。版本信息按进程启动时固定，便于识别服务是否已重新启动到新版。</p><p>5 项相关测试、类型检查与生产构建通过。编译后的配置接口可在其他工作目录读取安装包版本；替换文件不会使旧进程冒报新版本。375px 界面无横向溢出，“重新检查”后显示正常。</p></div><div class="box"><h2>桌面预览</h2><p>截图为隔离界面预览；路径和健康状态为测试数据。版本值来自现有 v1.0.10 包元数据，不表示该包已含新字段。</p><img src="desktop.jpg" alt="设置页 Web 服务首行显示当前版本"></div><div class="box"><h2>手机预览 · 375px</h2><img class="mobile" src="mobile-375.jpg" alt="手机设置页正常显示当前版本"></div><div class="box"><h2>验证记录</h2><pre>{
+  &quot;status&quot;: &quot;已实现&quot;,
+  &quot;merged&quot;: false,
+  &quot;published&quot;: false,
+  &quot;unitTests&quot;: {
+    &quot;passed&quot;: 5,
+    &quot;failed&quot;: 0
+  },
+  &quot;typecheck&quot;: &quot;passed&quot;,
+  &quot;productionBuild&quot;: &quot;passed&quot;,
+  &quot;compiledRoute&quot;: {
+    &quot;readInstalledMetadata&quot;: true,
+    &quot;version&quot;: &quot;v1.0.10&quot;,
+    &quot;packageJsonVersion&quot;: &quot;1.0.0&quot;,
+    &quot;workingDirectory&quot;: &quot;/private/tmp&quot;,
+    &quot;runningVersionUnaffectedByMetadataReplacement&quot;: true
+  },
+  &quot;ui&quot;: {
+    &quot;desktop&quot;: &quot;passed&quot;,
+    &quot;mobile375&quot;: &quot;passed&quot;,
+    &quot;mobileDocumentWidth&quot;: 375,
+    &quot;refresh&quot;: &quot;passed&quot;,
+    &quot;screenshotsAreIsolatedPreview&quot;: true
+  },
+  &quot;existingMainServiceChanged&quot;: false
+}</pre><a href="verification.json">原始 JSON</a></div></main></body></html>
