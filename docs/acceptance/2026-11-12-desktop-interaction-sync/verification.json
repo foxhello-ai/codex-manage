@@ -1,8 +1,7 @@
 {
-  "date": "2026-11-12T02:55:14.048193+00:00",
+  "date": "2026-11-12T05:08:51.655476+00:00",
   "base": "e3b4986",
   "branch": "codex/desktop-interaction-sync",
-  "verifiedSourceArchiveSha256": "de4339bfac67878716d7eeb22c1b399a0feee9bcff356b4fee135f9f80cea17d",
   "linux": {
     "environment": "instabox ci@2026-11-05.ci.1, Ubuntu 24.04, 4 CPU / 8 GiB, Node 22.23.3, systemd 255",
     "testFiles": 30,
@@ -31,7 +30,21 @@
       375,
       1440
     ],
-    "screenshotsVisuallyInspected": true
+    "screenshotsVisuallyInspected": true,
+    "clarifiedWebApprovalUI": {
+      "passed": 14,
+      "failed": 0,
+      "viewports": [
+        375,
+        1440
+      ],
+      "scope": "Browser fixtures, including native asynchronous question panel, own approvals, MCP and history"
+    },
+    "asyncQuestionUnit": {
+      "passed": 189,
+      "failed": 0,
+      "testFiles": 32
+    }
   },
   "workflowValidation": {
     "tool": "actionlint 1.7.12",
@@ -40,11 +53,13 @@
     "customRunnerLabelDeclared": "instabox-medium"
   },
   "desktopPrivateBackend": {
-    "crossClientInteractionPassed": false,
-    "finding": "No verified external pending-request read/answer channel in the inspected default desktop installation.",
+    "crossClientInteractionPassed": true,
+    "finding": "已确认 Web 回答由原桌面接受；当前任务收到关联答案。",
     "desktopStartupModified": false,
     "originalDesktopPid": 32288,
-    "originalBackendPid": 32800
+    "originalBackendPid": 32800,
+    "existingIpcReadPassed": true,
+    "realQuestionWebDisplayPassed": true
   },
   "actions": {
     "targetRepository": "foxhello-ai/codex-manage",
@@ -94,5 +109,29 @@
     "vaultLoaded": false,
     "secretsSelected": false,
     "deleted": true
-  }
+  },
+  "scopeClarifiedAt": "2026-11-12T04:14:22.522294+00:00",
+  "clarifiedAcceptance": {
+    "implemented": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "notImplemented": [],
+    "approvalScope": "Manage Web own approval UI, not desktop approvals",
+    "questionScope": "Independent desktop question/options panel, confirmed by user"
+  },
+  "questionTextQueueProbe": {
+    "result": "passed",
+    "checks": 5,
+    "evidence": "question-text-queue.json",
+    "realDesktopTested": false,
+    "realModelInferenceTested": false,
+    "desktopModified": false,
+    "scope": "Synchronous request_user_input RPC ONLY; does not describe screenshot asynchronous cards"
+  },
+  "desktopAsyncQuestionEvidence": "desktop-async-questions.json",
+  "priorLinuxVerifiedSourceArchiveSha256": "de4339bfac67878716d7eeb22c1b399a0feee9bcff356b4fee135f9f80cea17d",
+  "latestSourceScope": "Local uncommitted asynchronous question changes on codex/desktop-interaction-sync at f525e48; prior Linux archive hash and Actions run do not cover these changes."
 }

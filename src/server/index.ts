@@ -19,6 +19,8 @@ import { ModelCatalogService } from "./services/ModelCatalogService";
 import { SessionModelService } from "./services/SessionModelService";
 import { registerStaticClient } from "./staticClient";
 import { CollaborationStore } from "./services/CollaborationStore";
+import { dirname } from "node:path";
+import { DesktopQuestionService } from "./services/DesktopQuestionService";
 import { TaskStore } from "./services/TaskStore";
 
 const config = loadConfig();
@@ -33,6 +35,8 @@ const collaborationStore = new CollaborationStore(
   config.collaborationFile ?? ".codex-manage/collaboration.json",
   { displayName: config.ownerName, localEmail: config.ownerEmail }
 );
+const desktopQuestions = new DesktopQuestionService(process.env.CODEX_HOME ?? dirname(config.sessionsDir), `${config.metadataFile}.desktop-questions.json`);
+app.addHook("onClose", async () => desktopQuestions.dispose());
 const taskStore = new TaskStore(`${config.metadataFile}.tasks.json`);
 const modelCatalog = new ModelCatalogService(runtime.appServer);
 let runtimeReloadRetryAttempt = 0;
@@ -68,7 +72,7 @@ registerCollaborationRoutes(app, collaborationStore);
 registerConfigRoutes(app, config, () => runtime.getSnapshot());
 registerModelRoutes(app, modelCatalog);
 registerRuntimeRoutes(app, runtime, modelCatalog);
-registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager, sessionModelService, collaborationStore, taskStore);
+registerSessionRoutes(app, sessionService, jsonlSessionParser, runtime.runtimeManager, sessionModelService, collaborationStore, taskStore, desktopQuestions);
 
 if (process.env.NODE_ENV === "production") {
   await registerStaticClient(app, config.clientDir);

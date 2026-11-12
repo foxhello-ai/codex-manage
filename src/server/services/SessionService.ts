@@ -47,7 +47,7 @@ export type SessionTurn = {
 
 export type SessionTurnItem =
   | { id: string; type: "user_message"; text: string; clientId?: string | null }
-  | { id: string; type: "agent_message"; text: string; phase: string | null }
+  | { id: string; type: "agent_message"; text: string; phase: string | null; delivery?: string | null; questions?: Array<{ title: string; options: string[] }> }
   | { id: string; type: "file_change"; status: string | null; changes: SessionFileChange[] }
   | { id: string; type: "context_compaction" }
   | { id: string; type: "unknown"; rawType: string | null };
@@ -446,7 +446,11 @@ function toTurnItem(value: unknown, index: number, sessionId: string): SessionTu
         id,
         type: "agent_message",
         text: rewriteLocalAssetLinks(readString(source.text) ?? "", sessionId),
-        phase: readString(source.phase)
+        phase: readString(source.phase),
+        ...(Array.isArray(source.questions) ? { delivery: readString(source.delivery), questions: source.questions.flatMap(value => {
+          const question = value as Record<string, unknown>;
+          return question && typeof question.title === "string" ? [{ title: question.title, options: readArray(question.options).filter((option): option is string => typeof option === "string") }] : [];
+        }) } : {})
       };
     case "fileChange":
       return {

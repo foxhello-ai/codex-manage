@@ -2,11 +2,12 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 import type { ApprovalDecision, ApprovalSummary } from "../shared/models";
 import { BottomSheet } from "./BottomSheet";
 
-export function InteractionCard({ approval, onSubmit, onClose, navigation }: {
+export function InteractionCard({ approval, onSubmit, onClose, navigation, description }: {
   approval: ApprovalSummary;
   onSubmit: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
   onClose: () => void;
   navigation?: ReactNode;
+  description?: string;
 }) {
   const id = useId();
   const customOption = `${id}-custom`;
@@ -27,7 +28,7 @@ export function InteractionCard({ approval, onSubmit, onClose, navigation }: {
   }
   function handleSubmit(event: FormEvent) { event.preventDefault(); void submit("accept"); }
   return (
-    <BottomSheet title={approval.title} description="会话正在等你回答。关闭后仍会保留问题。" onClose={onClose} busy={busy} className="approvalSheet">
+    <BottomSheet title={approval.title} description={description ?? "会话正在等你回答。关闭后仍会保留问题。"} onClose={onClose} busy={busy} className="approvalSheet">
       {navigation}
       {approval.reason ? <p>{approval.reason}</p> : null}
       {unsupported ? <p role="status">此交互需要原客户端提供的界面，请回原客户端处理。这里可以拒绝或取消请求。</p> : null}

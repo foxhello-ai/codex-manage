@@ -1,0 +1,134 @@
+{
+  "checkedAt": "2026-11-12T04:10:33.532Z",
+  "cliVersion": "codex-cli 0.162.0-alpha.2",
+  "isolation": {
+    "desktopStarted": false,
+    "desktopModified": false,
+    "realCredentialsUsed": false,
+    "realModelInferenceUsed": false
+  },
+  "scope": "Actual installed CLI, two isolated private stdio app-servers and native queue, shared temporary CODEX_HOME, localhost model stub; no official desktop process or UI automation.",
+  "checks": [
+    {
+      "id": "actual-structured-question-created",
+      "passed": true,
+      "evidence": {
+        "requestId": 0,
+        "turnId": "01a1cdf3-4232-7733-a9f9-f30dca6a7dd4"
+      }
+    },
+    {
+      "id": "queued-text-does-not-answer-pending-question",
+      "passed": true,
+      "evidence": {
+        "observationMs": 1500,
+        "modelRequests": 1,
+        "turnCompleted": false,
+        "queueId": "01a1cdf3-4357-7f82-a488-ebd6392945bb"
+      }
+    },
+    {
+      "id": "same-request-id-on-other-private-connection-does-not-answer",
+      "passed": true,
+      "evidence": {
+        "observationMs": 500
+      }
+    },
+    {
+      "id": "structured-text-answer-on-original-connection-resumes-turn",
+      "passed": true,
+      "evidence": {
+        "toolOutputs": [
+          "{\"answers\":{\"screen\":{\"answers\":[\"方案 B\"]}}}"
+        ]
+      }
+    },
+    {
+      "id": "queued-text-is-consumed-as-next-turn-after-question-is-answered",
+      "passed": true,
+      "evidence": {
+        "originalTurnId": "01a1cdf3-4232-7733-a9f9-f30dca6a7dd4",
+        "nextTurnId": "01a1cdf3-4b5e-74d2-9142-f25c799a3cb1"
+      }
+    }
+  ],
+  "modelRequests": [
+    {
+      "index": 1,
+      "path": "/v1/responses",
+      "toolAvailable": true,
+      "toolOutputs": [],
+      "userTexts": [
+        "<environment_context>\n  <cwd>/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/question-text-queue-7cYhg8/workspace</cwd>\n  <shell>zsh</shell>\n  <current_date>2026-11-12</current_date>\n  <timezone>Asia/Shanghai</timezone>\n  <filesystem><workspace_roots><root>/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/question-text-queue-7cYhg8/workspace</root></workspace_roots><permission_profile type=\"managed\"><file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry></file_system></permission_profile></filesystem>\n</environment_context>",
+        "QUESTION-PROBE"
+      ]
+    },
+    {
+      "index": 2,
+      "path": "/v1/responses",
+      "toolAvailable": true,
+      "toolOutputs": [
+        "{\"answers\":{\"screen\":{\"answers\":[\"方案 B\"]}}}"
+      ],
+      "userTexts": [
+        "<environment_context>\n  <cwd>/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/question-text-queue-7cYhg8/workspace</cwd>\n  <shell>zsh</shell>\n  <current_date>2026-11-12</current_date>\n  <timezone>Asia/Shanghai</timezone>\n  <filesystem><workspace_roots><root>/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/question-text-queue-7cYhg8/workspace</root></workspace_roots><permission_profile type=\"managed\"><file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry></file_system></permission_profile></filesystem>\n</environment_context>",
+        "QUESTION-PROBE"
+      ]
+    },
+    {
+      "index": 3,
+      "path": "/v1/responses",
+      "toolAvailable": true,
+      "toolOutputs": [
+        "{\"answers\":{\"screen\":{\"answers\":[\"方案 B\"]}}}"
+      ],
+      "userTexts": [
+        "<environment_context>\n  <cwd>/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/question-text-queue-7cYhg8/workspace</cwd>\n  <shell>zsh</shell>\n  <current_date>2026-11-12</current_date>\n  <timezone>Asia/Shanghai</timezone>\n  <filesystem><workspace_roots><root>/var/folders/91/t_2_gmln26l2r0lzxx1tq4s00000gn/T/question-text-queue-7cYhg8/workspace</root></workspace_roots><permission_profile type=\"managed\"><file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry></file_system></permission_profile></filesystem>\n</environment_context>",
+        "QUESTION-PROBE",
+        "QUEUE-TEXT-方案 B"
+      ]
+    }
+  ],
+  "threadId": "01a1cdf3-4209-7a30-984d-2ba4fb36bdfd",
+  "pendingRequest": {
+    "client": "owner",
+    "at": 1794456634162,
+    "method": "item/tool/requestUserInput",
+    "id": 0,
+    "params": {
+      "threadId": "01a1cdf3-4209-7a30-984d-2ba4fb36bdfd",
+      "turnId": "01a1cdf3-4232-7733-a9f9-f30dca6a7dd4",
+      "itemId": "call_question",
+      "questions": [
+        {
+          "id": "screen",
+          "header": "审核界面",
+          "question": "请选择界面",
+          "isOther": true,
+          "isSecret": false,
+          "options": [
+            {
+              "label": "方案 A",
+              "description": "界面 A"
+            },
+            {
+              "label": "方案 B",
+              "description": "界面 B"
+            }
+          ]
+        }
+      ],
+      "isBlocking": true,
+      "autoResolutionMs": null
+    }
+  },
+  "queueAfterAnswer": {
+    "data": [],
+    "nextCursor": null
+  },
+  "conclusion": "The answer may be text, but it must resolve the pending question on its original connection. Native queued chat text and a JSON-RPC reply sent to another private process do not resolve it in this isolated app-server probe.",
+  "limits": [
+    "This does not exercise the running official desktop or every internal interface.",
+    "No desktop UI bridge, real model, or real user question was tested."
+  ]
+}

@@ -23,6 +23,26 @@ class FakeAppServer extends EventEmitter {
 }
 
 describe("RuntimeManager", () => {
+  it("observes a desktop owner without resuming or taking over a writer", async () => {
+    const appServer = new FakeAppServer();
+    const queue = { list: () => [], hasPending: async () => false, find: async () => null, enqueue: async () => {} };
+    const manager = new RuntimeManager(appServer as any, { desktopQueue: queue as any });
+    manager.observeDesktopThread("desktop-thread", "desktop-turn");
+    expect(manager.getRuntime("desktop-thread")).toMatchObject({ status: "running", activeTurnId: "desktop-turn", executionSource: "external_queue" });
+    expect(appServer.requests).toEqual([]);
+    manager.observeDesktopThread("desktop-thread", null);
+    expect(manager.getRuntime("desktop-thread")).toMatchObject({ status: "history", activeTurnId: null });
+    await manager.resumeThread("manage-thread");
+    manager.observeDesktopThread("manage-thread", "other-turn");
+    expect(manager.getRuntime("manage-thread").executionSource).toBe("manage");
+    manager.dispose();
+  });
+  it("does not enter the external queue path when it is disabled", () => {
+    const manager = new RuntimeManager(new FakeAppServer() as any);
+    manager.observeDesktopThread("desktop-thread", "desktop-turn");
+    expect(manager.getRuntime("desktop-thread").executionSource).not.toBe("external_queue");
+    manager.dispose();
+  });
   it("recognizes native active flags without confusing user interaction with an idle completed turn", () => {
     const appServer = new FakeAppServer();
     const manager = new RuntimeManager(appServer as any);

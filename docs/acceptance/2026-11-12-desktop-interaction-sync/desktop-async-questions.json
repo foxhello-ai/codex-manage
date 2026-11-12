@@ -1,0 +1,62 @@
+{
+  "checkedAt": "2026-11-12T05:08:51.655476+00:00",
+  "desktopVersion": "26.1002.52244",
+  "embeddedCliVersion": "0.162.0-alpha.2",
+  "desktopStartupModified": false,
+  "desktopBundleModified": false,
+  "sharedAppServerRequired": false,
+  "connection": "Existing same-user local desktop IPC; no new router, listener or writer resume",
+  "questionKind": "request_user_input_async, agentMessage.questions with delivery=async",
+  "answerRoute": "thread-follower-steer-turn v1, exact discovered desktop owner, correlated question reply text",
+  "liveDesktop": {
+    "discoveryPassed": true,
+    "canonicalSnapshotPassed": true,
+    "patchUpdatesPassed": true,
+    "pendingQuestionDisplayedInWeb": true,
+    "webRefreshDidNotResurrectQuestion": true,
+    "beforePendingCount": 1,
+    "afterPendingCount": 0,
+    "readOnlyProbe": {
+      "checkedAt": "2026-11-12T05:02:34.166Z",
+      "elapsedMs": 3685,
+      "pendingQuestions": 1
+    },
+    "realWebSubmissionAccepted": true,
+    "desktopAndWebCleared": true,
+    "sameTaskReceivedReply": true,
+    "testAnswerSource": "Agent used Web UI on a newly created dedicated test question; explicit automated test text, no user preference inferred",
+    "postSubmitVerification": {
+      "checkedAt": "2026-11-12T05:09:22.523Z",
+      "sameActiveTurn": true,
+      "remainingQuestions": 0,
+      "acceptedLedgerRows": 1,
+      "available": true
+    },
+    "desktopVisualPanelIndependentlyCaptured": false,
+    "webReloadVerified": true
+  },
+  "automated": {
+    "unitPassed": 189,
+    "unitFailed": 0,
+    "uiPassed": 14,
+    "uiFailed": 0,
+    "viewports": [
+      375,
+      1440
+    ],
+    "scope": "Real Unix socket fixtures + authenticated HTTP + browser fixtures, distinct from real desktop delivery"
+  },
+  "limits": [
+    "Same host/user and compatible desktop IPC version required",
+    "Private version-sensitive interface; unavailable/unknown fails closed",
+    "No support added for desktop synchronous RPC approvals, stop or model/permission changes"
+  ],
+  "userHelpRequired": false,
+  "userHelp": "无需新增账号授权、辅助程序或系统权限。",
+  "screenshots": {
+    "real-desktop-web-question.jpg": "Real native question shown in Web; cropped to test card only",
+    "real-desktop-web-answer.jpg": "Actual accepted submission in Web composer; no unrelated histories",
+    "desktop-desktop-async-question.png": "Browser fixture, 1440 px",
+    "mobile-375-desktop-async-question.png": "Browser fixture, 375 px"
+  }
+}

@@ -1,3 +1,5 @@
+import { parseQuestionReplies } from "../shared/desktopQuestions";
+import { DesktopQuestionsPanel } from "./DesktopQuestionsPanel";
 import { CSSProperties, ChangeEvent, ClipboardEvent, FormEvent, Fragment, KeyboardEvent, PointerEvent, ReactNode, RefObject, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ApiRequestError, attachSessionToTask, branchSession, continueSessionFromHistory, createCollaborator, createSession, createTask, createTaskSession, getCollaborators, getHealthStatus, getLoginAccounts, getMe, getModels, getPublicConfig, getSessionDetail, getSessionRuntime, getSessionWebSocketUrl, getSessions, getTask, getTasks, login, logout, reloadRuntime, resumeSession, sendSessionInput, submitApproval, updateCollaboratorGrants, updateCollaboratorStatus, updateSessionMetadata, updateSessionModel, updateTask, uploadSessionAttachment, type UploadedSessionAttachment } from "../shared/api";
 import type { ApprovalDecision, ApprovalSummary, Collaborator, HealthStatus, LoginAccount, ModelCatalogResponse, PublicConfig, RuntimeSnapshot, SessionBranchMode, SessionDetail, SessionModelState, SessionPermissionMode, SessionSummary, SessionStatus, SessionTurnItem, TaskDetail, TaskSummary, UpdateModelSelectionInput, UserIdentity, UserSession, WebSessionEvent } from "../shared/models";
@@ -2629,7 +2631,7 @@ function SessionDetailPanel({
       <div className="composerDock">
         {runtime?.executionSource === "external_queue" ? (
           <div className="successBanner composerWarning" role="status">
-            此会话由桌面或其他客户端处理。后续文字沿用桌面设置并通过原生队列发送，审批、途中提问和界面选择、停止任务及设置请到桌面操作；Web 暂时无法读取或回答桌面的待交互请求。
+            此会话由桌面或其他客户端处理。后续文字沿用桌面设置并通过原生队列发送。桌面的问题卡片可在下方选择或填写回答；停止任务及执行设置请到桌面操作。
             {runtime.deliveries?.filter(row => row.status !== "completed").map(row => (
               <div key={row.requestId}>{row.status === "unknown" || row.status === "submitting" ? "投递结果待确认，请勿重复发送" : row.status === "failed" ? "桌面处理失败" : row.status === "observed" ? "消息已进入原会话，等待桌面完成" : "已入队，等待桌面处理"}：{row.text.slice(0, 120)}{row.error ? `（${row.error}）` : ""}</div>
             ))}
@@ -2642,6 +2644,7 @@ function SessionDetailPanel({
         {runtime?.permissionMode === "full_access" && pendingApprovals.some(approval => !["tool_user_input", "mcp_elicitation"].includes(approval.kind)) ? (
           <div className="errorBanner composerWarning" role="alert">完全权限模式收到未预期的审批请求，系统未自动处理；你仍可拒绝或取消该请求。</div>
         ) : null}
+        {runtime?.executionSource !== "manage" && !isChild ? <DesktopQuestionsPanel key={`desktop-questions-${session.id}`} sessionId={session.id} showUnavailable={runtime?.executionSource === "external_queue"} /> : null}
         <ApprovalPanel
           approvals={pendingApprovals}
           pendingCount={pendingApprovalCount}
@@ -3231,9 +3234,12 @@ function TurnItemView({
 }) {
   switch (item.type) {
     case "user_message":
-      return <MessageItem role="user" label="用户" text={stripAmbientBrowserContext(item.text)} />;
+      {
+      const replies = parseQuestionReplies(item.text);
+      return <MessageItem role="user" label="用户" text={replies.length ? replies.map(reply => `${reply.question}\n\n${reply.answer}`).join("\n\n") : stripAmbientBrowserContext(item.text)} />;
+      }
     case "agent_message":
-      return <MessageItem role="agent" label="Codex" text={item.text} />;
+      return <MessageItem role="agent" label="Codex" text={item.text || item.questions?.map(question => question.title).join("\n\n") || ""} />;
     case "file_change":
       return null;
     case "context_compaction":

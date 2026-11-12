@@ -1,100 +1,11 @@
 {
-  "stats": {
-    "startTime": "2026-11-12T02:41:25.320Z",
-    "duration": 15430.716000000002,
-    "expected": 8,
-    "skipped": 0,
-    "unexpected": 0,
-    "flaky": 0
-  },
-  "cases": [
-    {
-      "title": "HTTP runtime arriving before an older WS snapshot does not hide the question",
-      "project": "mobile-375",
-      "status": "expected",
-      "results": [
-        {
-          "status": "passed",
-          "duration": 2535
-        }
-      ]
-    },
-    {
-      "title": "history loads one recent page and retrieves older pages only after local history is revealed",
-      "project": "mobile-375",
-      "status": "expected",
-      "results": [
-        {
-          "status": "passed",
-          "duration": 2274
-        }
-      ]
-    },
-    {
-      "title": "HTTP recovers pending questions without WS; closing preserves them and refresh restores them",
-      "project": "mobile-375",
-      "status": "expected",
-      "results": [
-        {
-          "status": "passed",
-          "duration": 2048
-        }
-      ]
-    },
-    {
-      "title": "MCP forms send typed controls and cancellation has its own API action",
-      "project": "mobile-375",
-      "status": "expected",
-      "results": [
-        {
-          "status": "passed",
-          "duration": 1665
-        }
-      ]
-    },
-    {
-      "title": "HTTP runtime arriving before an older WS snapshot does not hide the question",
-      "project": "desktop",
-      "status": "expected",
-      "results": [
-        {
-          "status": "passed",
-          "duration": 2730
-        }
-      ]
-    },
-    {
-      "title": "history loads one recent page and retrieves older pages only after local history is revealed",
-      "project": "desktop",
-      "status": "expected",
-      "results": [
-        {
-          "status": "passed",
-          "duration": 2262
-        }
-      ]
-    },
-    {
-      "title": "HTTP recovers pending questions without WS; closing preserves them and refresh restores them",
-      "project": "desktop",
-      "status": "expected",
-      "results": [
-        {
-          "status": "passed",
-          "duration": 2318
-        }
-      ]
-    },
-    {
-      "title": "MCP forms send typed controls and cancellation has its own API action",
-      "project": "desktop",
-      "status": "expected",
-      "results": [
-        {
-          "status": "passed",
-          "duration": 1516
-        }
-      ]
-    }
-  ]
+  "scope": "Latest browser fixtures; distinct from actual native desktop submission",
+  "passed": 14,
+  "failed": 0,
+  "skipped": 0,
+  "viewports": [
+    375,
+    1440
+  ],
+  "screenshotsVisuallyInspected": true
 }

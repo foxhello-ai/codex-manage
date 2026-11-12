@@ -1,8 +1,8 @@
 {
-  "checkedAt": "2026-11-12T03:39:36.355933+00:00",
+  "checkedAt": "2026-11-12T05:08:51.655476+00:00",
   "acceptanceRule": "Only 已实现 / 没实现; evaluate complete original user scenarios. Implementation and deployment are separate.",
-  "implemented": 2,
-  "notImplemented": 2,
+  "implemented": 4,
+  "notImplemented": 0,
   "deployed": 0,
   "requests": [
     {
@@ -14,20 +14,30 @@
     },
     {
       "id": 2,
-      "status": "没实现",
-      "name": "官方桌面审批在 Web 展示与处理",
-      "blocker": "No verified external read/reply channel for pending requests on the unchanged desktop private backend.",
+      "status": "已实现",
+      "name": "Web 自身审批面板需反复打开",
+      "evidence": [
+        "verification.json",
+        "desktop-approval.png",
+        "mobile-375-approval.png"
+      ],
       "userHelpRequired": false,
-      "userHelpNote": "Not an account permission problem; no user action currently resolves the technical blocker.",
-      "alternativeScopeDecision": "A shared app-server route was previously verified, but it changes the desktop startup connection. This conflicts with the existing unchanged-desktop constraint and requires an explicit user scope change; it is not implemented for the default desktop."
+      "result": "HTTP 状态与 WebSocket 事件消费位置分开，恢复待审批内容并清理已解决请求；与桌面挂起审批无关。",
+      "deploymentScope": "implementation branch; not merged to main"
     },
     {
       "id": 3,
-      "status": "没实现",
-      "name": "官方桌面途中问答与 UI 选择",
-      "blocker": "Same desktop private request-channel blocker as request 2.",
+      "status": "已实现",
+      "name": "桌面独立异步问题/选项面板的 Web 答复",
+      "result": "已确认 Web 回答由原桌面接受；当前任务收到关联答案。",
+      "evidence": [
+        "desktop-async-questions.json",
+        "real-desktop-web-question.jpg"
+      ],
       "userHelpRequired": false,
-      "alternativeScopeDecision": "A shared app-server route was previously verified, but it changes the desktop startup connection. This conflicts with the existing unchanged-desktop constraint and requires an explicit user scope change; it is not implemented for the default desktop."
+      "userHelpNote": "无需新增账号授权、辅助程序或系统权限。",
+      "implementation": "Dedicated native IPC read/submit channel implemented; no ordinary queue fallback",
+      "deploymentScope": "implementation worktree; not merged, released or deployed"
     },
     {
       "id": 4,
@@ -41,5 +51,11 @@
       "deploymentScope": "implementation branch; not merged to main"
     }
   ],
-  "deploymentNote": "Implementation branch pushed and verified; main not merged or released."
+  "deploymentNote": "先前 CI 改动已推送；本轮问答补丁仍在独立 worktree，尚未合并、发布或重启原服务。",
+  "scopeClarification": {
+    "approval": "Manage Web 自身审批面板需反复点击，不要求 Web 代答桌面权限审批。",
+    "question": "用户确认是独立问题/选项面板，需要点击提交；可接受文字答案。",
+    "desktop": "保持原图标、原启动及原后台；不采用共享后台启动。",
+    "unchanged": "Web 停止桌面任务、修改桌面模型/权限维持现状。"
+  }
 }

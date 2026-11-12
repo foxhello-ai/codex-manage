@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-12T03:40:53.457Z",
+  "checkedAt": "2026-11-12T05:11:51.420Z",
   "results": [
     {
       "name": "desktop",
@@ -7,6 +7,30 @@
       "bodyWidth": 1440,
       "documentWidth": 1440,
       "images": [
+        {
+          "loaded": true,
+          "width": 560,
+          "height": 291,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 860,
+          "height": 281,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 1440,
+          "height": 960,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 375,
+          "height": 844,
+          "embedded": true
+        },
         {
           "loaded": true,
           "width": 1440,
@@ -71,7 +95,7 @@
       "pageErrors": [],
       "zoomVisible": true,
       "zoomClosed": true,
-      "sourceEvidence": 10,
+      "sourceEvidence": 12,
       "evidenceExpanded": true,
       "anchorWorked": true,
       "passed": true
@@ -84,6 +108,30 @@
       "images": [
         {
           "loaded": true,
+          "width": 560,
+          "height": 291,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 860,
+          "height": 281,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 1440,
+          "height": 960,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 375,
+          "height": 844,
+          "embedded": true
+        },
+        {
+          "loaded": true,
           "width": 1440,
           "height": 960,
           "embedded": true
@@ -146,7 +194,7 @@
       "pageErrors": [],
       "zoomVisible": true,
       "zoomClosed": true,
-      "sourceEvidence": 10,
+      "sourceEvidence": 12,
       "evidenceExpanded": true,
       "anchorWorked": true,
       "passed": true
@@ -159,6 +207,10 @@
     },
     {
       "link": "../../implementation-notes/2026-11-12-desktop-interaction-sync.md",
+      "exists": true
+    },
+    {
+      "link": "../../implementation-notes/2026-11-12-question-reply-alternatives.md",
       "exists": true
     }
   ],

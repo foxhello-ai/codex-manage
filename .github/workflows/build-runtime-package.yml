@@ -105,6 +105,11 @@ jobs:
           Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
           EOF
 
+          if [[ -f "docs/releases/runtime-v${version}.md" ]]; then
+            printf '\n' >> "$release_notes"
+            cat "docs/releases/runtime-v${version}.md" >> "$release_notes"
+          fi
+
           echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
           echo "package_path=$PWD/$package_name" >> "$GITHUB_OUTPUT"
           echo "checksum_name=$checksum_name" >> "$GITHUB_OUTPUT"

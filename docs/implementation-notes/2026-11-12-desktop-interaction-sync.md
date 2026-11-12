@@ -1,72 +1,53 @@
 # 桌面会话性能、途中交互与 instabox 实施记录
 
-日期：2026-11-12。需求及批准范围见 [需求文档](../desktop-interaction-sync-requirements.md)。基线 `main@e3b4986`，实施分支 `codex/desktop-interaction-sync`，独立 worktree `desktop-interaction-sync/codex-manage`。本次尚未合并或发布，也没有重启现有 4310/4311 服务。
+日期：2026-11-12。需求见 [批准范围](../desktop-interaction-sync-requirements.md)。基线 main@e3b4986，独立分支 codex/desktop-interaction-sync。本轮未合并、发布或重启原 Manage 服务。桌面原安装和启动保持原样。
 
 ## 说明原因
 
-已确认两类独立问题。Manage 首屏和轮询会读取全部历史，paginated 会话还会遍历历史分页；HTTP 状态序号又被当作 WebSocket 已消费事件序号，可能使包含审批内容的较早快照被丢弃。标准问答已有协议处理，但复用了权限审批按钮；取消、拒绝和允许曾返回同一份答案。MCP elicitation 未处理时被回复空对象。
+历史读取曾遍历全部轮次；HTTP 状态序号被当成 WebSocket 已消费序号，延迟到达的审批快照可能被丢弃。标准同步问答误用权限审批按钮，取消与允许曾返回同一答案；MCP elicitation 未处理时被回复空对象。
 
-官方桌面的默认私有后台是另一项能力边界。现有文字队列可以投递后续聊天，但没有把桌面持有的 pending RPC 传给 Manage。**本次修复不能让 Web 直接回答官方桌面私有后台中的挂起问题。** 用户截图的确切底层请求仍未取得，不能把 MCP 表单或 Manage 自身测试当成截图场景已经通过。
+此前将截图里的独立问题卡误判为同步挂起 RPC，因而错误推断必须共享 app-server。最新从真实原桌面的 live canonical history 确认：截图是 request_user_input_async，问题存于 agentMessage.questions，答案是带 questionItemId 的关联文字。它可通过原桌面已有 IPC 的当前 turn 投递通道处理，无需修改桌面启动。早期仅检查 CLI stdio 方法与 TCP 监听，未覆盖 ipc/ipc.sock，不能据此断言不存在桌面入口。
 
-## 当前代码问题点与完成状态
+## 当前代码问题点
 
-原始需求只按完整效果标注：1 已实现，2 没实现，3 没实现，4 已实现。第 2、3 项缺默认桌面原挂起请求的可用通道，不能靠用户补账号授权解决；若采用此前验证过的共享服务路线，需要用户明确允许改变桌面启动连接方式，这与此前桌面不修改的约束冲突，当前没有擅自改动。第 4 项通过验证分支 push 触发的真实 pilot 已成功，Linux 安装和发布默认 runner 已在实现分支切换，不依赖只读 gh 账号的手动触发权限。下表记录代码组件，不能替代原始场景验收。
+原 DesktopQueueService 只用 thread/queue/add 排队普通消息；该队列会在当前 turn 完成后消费，不能及时回答异步问题。SessionService 转换曾丢弃 questions/delivery，Web 也未订阅桌面实时问题。默认“history”状态不代表桌面空闲；不能等用户发送普通聊天触发占用错误后才识别外部运行。
 
-| 需求 | 本次状态 | 实际结果与限制 |
-| --- | --- | --- |
-| DSI-01 历史读取 | 已实现并验证 | Web 首次取最近 20 轮，旧历史按需分页，轮询保持最近一页；合并保留原 ID 和已加载旧页，时间缺失/相同也保持服务端顺序。paginated 存储的 rollout 文件时间不能证明内容未变化，因此仍读取最近一页。非 paginated 文件签名相同可复用已读结果。 |
-| DSI-02 审批恢复 | Manage 链路已验证 | HTTP 返回 runtime 和 pending 请求，分别管理运行态版本、待交互版本和已消费事件位置。支持刷新/重连恢复；另一客户端解决后清除，旧快照不复活请求。后台断开使原请求失效并清除，未承诺重启后台后恢复已失效 RPC。 |
-| DSI-03 标准问答 | Manage 链路已验证 | 自动打开专用回答面板，显示“等待你回答”、选项描述、自定义回答、必填校验；回复原 request ID。“稍后回答”仅关闭面板；不伪造标准协议没有的取消/拒绝动作。 |
-| DSI-04 MCP 交互 | 支持范围已实现并验证 | 支持扁平 primitive 表单、字符串枚举、多选、数值/布尔类型和基本长度/数量约束，后端转换 wire 类型。明确保留 decline/cancel。URL 需要用户显式确认；未知交互返回协议错误。嵌套对象、pattern/format 等未支持 schema 显式显示不支持，不能静默忽略其验证条件。 |
-| DSI-05 桌面原生跨端交互 | 调查完成，未打通 | 当前安装版本的协议和默认后台未提供已确认可用的外部 pending 请求读取/答复通道。保持桌面启动方式不变时，审批、途中提问、UI 选择仍需桌面操作。没有进行真实桌面挂起请求的跨端回答验收。 |
-| DSI-06 instabox | 已实现 | 真实目标仓库 pilot 成功，179 项测试、构建及安装生命周期通过。Linux 安装和发布默认 runner 已在实现分支改为 instabox-medium；Intel/ARM macOS runner 保留。main 尚未合并，默认值随合并生效。 |
+完整需求状态：1 已实现、2 已实现、3 已实现、4 已实现。已确认 Web 回答由原桌面接受；当前任务收到关联答案。 无需新增账号授权、辅助程序或系统权限。
 
 ## 代码错误位置
 
-- `src/server/services/SessionService.ts`、`src/server/routes/sessions.ts`：详情读取和历史分页查询。
-- `src/client/App.tsx`：HTTP/WS 事件序号、待交互恢复、历史合并及面板入口。
-- `src/server/services/ApprovalService.ts`、`RuntimeManager.ts`：问答回复语义、MCP 请求处理、等待状态、外端解决通知与请求失效。
-- `src/server/services/CodexAppServerClient.ts`：JSON-RPC 字符串/数字 request ID 和不支持请求的错误回复。
+- src/server/services/SessionService.ts：历史转换、最近一页读取和异步问题字段。
+- src/client/App.tsx：HTTP/WS 对账、问答入口和关联答案展示。
+- src/server/services/ApprovalService.ts、RuntimeManager.ts：同步交互语义、等待状态和原请求清理。
+- src/server/services/DesktopQueueService.ts：原普通续聊队列，不能代答当前问题。
 
-## 修改方案与修改的代码点
+## 修改方案
 
-1. 增加 bounded history API 和 `sessionHistory.ts`；首屏避免 `thread/read includeTurns:true`，随后仅取一个 descending page 并转换为时间顺序。单一“加载更早”入口先揭示已读内容，再读取旧页；最新页刷新不丢旧页和 cursor。
-2. HTTP runtime 响应带上待交互内容；三个同步位置独立推进。客户端用已解决 ID 屏蔽旧请求，后台重新连接后复用 RPC ID 也生成新的面板 ID。
-3. 新增 `InteractionCard.tsx` 与 `InteractionForms.ts`。普通问答、MCP 表单和权限审批使用各自真实协议动作。等待回答时保持会话占用，避免把“等待回答”当成执行完成后释放。
-4. 处理 `serverRequest/resolved`，广播双端清除；后台退出/会话关闭清理失效请求。补充官方 `active` / `waitingOnUserInput` 状态映射，问答期间阻止切换模型或普通输入。
-5. 新增独立桌面能力盘点和历史性能脚本；不修改桌面包、入口、真实会话或身份校验。
-6. 新增 `.github/workflows/instabox-pilot.yml`，使用 `instabox-medium` 跑测试、构建、Linux 安装验证；支持验证分支 push 自动触发及手动触发。真实 pilot 成功后，将现有安装矩阵与发布任务的 `LINUX_CI_RUNNER` 默认值改为 `instabox-medium`；设置变量 `ubuntu-24.04` 即可回退。两项 macOS 安装 job 保留原 runner。
+1. 首屏取最近 20 轮，旧页按需读；刷新保留原 ID、顺序和已加载旧页。独立管理 HTTP runtime 版本、交互状态版本和已消费 WS 事件位置。
+2. 保留 Manage 自身权限审批；同步问答使用专用提交、必填校验和自定义文字。MCP 支持明确 schema 范围，未知类型失败，不静默成功。解决、断开或关闭时清理原 pending 请求。
+3. 新增窄范围桌面异步问题接口。只连接当前同用户已存在的 IPC，发现该 thread 的真实 owner，订阅 version 11 快照和增量；不启动 router，不 resume 桌面 thread，不拿 writer。
+4. 选项与自定义文字以原问题 ID 关联，通过 thread-follower-steer-turn v1 投给原 owner 的当前 turn。严格校验 thread/turn/question，只允许主用户；同步 RPC 审批不走该接口。
+5. 提交前持久记录稳定 ID；相同重复提交不再发送，未知结果不重放、不降级为普通队列。收到原 owner 的准确 turn 确认或对应 accepted steering 消息才确认成功；原 turn 结束则问题过期。
+6. Linux 安装和发布 runner 默认 instabox-medium，保留 Intel/ARM macOS。LINUX_CI_RUNNER=ubuntu-24.04 可回退；无需再补项目授权。
+
+## 修改的代码点
+
+新增 DesktopIpcClient.ts、DesktopQuestionService.ts、shared/desktopQuestions.ts、DesktopQuestionsPanel.tsx；扩展 sessions.ts 的 owner-only GET/POST desktop-questions。index.ts 管理连接生命周期；RuntimeManager.observeDesktopThread 仅更新观察状态，保留 Manage 自有 writer。SessionService 保留异步问题，App 独立挂载并显示可回答卡片，InteractionCard 复用已有表单。
+
+前批已新增 sessionHistory.ts、InteractionForms.ts、历史分页和 Web 审批对账修复，以及 instabox-pilot.yml 和现有 Linux workflows 默认 runner 调整。
 
 ## 验证结果
 
-证据目录：[2026-11-12-desktop-interaction-sync](../acceptance/2026-11-12-desktop-interaction-sync/)。
+[自包含 HTML 报告](../acceptance/2026-11-12-desktop-interaction-sync/report.html)。最新本地 189 项单元/集成测试通过，375/1440px 交互/历史专项 14 项通过，类型检查和前后端构建通过。UI 包含自动开卡、自定义文字、单次提交、未知结果不重发；协议测试使用临时 Unix socket，覆盖真实帧格式、canonical history、patch、过期和重启去重。它们不代替真实桌面提交验收。
 
-提供 [自包含 HTML 验收报告](../acceptance/2026-11-12-desktop-interaction-sync/report.html)，内嵌 4 张 Manage 测试截图、1 张真实 Actions 成功截图、核心 JSON 证据、需求完成状态与 instabox 授权说明。原始 4 项需求中，2 项已实现、2 项没实现；main 尚未合并或发布。
+真实原桌面 26.1002.52244、CLI 0.162.0-alpha.2：owner discovery、快照及持续 patch 通过；新发专用问题已自动出现 Web，截图只保留测试卡片。已确认 Web 回答由原桌面接受；当前任务收到关联答案。 [证据](../acceptance/2026-11-12-desktop-interaction-sync/desktop-async-questions.json)。
 
-- 本地类型检查、前后端构建通过；instabox 最终 30 个测试文件、179 项测试及完整构建通过。Actionlint 1.7.12 校验 3 个工作流通过，已登记 instabox 自定义 runner label。最终汇总见证据目录 `verification.json`。
-- 全套 UI 回归（含首批新增交互用例）在桌面 1440px 和手机 375px 视窗执行：33 通过、1 项原有仅适用手机的用例在 desktop 跳过。追加历史分页用例后，交互/历史套件 8/8 通过，覆盖延迟快照、HTTP 恢复、关闭/刷新、重连、已解决旧快照、自定义回答、必填项、MCP 取消和历史按需读取。截图中的问题使用测试数据，非用户真实桌面请求。
-- 新增登录 + HTTP + 两个实际 WebSocket 的集成测试：未登录被拒；登录后恢复问题；一端回答回到原 RPC，状态恢复 running；两端收到清理事件；重复提交不产生第二次回复。底层执行服务使用测试 transport，不能据此宣称官方桌面通道通过。
-- 同一真实本地 thread 交替读取 4 次：完整历史 7094/5237ms，最近 20 轮 1966/1582ms；均为 2 次 RPC。平均读取时间下降约 71%。完整历史 29 轮约 693KB，最近页约 575KB。该 thread 正在继续写入，样本内容有小幅变化；不是固定静态快照或公网浏览器端到端性能保证。脚本检查 writer 操作为 0。[原始数据](../acceptance/2026-11-12-desktop-interaction-sync/history-performance.json)。
-- instabox `ci@2026-11-05.ci.1`，Ubuntu 24.04/systemd 255、4CPU/8GiB、Node 22.23.3。真实安装的是既有 `v1.0.9` / `v1.0.8` 发布包，覆盖全新安装、ZIP artifact、升级、回滚、恢复、restart、stop/start；检查 health、Manage 登录、鉴权、静态资源、配置/会话目录标记保留。**未验证 OpenAI 账户登录或真实模型推理，也不表示本次改动已经发布。** [安装报告](../acceptance/2026-11-12-desktop-interaction-sync/instabox-installation.json)。实验 VM 不加载 Vault/Secrets，完成后删除。
+历史性能同一活动会话 4 次交替采样：完整历史 7094/5237ms，最近 20 轮 1966/1582ms，平均下降约 71%；非浏览器公网耗时保证。writer 操作 0。[证据](../acceptance/2026-11-12-desktop-interaction-sync/history-performance.json)。
 
-### 官方桌面能力验证边界
+真实目标仓库 [Instabox Pilot 43148957035](https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035)，源码 d3d6315：179 项测试、完整构建、8 项安装生命周期通过。Linux Ubuntu 24.04/systemd255，Node22.23.3。安装验证使用既有 v1.0.9/v1.0.8 包，不能声称本轮问答补丁已发布或已跑该 CI。未验证 OpenAI 账户重新登录/真实模型推理。[CI](../acceptance/2026-11-12-desktop-interaction-sync/instabox-actions.json)、[安装](../acceptance/2026-11-12-desktop-interaction-sync/actions-installation.json)。
 
-当前桌面 `26.1002.52244`，内置 CLI `0.162.0-alpha.2`。重新生成实验协议 schema，共 170 个 client method；相关交互 client method 只有增减 out-of-band elicitation 计数，没有枚举/答复另一连接 pending 请求的方法。计数接口仅暂停/恢复 timeout accounting，不提供问题或答案传送。标准问答、MCP 和审批是 server → client request，回复走接收该 request 的原 JSON-RPC 连接。
+## 能力边界与回滚
 
-只读盘点正在运行的桌面直接子后台：未带外部 listener 参数、没有 TCP LISTEN，默认 daemon control socket 不存在。只读检查安装包还可见私有 app-tools 管道的授权/签名校验路径；没有绕过这些校验，也没有使用非受支持身份连接。以上说明当前未找到可实施通道，不等于证明所有内部、未来版本或部署方式永远不可能。
+桌面 IPC 是已安装版本的内部入口，尚无官方稳定兼容承诺；OpenAI Docs 页面前次抓取失败，不能把本机验证描述为官方支持。需同主机、同用户、保持原 thread 在桌面打开。桌面关闭或版本不兼容时明确显示不可用；不接管已失效同步 RPC、不新增桌面停止/模型/权限功能。
 
-[能力证据](../acceptance/2026-11-12-desktop-interaction-sync/desktop-capabilities.json)。重新抓取官方文档遇到网络失败，本次协议细节以实际安装版本生成的 schema 为证据。另外只读检查了 CLI help：`remote-control` 管理开启远控的 daemon，`agents --remote` 连接已有远端 endpoint；都未提供接管当前桌面私有 stdio 连接的命令。本次没有启动远控 daemon 或生成配对码。原共享服务和启动适配器仍是独立研究路线，需要改变启动链，未并入本次默认桌面修复。
-
-## instabox 激活步骤与回滚
-
-已有账号/项目授权不阻止增加其他项目：同一 GitHub OWNER 的新仓库修改现有 App 安装范围，保留旧仓库；另一个账号/组织通过授权页的 **Install on another GitHub account** 安装并授权目标仓库，再将 OWNER **Link** 到当前 workspace。无需因此重新登录 instabox。一个 GitHub OWNER 同时只能关联一个 workspace；显示 **Already used for CI** 时才需处理原关联，普通增加仓库无需解除旧授权。
-
-本次只读检查的近期任务均属于 `fmzh2021/schedule-task-cfworker`，汇总为 12 条、10 成功、0 失败、0 运行/等待；这些记录不证明目标仓库已授权，也不能仅凭缺少运行记录断言其未授权。见 [授权检查摘要](../acceptance/2026-11-12-desktop-interaction-sync/instabox-ci-status.json)。
-
-2026-11-12 11:18（UTC+08:00），用户完成授权后，通过官方只读 `GET /v1/orgs/{id}/github/installations` 接口确认：`foxhello-ai` 安装 ID `181104874` 已关联当前 workspace，`suspended=false`；原有 `fmzh2021` 关联仍保留。该接口不返回具体仓库选择范围，因此组织授权和 Link 已确认，`codex-manage` 的访问权限与首次实际 Actions 结果仍需实跑核验。见 [组织关联证据](../acceptance/2026-11-12-desktop-interaction-sync/instabox-authorization.json)。
-
-1. 组织 App 安装及 workspace 关联已确认；继续核对 `foxhello-ai/codex-manage` 的仓库访问范围。[instabox 授权页面](https://dashboard.instabox.sh/auth/github-app/install?org=org_65a2b3061d17430aa975eecac2ea15a2) 可查看安装与关联；如需调整仓库范围，由相应管理员操作。
-2. `Instabox Linux Pilot` 支持实施分支 push 自动触发及 workflow_dispatch。GitHub CLI 账号 `fmzh2025` 对仓库只读，但 git 使用另一套已有 SSH 身份，因此采用分支 push 完成实跑，无需修改 gh 权限。实际运行 [43148957035](https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035) 成功，测试源码提交 `d3d631558956475b7e6423c0a5d1b2c25edbdd38`，job `130953338930`。instabox 同样确认目标仓库使用 instabox-medium，状态 completed / success；179 测试、完整构建、8 项安装生命周期检查通过，artifact 已下载核对。[运行证据](../acceptance/2026-11-12-desktop-interaction-sync/instabox-actions.json)、[安装证据](../acceptance/2026-11-12-desktop-interaction-sync/actions-installation.json)。
-3. pilot 成功后，已将实现分支中 Linux 安装和发布 runner 默认值设为 `instabox-medium`，main 合并后生效；macOS 不变。无需再设置启用变量；回退时可设置 `LINUX_CI_RUNNER=ubuntu-24.04`。公开仓库未来若增加 fork PR 触发，应启用 GitHub 外部贡献者审批以控制 workspace 任务。
-
-回滚代码时撤销本实施分支改动；没有历史迁移或真实会话数据回滚步骤。
+回滚撤销本分支代码/workflow；无需修改桌面或回滚会话历史。提交未知状态时保留提交台账供核对，禁止删除后盲目重发。main 和原 4310/4311 服务未修改；独立 Web 验收使用 4330 端口。

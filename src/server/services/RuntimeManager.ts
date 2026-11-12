@@ -453,6 +453,17 @@ export class RuntimeManager {
     }
   }
 
+  // The existing desktop IPC owner supplies live state without acquiring a writer.
+  observeDesktopThread(threadId: string, activeTurnId: string | null): void {
+    if (!this.desktopQueue || this.ownedThreads.has(threadId)) return;
+    this.externalThreads.add(threadId);
+    const status = activeTurnId ? "running" : "history";
+    const current = this.runtimes.get(threadId);
+    if (current?.status !== status || current.activeTurnId !== activeTurnId) {
+      this.setRuntime(threadId, { status, activeTurnId, lastError: null });
+    }
+  }
+
   async refreshExternal(threadId: string): Promise<RuntimeSnapshot> {
     if (this.desktopQueue) {
       const deliveries = await this.desktopQueue.refresh(threadId);

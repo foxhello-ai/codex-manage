@@ -1,3 +1,4 @@
+import type { DesktopQuestionService } from "../services/DesktopQuestionService";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sendError } from "../httpErrors";
@@ -117,11 +118,39 @@ export function registerSessionRoutes(
   runtimeManager?: RuntimeManager,
   sessionModelService?: SessionModelService,
   collaborationStore?: CollaborationStore,
-  taskStore?: TaskStore
+  taskStore?: TaskStore,
+  desktopQuestions?: Pick<DesktopQuestionService, "read" | "submit">
 ) {
   app.addHook("onResponse", async (request, reply) => {
     if (request.method !== "GET" && request.method !== "HEAD" && reply.statusCode < 400
       && /^\/api\/(sessions|tasks)(\/|$)/.test(request.url)) sessionService.invalidateList?.();
+  });
+
+  app.get("/api/sessions/:id/desktop-questions", async (request, reply) => {
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore);
+    if (!user) return;
+    if (user.role !== "owner") return sendError(reply, 403, "OWNER_REQUIRED", "桌面问题仅主用户可操作");
+    if (!desktopQuestions) return reply.send({ available: false, turnId: null, questions: [], submissions: [] });
+    const state = await desktopQuestions.read(params.data.id);
+    if (state.available) runtimeManager?.observeDesktopThread?.(params.data.id, state.turnId);
+    return reply.send(state);
+  });
+  app.post("/api/sessions/:id/desktop-questions", async (request, reply) => {
+    const params = SessionParams.safeParse(request.params);
+    if (!params.success) return sendError(reply, 400, "INVALID_SESSION_PARAMS", "会话参数不正确");
+    const user = await requireSessionAccess(request, reply, params.data.id, collaborationStore);
+    if (!user) return;
+    if (user.role !== "owner") return sendError(reply, 403, "OWNER_REQUIRED", "桌面问题仅主用户可操作");
+    const body = z.object({ turnId: z.string().min(1).max(128), questionId: z.string().min(1).max(1024), answer: z.string().trim().min(1).max(4000) }).strict().safeParse(request.body);
+    if (!body.success) return sendError(reply, 400, "INVALID_QUESTION_REPLY", "请选择选项或填写回答");
+    if (!desktopQuestions) return sendError(reply, 503, "DESKTOP_QUESTION_UNAVAILABLE", "桌面问题通道不可用");
+    try { return reply.send(await desktopQuestions.submit(params.data.id, body.data.turnId, body.data.questionId, body.data.answer)); }
+    catch (error) {
+      if (error instanceof ModelDomainError) return sendModelError(reply, error);
+      return sendError(reply, 503, "DESKTOP_QUESTION_FAILED", sanitizeModelError(error));
+    }
   });
 
   app.get("/api/tasks", async (request, reply) => {

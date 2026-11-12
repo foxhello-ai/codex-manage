@@ -235,6 +235,9 @@ export type ResolvedModelOverride = {
 };
 
 export type ModelErrorCode =
+  | "QUESTION_REPLY_CONFLICT"
+  | "DESKTOP_QUESTION_UNAVAILABLE"
+  | "DESKTOP_QUESTION_STALE"
   | "INPUT_REQUEST_CONFLICT"
   | "DESKTOP_QUEUE_UNAVAILABLE"
   | "DESKTOP_QUEUE_TEXT_ONLY"
@@ -276,7 +279,7 @@ export type SessionTurn = {
 
 export type SessionTurnItem =
   | { id: string; type: "user_message"; text: string; clientId?: string | null }
-  | { id: string; type: "agent_message"; text: string; phase: string | null }
+  | { id: string; type: "agent_message"; text: string; phase: string | null; delivery?: string | null; questions?: Array<{ title: string; options: string[] }> }
   | { id: string; type: "file_change"; status: string | null; changes: SessionFileChange[] }
   | { id: string; type: "context_compaction" }
   | { id: string; type: "unknown"; rawType: string | null };

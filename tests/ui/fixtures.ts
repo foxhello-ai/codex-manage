@@ -134,6 +134,7 @@ export async function installUiHarness(page: Page, options: { status?: SessionSt
       return json({ approval: { ...approval, status: "resolved" }, runtime });
     }
     if (path.endsWith("/runtime")) return json({ runtime, ...(options.runtimeApprovals === false ? {} : { approvals }) });
+    if (path.endsWith("/desktop-questions") && method === "GET") return json({ available: false, turnId: null, questions: [], submissions: [] });
     const id = path.match(/^\/api\/sessions\/([^/]+)$/)?.[1];
     if (id) return json({ session: { ...detail(decodeURIComponent(id)), ...(url.searchParams.get("turns") === "false" ? { turns: [] } : {}) } });
     pageErrors.push(`Unexpected API request: ${method} ${path}`);
