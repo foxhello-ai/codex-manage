@@ -9,5 +9,8 @@
     "triage": false,
     "pull": true
   },
-  "purpose": "Push the reviewed implementation branch and dispatch Instabox Linux Pilot; no write attempted by this API check."
+  "purpose": "Push the reviewed implementation branch and dispatch Instabox Linux Pilot; no write attempted by this API check.",
+  "gitSshPushVerified": true,
+  "gitPushEvidence": "https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035",
+  "resolution": "Use the existing SSH origin identity to push the branch. Push triggers the pilot; no gh account permission change is required."
 }

@@ -1,0 +1,8 @@
+{
+  "runId": 43148957035,
+  "sourceCommit": "d3d631558956475b7e6423c0a5d1b2c25edbdd38",
+  "extractedLogLines": [
+    "verify\tRun npm test\t2026-11-12T03:33:30.7719686Z ^[[2m Test Files ^[[22m ^[[1m^[[32m30 passed^[[39m^[[22m^[[90m (30)^[[39m",
+    "verify\tRun npm test\t2026-11-12T03:33:30.7720471Z ^[[2m      Tests ^[[22m ^[[1m^[[32m179 passed^[[39m^[[22m^[[90m (179)^[[39m"
+  ]
+}

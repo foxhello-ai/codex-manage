@@ -24,7 +24,7 @@
 ## 变更与追溯资料
 
 - [`acceptance/2026-11-12-desktop-interaction-sync/report.html`](acceptance/2026-11-12-desktop-interaction-sync/report.html)：自包含 HTML 验收报告，内嵌桌面/手机截图与 JSON 证据，逐项说明原始需求完成程度和 instabox 多账号/组织授权步骤。
-- [`implementation-notes/2026-11-12-desktop-interaction-sync.md`](implementation-notes/2026-11-12-desktop-interaction-sync.md)：历史分页、审批/途中问答修复的实现与验收；明确默认桌面跨端交互未打通、instabox Actions 待激活。
+- [`implementation-notes/2026-11-12-desktop-interaction-sync.md`](implementation-notes/2026-11-12-desktop-interaction-sync.md)：历史分页、审批/途中问答修复的实现与验收；明确默认桌面跨端交互没实现、目标仓库 instabox Actions 已通过、Linux 默认 runner 切换位于实现分支。
 - [`desktop-interaction-sync-requirements.md`](desktop-interaction-sync-requirements.md)：2026-11-12 用户批准的桌面会话性能、审批同步、途中问答、桌面交互通道验证及 instabox Linux CI 迁移需求与验收标准。
 - [`implementation-notes/2026-11-03-desktop-session-handoff.md`](implementation-notes/2026-11-03-desktop-session-handoff.md)：桌面原会话文字投递、双端持久消息同步、Manage 空闲释放的实现、兼容边界和隔离验收方式。
 - [`implementation-notes/`](implementation-notes/)：按日期的调研、实现和问题修复记录。若项目级状态与笔记冲突，以日期更晚、且包含实现和验证记录的笔记为准，并在项目级文档中回写确认结论。

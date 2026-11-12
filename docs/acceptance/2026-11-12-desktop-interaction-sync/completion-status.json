@@ -1,8 +1,8 @@
 {
-  "checkedAt": "2026-11-12T03:30:48.319028+00:00",
+  "checkedAt": "2026-11-12T03:39:36.355933+00:00",
   "acceptanceRule": "Only 已实现 / 没实现; evaluate complete original user scenarios. Implementation and deployment are separate.",
-  "implemented": 1,
-  "notImplemented": 3,
+  "implemented": 2,
+  "notImplemented": 2,
   "deployed": 0,
   "requests": [
     {
@@ -18,22 +18,28 @@
       "name": "官方桌面审批在 Web 展示与处理",
       "blocker": "No verified external read/reply channel for pending requests on the unchanged desktop private backend.",
       "userHelpRequired": false,
-      "userHelpNote": "Not an account permission problem; no user action currently resolves the technical blocker."
+      "userHelpNote": "Not an account permission problem; no user action currently resolves the technical blocker.",
+      "alternativeScopeDecision": "A shared app-server route was previously verified, but it changes the desktop startup connection. This conflicts with the existing unchanged-desktop constraint and requires an explicit user scope change; it is not implemented for the default desktop."
     },
     {
       "id": 3,
       "status": "没实现",
       "name": "官方桌面途中问答与 UI 选择",
       "blocker": "Same desktop private request-channel blocker as request 2.",
-      "userHelpRequired": false
+      "userHelpRequired": false,
+      "alternativeScopeDecision": "A shared app-server route was previously verified, but it changes the desktop startup connection. This conflicts with the existing unchanged-desktop constraint and requires an explicit user scope change; it is not implemented for the default desktop."
     },
     {
       "id": 4,
-      "status": "没实现",
+      "status": "已实现",
       "name": "instabox Linux CI",
-      "blocker": "First target repository Actions run and Linux runner switch not yet complete.",
+      "evidence": "instabox-actions.json",
+      "sourceCommit": "d3d631558956475b7e6423c0a5d1b2c25edbdd38",
+      "runUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035",
       "userHelpRequired": false,
-      "userHelpNote": "Existing git SSH push dry-run passed. gh identity fmzh2025 is read-only; use branch push to trigger pilot instead of workflow_dispatch."
+      "result": "Target repository pilot succeeded: 179 tests, build and eight installation lifecycle checks. Implementation branch Linux installer and release defaults use instabox-medium; macOS retained.",
+      "deploymentScope": "implementation branch; not merged to main"
     }
-  ]
+  ],
+  "deploymentNote": "Implementation branch pushed and verified; main not merged or released."
 }

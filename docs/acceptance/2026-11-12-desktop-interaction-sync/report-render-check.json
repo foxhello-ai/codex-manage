@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-12T03:31:48.375Z",
+  "checkedAt": "2026-11-12T03:40:53.457Z",
   "results": [
     {
       "name": "desktop",
@@ -29,6 +29,12 @@
           "loaded": true,
           "width": 375,
           "height": 844,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 1280,
+          "height": 720,
           "embedded": true
         }
       ],
@@ -65,7 +71,7 @@
       "pageErrors": [],
       "zoomVisible": true,
       "zoomClosed": true,
-      "sourceEvidence": 7,
+      "sourceEvidence": 10,
       "evidenceExpanded": true,
       "anchorWorked": true,
       "passed": true
@@ -99,6 +105,12 @@
           "width": 375,
           "height": 844,
           "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 1280,
+          "height": 720,
+          "embedded": true
         }
       ],
       "anchors": [
@@ -134,7 +146,7 @@
       "pageErrors": [],
       "zoomVisible": true,
       "zoomClosed": true,
-      "sourceEvidence": 7,
+      "sourceEvidence": 10,
       "evidenceExpanded": true,
       "anchorWorked": true,
       "passed": true

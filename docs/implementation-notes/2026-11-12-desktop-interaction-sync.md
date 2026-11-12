@@ -10,7 +10,7 @@
 
 ## 当前代码问题点与完成状态
 
-原始需求只按完整效果标注：1 已实现，2 没实现，3 没实现，4 没实现。第 2、3 项缺默认桌面原挂起请求的可用通道，不能靠用户补账号授权解决；当前没有需要用户重复操作的前置项。第 4 项正在通过验证分支 push 触发 pilot，不依赖只读 gh 账号的手动触发权限。下表记录代码组件，不能替代原始场景验收。
+原始需求只按完整效果标注：1 已实现，2 没实现，3 没实现，4 已实现。第 2、3 项缺默认桌面原挂起请求的可用通道，不能靠用户补账号授权解决；若采用此前验证过的共享服务路线，需要用户明确允许改变桌面启动连接方式，这与此前桌面不修改的约束冲突，当前没有擅自改动。第 4 项通过验证分支 push 触发的真实 pilot 已成功，Linux 安装和发布默认 runner 已在实现分支切换，不依赖只读 gh 账号的手动触发权限。下表记录代码组件，不能替代原始场景验收。
 
 | 需求 | 本次状态 | 实际结果与限制 |
 | --- | --- | --- |
@@ -19,7 +19,7 @@
 | DSI-03 标准问答 | Manage 链路已验证 | 自动打开专用回答面板，显示“等待你回答”、选项描述、自定义回答、必填校验；回复原 request ID。“稍后回答”仅关闭面板；不伪造标准协议没有的取消/拒绝动作。 |
 | DSI-04 MCP 交互 | 支持范围已实现并验证 | 支持扁平 primitive 表单、字符串枚举、多选、数值/布尔类型和基本长度/数量约束，后端转换 wire 类型。明确保留 decline/cancel。URL 需要用户显式确认；未知交互返回协议错误。嵌套对象、pattern/format 等未支持 schema 显式显示不支持，不能静默忽略其验证条件。 |
 | DSI-05 桌面原生跨端交互 | 调查完成，未打通 | 当前安装版本的协议和默认后台未提供已确认可用的外部 pending 请求读取/答复通道。保持桌面启动方式不变时，审批、途中提问、UI 选择仍需桌面操作。没有进行真实桌面挂起请求的跨端回答验收。 |
-| DSI-06 instabox | Linux 环境通过，Actions 切换待激活 | 隔离 instabox CI 模板通过测试/构建和已发布包安装生命周期验证。提供手动 pilot 工作流及 Linux runner 开关；已确认 foxhello-ai 的 App 安装与 workspace 关联，具体仓库访问权限及首次目标仓库 Actions 实跑未验证，默认继续 GitHub Ubuntu；Intel/ARM macOS runner 保留。 |
+| DSI-06 instabox | 已实现 | 真实目标仓库 pilot 成功，179 项测试、构建及安装生命周期通过。Linux 安装和发布默认 runner 已在实现分支改为 instabox-medium；Intel/ARM macOS runner 保留。main 尚未合并，默认值随合并生效。 |
 
 ## 代码错误位置
 
@@ -35,13 +35,13 @@
 3. 新增 `InteractionCard.tsx` 与 `InteractionForms.ts`。普通问答、MCP 表单和权限审批使用各自真实协议动作。等待回答时保持会话占用，避免把“等待回答”当成执行完成后释放。
 4. 处理 `serverRequest/resolved`，广播双端清除；后台退出/会话关闭清理失效请求。补充官方 `active` / `waitingOnUserInput` 状态映射，问答期间阻止切换模型或普通输入。
 5. 新增独立桌面能力盘点和历史性能脚本；不修改桌面包、入口、真实会话或身份校验。
-6. 新增 `.github/workflows/instabox-pilot.yml`，使用 `instabox-medium` 跑测试、构建、Linux 安装验证。现有安装矩阵与发布任务读取 `LINUX_CI_RUNNER`，默认 `ubuntu-24.04`，pilot 成功后设为 `instabox-medium`；删除变量即可恢复。两项 macOS 安装 job 保留原 runner。
+6. 新增 `.github/workflows/instabox-pilot.yml`，使用 `instabox-medium` 跑测试、构建、Linux 安装验证；支持验证分支 push 自动触发及手动触发。真实 pilot 成功后，将现有安装矩阵与发布任务的 `LINUX_CI_RUNNER` 默认值改为 `instabox-medium`；设置变量 `ubuntu-24.04` 即可回退。两项 macOS 安装 job 保留原 runner。
 
 ## 验证结果
 
 证据目录：[2026-11-12-desktop-interaction-sync](../acceptance/2026-11-12-desktop-interaction-sync/)。
 
-提供 [自包含 HTML 验收报告](../acceptance/2026-11-12-desktop-interaction-sync/report.html)，内嵌 4 张测试截图、核心 JSON 证据、需求完成状态与 instabox 授权说明。原始 4 项需求中，1 项已实现、3 项没实现；均尚未上线。HTML 只是新增呈现，不改变既有验证边界。
+提供 [自包含 HTML 验收报告](../acceptance/2026-11-12-desktop-interaction-sync/report.html)，内嵌 4 张 Manage 测试截图、1 张真实 Actions 成功截图、核心 JSON 证据、需求完成状态与 instabox 授权说明。原始 4 项需求中，2 项已实现、2 项没实现；main 尚未合并或发布。
 
 - 本地类型检查、前后端构建通过；instabox 最终 30 个测试文件、179 项测试及完整构建通过。Actionlint 1.7.12 校验 3 个工作流通过，已登记 instabox 自定义 runner label。最终汇总见证据目录 `verification.json`。
 - 全套 UI 回归（含首批新增交互用例）在桌面 1440px 和手机 375px 视窗执行：33 通过、1 项原有仅适用手机的用例在 desktop 跳过。追加历史分页用例后，交互/历史套件 8/8 通过，覆盖延迟快照、HTTP 恢复、关闭/刷新、重连、已解决旧快照、自定义回答、必填项、MCP 取消和历史按需读取。截图中的问题使用测试数据，非用户真实桌面请求。
@@ -66,7 +66,7 @@
 2026-11-12 11:18（UTC+08:00），用户完成授权后，通过官方只读 `GET /v1/orgs/{id}/github/installations` 接口确认：`foxhello-ai` 安装 ID `181104874` 已关联当前 workspace，`suspended=false`；原有 `fmzh2021` 关联仍保留。该接口不返回具体仓库选择范围，因此组织授权和 Link 已确认，`codex-manage` 的访问权限与首次实际 Actions 结果仍需实跑核验。见 [组织关联证据](../acceptance/2026-11-12-desktop-interaction-sync/instabox-authorization.json)。
 
 1. 组织 App 安装及 workspace 关联已确认；继续核对 `foxhello-ai/codex-manage` 的仓库访问范围。[instabox 授权页面](https://dashboard.instabox.sh/auth/github-app/install?org=org_65a2b3061d17430aa975eecac2ea15a2) 可查看安装与关联；如需调整仓库范围，由相应管理员操作。
-2. `Instabox Linux Pilot` 支持实施分支 push 自动触发及 workflow_dispatch。GitHub CLI 账号 `fmzh2025` 对仓库只读，但 git 使用另一套已有 SSH 身份且推送检查通过，因此采用分支 push 完成实跑，不要求用户先修改 gh 权限。检查 GitHub 任务和 `instabox ci` 两边结果，核对安装证据 artifact。
-3. 首次 pilot 成功后，将 repository variable `LINUX_CI_RUNNER` 设为 `instabox-medium`，Linux 安装和发布任务才会切换；macOS 不变。恢复时删除该变量。公开仓库未来若增加 fork PR 触发，应启用 GitHub 外部贡献者审批以控制 workspace 任务。
+2. `Instabox Linux Pilot` 支持实施分支 push 自动触发及 workflow_dispatch。GitHub CLI 账号 `fmzh2025` 对仓库只读，但 git 使用另一套已有 SSH 身份，因此采用分支 push 完成实跑，无需修改 gh 权限。实际运行 [43148957035](https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035) 成功，测试源码提交 `d3d631558956475b7e6423c0a5d1b2c25edbdd38`，job `130953338930`。instabox 同样确认目标仓库使用 instabox-medium，状态 completed / success；179 测试、完整构建、8 项安装生命周期检查通过，artifact 已下载核对。[运行证据](../acceptance/2026-11-12-desktop-interaction-sync/instabox-actions.json)、[安装证据](../acceptance/2026-11-12-desktop-interaction-sync/actions-installation.json)。
+3. pilot 成功后，已将实现分支中 Linux 安装和发布 runner 默认值设为 `instabox-medium`，main 合并后生效；macOS 不变。无需再设置启用变量；回退时可设置 `LINUX_CI_RUNNER=ubuntu-24.04`。公开仓库未来若增加 fork PR 触发，应启用 GitHub 外部贡献者审批以控制 workspace 任务。
 
 回滚代码时撤销本实施分支改动；没有历史迁移或真实会话数据回滚步骤。

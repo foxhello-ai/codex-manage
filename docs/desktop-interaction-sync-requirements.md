@@ -57,10 +57,10 @@
 
 ## 状态
 
-按用户完整场景验收，只使用“已实现 / 没实现”：第 1 项已实现；第 2、3 项没实现，缺少默认桌面私有后台的交互读取/答复通道；第 4 项没实现，正在进行目标仓库 instabox Actions 实跑和 Linux runner 切换。实现状态与是否合并、发布分别记录，不用内部组件通过测试替代完整场景。
+按用户完整场景验收，只使用“已实现 / 没实现”：第 1、4 项已实现；第 2、3 项没实现，缺少默认桌面私有后台的交互读取/答复通道。第 4 项已通过目标仓库真实 instabox Actions，Linux 安装和发布 runner 默认值已在实现分支切换。实现状态与是否合并、发布分别记录，不用内部组件通过测试替代完整场景。
 
-面向审核的 [HTML 验收报告](acceptance/2026-11-12-desktop-interaction-sync/report.html) 内嵌 4 张 Manage 测试截图、原始证据和逐项完成状态；截图不表示官方桌面真实跨端请求已验收通过。
+面向审核的 [HTML 验收报告](acceptance/2026-11-12-desktop-interaction-sync/report.html) 内嵌 4 张 Manage 测试截图、1 张真实 GitHub Actions 成功截图、原始证据和逐项完成状态；Manage 测试截图不表示官方桌面真实跨端请求已验收通过。
 
-需求已批准，已完成可实施修复并形成 [实施及验收记录](implementation-notes/2026-11-12-desktop-interaction-sync.md)。DSI-01～04 的 Manage 链路已实现并验证。DSI-05 已完成当前版本能力盘点，默认官方桌面的原生跨端回答没实现；不能关闭此项产品需求。DSI-06 已通过隔离 instabox Linux 测试、构建及安装生命周期验证；2026-11-12 已确认 foxhello-ai 的 App 安装与当前 workspace 关联。现有 SSH 推送检查通过，验证分支 push 将自动触发 pilot，无需先修改只读 gh 账号权限；目标仓库访问及首次 Actions 结果仍以实际运行核验。尚未合并或发布。
+需求已批准，已完成可实施修复并形成 [实施及验收记录](implementation-notes/2026-11-12-desktop-interaction-sync.md)。DSI-01～04 的 Manage 链路已实现并验证。DSI-05 已完成当前版本能力盘点，默认官方桌面的原生跨端回答没实现；不能关闭此项产品需求。若采用已验证的共享 app-server 路线，需要用户明确放宽此前“桌面不修改”的启动连接约束；当前不能靠补账号授权解决此技术阻塞。DSI-06 已通过目标仓库 [Instabox Linux Pilot #1](https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035)：179 项测试、构建及安装生命周期全通过。实现分支中 Linux 默认 runner 为 instabox-medium，Intel/ARM macOS runner 保留；LINUX_CI_RUNNER=ubuntu-24.04 可回退。尚未合并或发布。
 
 参考：[既有桌面接续验收](acceptance/2026-11-03-desktop-session-handoff/README.md)、[instabox CI](https://instabox.sh/docs/ci)。

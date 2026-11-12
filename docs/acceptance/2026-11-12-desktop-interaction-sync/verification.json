@@ -49,11 +49,11 @@
   "actions": {
     "targetRepository": "foxhello-ai/codex-manage",
     "pilotImplemented": true,
-    "firstTargetActionsRunVerified": false,
-    "appAuthorizationVerified": false,
+    "firstTargetActionsRunVerified": true,
+    "appAuthorizationVerified": true,
     "linuxMigrationActivated": false,
-    "defaultRunner": "ubuntu-24.04",
-    "activationVariable": "LINUX_CI_RUNNER=instabox-medium",
+    "defaultRunner": "instabox-medium",
+    "activationVariable": null,
     "macosRunners": [
       "macos-15-intel",
       "macos-15"
@@ -61,8 +61,14 @@
     "ownerAuthorizationVerified": true,
     "ownerLinked": true,
     "ownerAuthorizationCheckedAt": "2026-11-12T03:18:29.133973+00:00",
-    "repositoryAccessVerified": false,
-    "appAuthorizationScope": "foxhello-ai installation and workspace link confirmed; per-repository access and first Actions run not verified"
+    "repositoryAccessVerified": true,
+    "appAuthorizationScope": "foxhello-ai/codex-manage job was accepted and completed successfully on instabox-medium.",
+    "linuxMigrationImplemented": true,
+    "mainRunnerAtVerification": "ubuntu-24.04",
+    "rollbackVariable": "LINUX_CI_RUNNER=ubuntu-24.04",
+    "pilotRunUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43148957035",
+    "pilotSourceCommit": "d3d631558956475b7e6423c0a5d1b2c25edbdd38",
+    "scope": "Linux defaults changed in the implementation branch; main has not been merged or released."
   },
   "installation": {
     "report": "instabox-installation.json",

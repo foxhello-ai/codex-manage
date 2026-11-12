@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ${{ vars.LINUX_CI_RUNNER || 'ubuntu-24.04' }}
+    runs-on: ${{ vars.LINUX_CI_RUNNER || 'instabox-medium' }}
     timeout-minutes: 20
     steps:
       - name: Checkout
