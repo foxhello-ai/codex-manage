@@ -32,3 +32,11 @@ curl -fsSL https://github.com/foxhello-ai/codex-manage/releases/download/v1.0.11
 ```
 
 安装器保留已有配置和数据。升级后打开设置和诊断，“当前版本”应为 v1.0.11。v1.0.10 可用于回滚。
+
+## 正式发布结果
+
+已于 2026-11-12T06:39:00Z 正式发布。源码 `2315e46b7a08834eb22f571737662c7cec814e03`。版本 tag 与 release 分支均冻结于此提交。
+
+[发布流水线](https://github.com/foxhello-ai/codex-manage/actions/runs/43169476570) 的 192 项测试、构建、Linux 8 项安装检查和正式下载复核均通过。[发布后矩阵](https://github.com/foxhello-ai/codex-manage/actions/runs/43169841959) 对 Linux、Intel Mac、Apple ARM Mac 均通过；本机 Intel Mac 10 项 launchd 检查也通过。正式包设置页显示 v1.0.11，1440px 与 375px 验证通过。
+
+SHA-256：`1f4d2b5bfe0e11badc8012049ce89948010c62e368bb28e6a6b5906a0154c650`。[完整证据](../acceptance/2026-11-12-runtime-v1.0.11/README.md)。用户现有生产安装未自动升级。
