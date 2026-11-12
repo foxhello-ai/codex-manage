@@ -76,6 +76,7 @@ describe("model selection helpers", () => {
     expect(modelSwitchDisabledReason("starting")).toContain("恢复中");
     expect(modelSwitchDisabledReason("running")).toContain("运行中");
     expect(modelSwitchDisabledReason("waiting_approval")).toContain("审批");
+    expect(modelSwitchDisabledReason("waiting_user")).toContain("回答");
     expect(modelSwitchDisabledReason("waiting_input")).toBeNull();
     expect(modelSwitchDisabledReason("history")).toBeNull();
     expect(modelSwitchDisabledReason("failed")).toBeNull();

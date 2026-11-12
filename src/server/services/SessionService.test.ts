@@ -19,6 +19,28 @@ function metadataStore(entries: Record<string, { remarkTitle: string | null }> =
 }
 
 describe("SessionService", () => {
+  it("reads just the requested recent or older history page without loading all turns first", async () => {
+    const calls: Array<{ method: string; params: any }> = [];
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready", pid: 1, lastError: null, initialized: true }),
+      request: (async (method: string, params: any) => {
+        calls.push({ method, params });
+        if (method === "thread/read") return { thread: { id: "thread-1", historyMode: "paginated" } };
+        return { data: [{ id: "newer", items: [] }, { id: "older", items: [] }], nextCursor: "page-before" };
+      }) as any
+    });
+    const recent = await service.getSessionDetail("thread-1", { turnLimit: 20 });
+    expect(recent.turns.map(turn => turn.id)).toEqual(["older", "newer"]);
+    expect(recent.historyPage).toEqual({ nextCursor: "page-before", version: null, unchanged: false });
+    expect(calls).toEqual([
+      { method: "thread/read", params: { threadId: "thread-1", includeTurns: false } },
+      { method: "thread/turns/list", params: { threadId: "thread-1", cursor: null, limit: 20, sortDirection: "desc", itemsView: "full" } }
+    ]);
+    await service.getSessionDetail("thread-1", { turnLimit: 20, turnCursor: "page-before" });
+    expect(calls.at(-1)?.params.cursor).toBe("page-before");
+    expect(calls.map(call => call.method)).not.toContain("thread/resume");
+  });
+
   it("reads all stored paginated turns without resuming and preserves client IDs for exact queue reconciliation", async () => {
     const calls: string[] = [];
     const service = new SessionService({

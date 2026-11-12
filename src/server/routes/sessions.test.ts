@@ -103,12 +103,14 @@ describe("session routes", () => {
     const runtime = runtimeSnapshot("thread-1", { status: "history" });
     const app = buildApp({ listSessions: async () => [], getSessionDetail: async () => ({}) as any, updateMetadata: async () => ({}) as any }, undefined, {
       getRuntime: () => runtime,
+      approvalService: { listPending: (threadId: string) => [{ id: "question-1", threadId, kind: "tool_user_input", status: "pending", questions: [] }] },
       hydratePermissionMode: () => runtime,
       resumeThread: async () => { resumes++; return runtime; },
       sendInput: async (_id: string, body: any) => { submitted = body; return { ...runtime, executionSource: "external_queue", deliveries: [{ status: "queued" }] }; }
     } as any);
     const read = await app.inject({ method: "GET", url: "/api/sessions/thread-1/runtime" });
     expect(read.statusCode).toBe(200);
+    expect(read.json().approvals).toMatchObject([{ id: "question-1", threadId: "thread-1", kind: "tool_user_input" }]);
     expect(resumes).toBe(0);
     const sent = await app.inject({ method: "POST", url: "/api/sessions/thread-1/input", payload: { text: "follow up", clientRequestId: "request-1" } });
     expect(sent.statusCode).toBe(202);
@@ -473,7 +475,7 @@ describe("session routes", () => {
           },
           submitApproval: () => { throw new Error("not used"); },
           eventHub: {} as any,
-          approvalService: {} as any
+          approvalService: { listPending: () => [] } as any
         } as unknown as RuntimeManager,
         undefined,
         store
@@ -647,7 +649,7 @@ describe("session routes", () => {
           throw new Error("not used");
         }) as any,
         eventHub: {} as any,
-        approvalService: {} as any
+        approvalService: { listPending: () => [] } as any
       }
     );
 
@@ -675,7 +677,7 @@ describe("session routes", () => {
         sendInput: async () => { throw new Error("not used"); },
         submitApproval: (() => { throw new Error("not used"); }) as any,
         eventHub: {} as any,
-        approvalService: {} as any
+        approvalService: { listPending: () => [] } as any
       }
     );
 
@@ -737,7 +739,7 @@ describe("session routes", () => {
           throw new Error("not used");
         }) as any,
         eventHub: {} as any,
-        approvalService: {} as any
+        approvalService: { listPending: () => [] } as any
       }
     );
 
@@ -767,7 +769,7 @@ describe("session routes", () => {
         },
         submitApproval: (() => { throw new Error("not used"); }) as any,
         eventHub: {} as any,
-        approvalService: {} as any
+        approvalService: { listPending: () => [] } as any
       }
     );
 
@@ -795,7 +797,7 @@ describe("session routes", () => {
         sendInput: async () => { throw new Error("thread already has an active writer"); },
         submitApproval: (() => { throw new Error("not used"); }) as any,
         eventHub: {} as any,
-        approvalService: {} as any
+        approvalService: { listPending: () => [] } as any
       }
     );
 
@@ -846,7 +848,7 @@ describe("session routes", () => {
         }),
         submitApproval: (() => { throw new Error("not used"); }) as any,
         eventHub: {} as any,
-        approvalService: {} as any
+        approvalService: { listPending: () => [] } as any
       }
     );
 
@@ -902,7 +904,7 @@ describe("session routes", () => {
         sendInput: (() => { throw new Error("not used"); }) as any,
         submitApproval: (() => { throw new Error("not used"); }) as any,
         eventHub: {} as any,
-        approvalService: {} as any
+        approvalService: { listPending: () => [] } as any
       } as unknown as RuntimeManager
     );
 
@@ -969,7 +971,7 @@ describe("session routes", () => {
           };
         }) as any,
         eventHub: {} as any,
-        approvalService: {} as any
+        approvalService: { listPending: () => [] } as any
       }
     );
 
@@ -1014,7 +1016,7 @@ describe("session routes", () => {
         sendInput: async () => runtime,
         submitApproval: (() => { throw new Error("not used"); }) as any,
         eventHub: {} as any,
-        approvalService: {} as any
+        approvalService: { listPending: () => [] } as any
       },
       {
         updateSelection: async (_sessionId, input) => ({

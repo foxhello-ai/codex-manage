@@ -151,6 +151,7 @@ export class RuntimeManager {
     this.appServer.on("exit", () => {
       this.stopReleaseTimers();
       this.ownedThreads.clear();
+      this.approvalService.expirePending();
       if (!this.appServerReloading) this.markAllFailed("Codex app-server 已退出");
     });
     this.appServer.on("error", (error: Error) => this.markAllFailed(sanitizeModelError(error)));
@@ -502,8 +503,8 @@ export class RuntimeManager {
 
   private async sendInputInRuntime(threadId: string, params: SendInputParams, text: string): Promise<RuntimeSnapshot> {
     const latest = this.runtimes.get(threadId);
-    if (latest?.status === "waiting_approval") {
-      throw new Error("当前会话正在等待审批，请先处理审批");
+    if (latest?.status === "waiting_approval" || latest?.status === "waiting_user") {
+      throw new Error("当前会话正在等待确认或回答，请先处理待交互请求");
     }
 
     const attachmentNotice = params.attachmentPaths?.length
@@ -642,7 +643,7 @@ export class RuntimeManager {
     const seen = new Set<string>();
 
     for (const [threadId, runtime] of this.runtimes) {
-      if (runtime.status === "starting" || runtime.status === "running" || runtime.status === "waiting_approval") {
+      if (runtime.status === "starting" || runtime.status === "running" || runtime.status === "waiting_approval" || runtime.status === "waiting_user") {
         blockers.push({ threadId, status: runtime.status, reason: "active_runtime" });
         seen.add(threadId);
         continue;
@@ -850,7 +851,9 @@ export class RuntimeManager {
   private handleServerRequest(request: JsonRpcRequest) {
     const handled = this.approvalService.handleServerRequest(request);
     if (!handled) {
-      this.appServer.respondToServerRequest(request.id, {});
+      this.appServer.rejectServerRequest(request.id, `Unsupported server request: ${request.method}`);
+      const threadId = readString(asRecord(request.params).threadId);
+      if (threadId) this.eventHub.publish(threadId, "warning", { message: `当前客户端尚不支持此交互：${request.method}` });
     }
   }
 
@@ -868,14 +871,19 @@ export class RuntimeManager {
     if (!threadId) return;
 
     switch (notification.method) {
+      case "serverRequest/resolved":
+        this.approvalService.resolveRequest(threadId, params.requestId);
+        break;
       case "thread/settings/updated":
         this.reconcileThreadSettings(threadId, asRecord(params.threadSettings));
         break;
       case "thread/status/changed":
         if (asRecord(params.status).type === "notLoaded") this.markReleased(threadId);
         this.setRuntime(threadId, { status: mapRuntimeStatus(asRecord(params.status)), lastError: null });
+        if (this.approvalService.getPendingCount(threadId)) this.refreshApprovalStatus(threadId);
         break;
       case "thread/closed":
+        this.approvalService.expirePending(threadId);
         this.markReleased(threadId);
         this.setRuntime(threadId, { status: "history", activeTurnId: null });
         break;
@@ -889,9 +897,10 @@ export class RuntimeManager {
       case "turn/completed": {
         this.unmaterializedThreads.delete(threadId);
         this.setRuntime(threadId, {
-          status: this.approvalService.getPendingCount(threadId) > 0 ? "waiting_approval" : "waiting_input",
+          status: "waiting_input",
           activeTurnId: null
         });
+        this.refreshApprovalStatus(threadId);
         this.eventHub.publish(threadId, "turn_completed", { turn });
         break;
       }
@@ -957,10 +966,11 @@ export class RuntimeManager {
     const pendingApprovalCount = this.approvalService.getPendingCount(threadId);
     const runtime = this.runtimes.get(threadId);
     if (pendingApprovalCount > 0) {
-      this.setRuntime(threadId, { status: "waiting_approval" });
+      const needsAnswer = this.approvalService.listPending(threadId).some(approval => ["tool_user_input", "mcp_elicitation"].includes(approval.kind));
+      this.setRuntime(threadId, { status: needsAnswer ? "waiting_user" : "waiting_approval" });
       return;
     }
-    if (runtime?.status === "waiting_approval") {
+    if (runtime?.status === "waiting_approval" || runtime?.status === "waiting_user") {
       this.setRuntime(threadId, { status: runtime.activeTurnId ? "running" : "waiting_input" });
     }
   }
@@ -1179,11 +1189,14 @@ function buildHistoryContinuationPrompt(historyDirectory: string, sourceThreadId
 }
 
 function mapRuntimeStatus(value: Record<string, unknown>): RuntimeStatus {
+  if (Array.isArray(value.activeFlags) && value.activeFlags.includes("waitingOnUserInput")) return "waiting_user";
+  if (Array.isArray(value.activeFlags) && value.activeFlags.includes("waitingOnApproval")) return "waiting_approval";
   const type = readString(value.type) ?? readString(value.status);
   switch (type) {
     case "starting":
       return "starting";
     case "running":
+    case "active":
     case "inProgress":
     case "loaded":
       return "running";
@@ -1194,6 +1207,8 @@ function mapRuntimeStatus(value: Record<string, unknown>): RuntimeStatus {
     case "waitingApproval":
     case "waiting_approval":
       return "waiting_approval";
+    case "waiting_user":
+      return "waiting_user";
     case "failed":
     case "errored":
       return "failed";

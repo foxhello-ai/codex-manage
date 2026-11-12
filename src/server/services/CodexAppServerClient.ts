@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { delimiter, dirname, isAbsolute } from "node:path";
 import { createInterface, type Interface } from "node:readline";
 
-export type JsonRpcId = number;
+export type JsonRpcId = number | string;
 
 export type JsonRpcRequest = {
   id: JsonRpcId;
@@ -221,6 +221,11 @@ export class CodexAppServerClient extends EventEmitter {
     this.process.stdin.write(`${JSON.stringify({ id, result })}\n`);
   }
 
+  rejectServerRequest(id: JsonRpcId, message: string): void {
+    if (!this.process || !this.process.stdin.writable) throw new Error("codex app-server is not running");
+    this.process.stdin.write(`${JSON.stringify({ id, error: { code: -32601, message } })}\n`);
+  }
+
   private handleLine(line: string) {
     let message: unknown;
 
@@ -234,13 +239,13 @@ export class CodexAppServerClient extends EventEmitter {
     if (!message || typeof message !== "object") return;
 
     const maybeResponse = message as Partial<JsonRpcResponse>;
-    if (typeof maybeResponse.id === "number" && ("result" in maybeResponse || "error" in maybeResponse)) {
+    if ((typeof maybeResponse.id === "number" || typeof maybeResponse.id === "string") && ("result" in maybeResponse || "error" in maybeResponse)) {
       this.handleResponse(maybeResponse as JsonRpcResponse);
       return;
     }
 
     const maybeRequest = message as Partial<JsonRpcRequest>;
-    if (typeof maybeRequest.id === "number" && typeof maybeRequest.method === "string") {
+    if ((typeof maybeRequest.id === "number" || typeof maybeRequest.id === "string") && typeof maybeRequest.method === "string") {
       this.emit("serverRequest", maybeRequest);
       return;
     }

@@ -7,8 +7,9 @@ import type { RuntimeManager } from "./RuntimeManager";
 import { sanitizeModelError } from "../modelErrors";
 import { stripAmbientBrowserContext } from "../../shared/messageText";
 import { performance } from "node:perf_hooks";
+import { stat } from "node:fs/promises";
 
-export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
+export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_user" | "waiting_approval" | "exited" | "failed";
 
 export type SessionSummary = {
   id: string;
@@ -31,6 +32,7 @@ export type SessionDetail = SessionSummary & {
   historyMode: string | null;
   modelState: SessionModelState;
   turns: SessionTurn[];
+  historyPage?: { nextCursor: string | null; version: string | null; unchanged: boolean };
 };
 
 export type SessionTurn = {
@@ -72,6 +74,9 @@ type ListSessionsParams = {
 
 type GetSessionDetailParams = {
   includeTurns?: boolean;
+  turnLimit?: number;
+  turnCursor?: string;
+  historyVersion?: string;
 };
 
 type MetadataStore = {
@@ -214,11 +219,11 @@ export class SessionService {
 
   async getSessionDetail(sessionId: string, params: GetSessionDetailParams = {}): Promise<SessionDetail> {
     const includeTurns = params.includeTurns ?? true;
-    const requestKey = `${sessionId}:${includeTurns ? "turns" : "summary"}`;
+    const requestKey = JSON.stringify([sessionId, includeTurns, params.turnLimit, params.turnCursor, params.historyVersion]);
     const existing = this.detailRequests.get(requestKey);
     if (existing) return existing;
 
-    const request = this.readSessionDetail(sessionId, includeTurns);
+    const request = this.readSessionDetail(sessionId, includeTurns, params);
     this.detailRequests.set(requestKey, request);
     void request.then(() => {
       if (this.detailRequests.get(requestKey) === request) this.detailRequests.delete(requestKey);
@@ -228,14 +233,14 @@ export class SessionService {
     return request;
   }
 
-  private async readSessionDetail(sessionId: string, includeTurns: boolean): Promise<SessionDetail> {
+  private async readSessionDetail(sessionId: string, includeTurns: boolean, params: GetSessionDetailParams): Promise<SessionDetail> {
     this.assertReady();
 
     const startedAt = performance.now();
     const [response, metadata] = await Promise.all([
       this.appServer.request<ThreadReadResponse>("thread/read", {
         threadId: sessionId,
-        includeTurns
+        includeTurns: includeTurns && !params.turnLimit
       }),
       this.readMetadata()
     ]);
@@ -245,7 +250,25 @@ export class SessionService {
     }
 
     const thread = response.thread && typeof response.thread === "object" ? (response.thread as Record<string, unknown>) : {};
-    if (includeTurns && thread.historyMode === "paginated") {
+    let historyPage: SessionDetail["historyPage"];
+    if (includeTurns && params.turnLimit) {
+      const signature = typeof thread.path === "string" ? await stat(thread.path).catch(() => null) : null;
+      // Only a durable file signature can prove that history is unchanged.
+      // Paginated turns live in a separate store: the rollout header's mtime
+      // alone cannot prove that their contents have not changed.
+      const version = signature && thread.historyMode !== "paginated" ? `${signature.size}:${signature.mtimeMs}` : null;
+      const unchanged = Boolean(!params.turnCursor && version && params.historyVersion === version);
+      if (unchanged) {
+        thread.turns = [];
+        historyPage = { nextCursor: null, version, unchanged: true };
+      } else {
+        const page: { data: unknown[]; nextCursor?: string | null } = await this.appServer.request("thread/turns/list", {
+          threadId: sessionId, cursor: params.turnCursor ?? null, limit: params.turnLimit, sortDirection: "desc", itemsView: "full"
+        });
+        thread.turns = [...page.data].reverse();
+        historyPage = { nextCursor: page.nextCursor ?? null, version, unchanged: false };
+      }
+    } else if (includeTurns && thread.historyMode === "paginated") {
       const turns: unknown[] = [];
       let cursor: string | null = null;
       do {
@@ -269,6 +292,7 @@ export class SessionService {
       modelProvider: readString(thread.modelProvider),
       historyMode: readString(thread.historyMode),
       modelState,
+      ...(historyPage ? { historyPage } : {}),
       turns: readArray(thread.turns).map((turn, index) => toTurn(turn, index, sessionId))
     };
   }
@@ -560,10 +584,14 @@ function makeTitle(preview: string | null, id: string): string {
 }
 
 function mapThreadStatus(value: unknown): SessionStatus {
+  const flags = readArray(value && typeof value === "object" ? (value as Record<string, unknown>).activeFlags : null);
+  if (flags.includes("waitingOnUserInput")) return "waiting_user";
+  if (flags.includes("waitingOnApproval")) return "waiting_approval";
   const type = typeof value === "string" ? value : value && typeof value === "object" ? readString((value as { type?: unknown }).type) : null;
 
   switch (type) {
     case "running":
+    case "active":
     case "inProgress":
     case "loaded":
       return "running";
@@ -575,6 +603,8 @@ function mapThreadStatus(value: unknown): SessionStatus {
     case "waiting_approval":
     case "waitingApproval":
       return "waiting_approval";
+    case "waiting_user":
+      return "waiting_user";
     case "failed":
     case "errored":
       return "failed";

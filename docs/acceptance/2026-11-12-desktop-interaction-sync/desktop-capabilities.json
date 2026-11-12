@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-12T02:37:10.185Z",
+  "desktopVersion": "26.1002.52244",
+  "cliVersion": "codex-cli 0.162.0-alpha.2",
+  "isolation": {
+    "desktopStarted": false,
+    "desktopModified": false,
+    "startupChanged": false,
+    "chatWritten": false,
+    "credentialsLoaded": false
+  },
+  "clientMethodCount": 170,
+  "interactionClientMethods": [
+    "thread/decrement_elicitation",
+    "thread/increment_elicitation"
+  ],
+  "interactionServerRequests": [
+    "applyPatchApproval",
+    "execCommandApproval",
+    "item/commandExecution/requestApproval",
+    "item/fileChange/requestApproval",
+    "item/permissions/requestApproval",
+    "item/tool/requestUserInput",
+    "mcpServer/elicitation/request"
+  ],
+  "nativeQueueMethods": [
+    "thread/queue/add",
+    "thread/queue/delete",
+    "thread/queue/list",
+    "thread/queue/reorder",
+    "thread/queue/start",
+    "thread/queue/update"
+  ],
+  "responseRouting": "Server request replies are JSON-RPC responses on the connection receiving the request; a request ID alone is not an external reply endpoint.",
+  "desktopBackends": [
+    {
+      "pid": 32800,
+      "parentPid": 32288,
+      "explicitListenerArgument": false,
+      "tcpListeners": []
+    }
+  ],
+  "defaultDaemonControlSocketPresent": false,
+  "result": "The inspected version exposes no client method for listing or answering another private backend connection’s pending requests. Default desktop backend attachment and screenshot-specific cross-client interaction remain unverified/unsupported by Manage. Native text queuing is a separate capability.",
+  "limits": [
+    "Static protocol and listener inventory only; no desktop pending request was created or answered.",
+    "No claim that every internal or future desktop interface is impossible."
+  ]
+}

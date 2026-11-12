@@ -1,0 +1,386 @@
+{
+  "stats": {
+    "startTime": "2026-11-12T02:34:25.129Z",
+    "duration": 125092.094,
+    "expected": 33,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "title": "three list views, search, rename and ordinary directory selection",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 13578
+        }
+      ]
+    },
+    {
+      "title": "task grouping, pin, attach, and recent/history/manual task directories",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 5960
+        }
+      ]
+    },
+    {
+      "title": "full replies, local code scrolling, process collapse and stable history reading",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 11295
+        }
+      ]
+    },
+    {
+      "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 11565
+        }
+      ]
+    },
+    {
+      "title": "approval accept preserves its API meaning; closing submits nothing",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 6052
+        }
+      ]
+    },
+    {
+      "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 6447
+        }
+      ]
+    },
+    {
+      "title": "approval decline preserves its API meaning; closing submits nothing",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 4432
+        }
+      ]
+    },
+    {
+      "title": "approval cancel preserves its API meaning; closing submits nothing",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 4509
+        }
+      ]
+    },
+    {
+      "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 3856
+        }
+      ]
+    },
+    {
+      "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 5792
+        }
+      ]
+    },
+    {
+      "title": "successful send clears the draft and attachments without adding reply action bars",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 4338
+        }
+      ]
+    },
+    {
+      "title": "desktop queue follows desktop settings and keeps uncertain delivery visible without resending",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 3730
+        }
+      ]
+    },
+    {
+      "title": "resending a retained draft after a failed HTTP request keeps its original delivery ID",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 4172
+        }
+      ]
+    },
+    {
+      "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 3493
+        }
+      ]
+    },
+    {
+      "title": "three list views, search, rename and ordinary directory selection",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 14583
+        }
+      ]
+    },
+    {
+      "title": "task grouping, pin, attach, and recent/history/manual task directories",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 8218
+        }
+      ]
+    },
+    {
+      "title": "full replies, local code scrolling, process collapse and stable history reading",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 12122
+        }
+      ]
+    },
+    {
+      "title": "auto-growing input, attachment feedback, failed send retention, model and retry",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 10033
+        }
+      ]
+    },
+    {
+      "title": "approval accept preserves its API meaning; closing submits nothing",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 5980
+        }
+      ]
+    },
+    {
+      "title": "approval acceptForSession preserves its API meaning; closing submits nothing",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 5405
+        }
+      ]
+    },
+    {
+      "title": "approval decline preserves its API meaning; closing submits nothing",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 6681
+        }
+      ]
+    },
+    {
+      "title": "approval cancel preserves its API meaning; closing submits nothing",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 5437
+        }
+      ]
+    },
+    {
+      "title": "live commands stay locally scrollable and sending keeps its disabled conditions",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 4283
+        }
+      ]
+    },
+    {
+      "title": "visual viewport shrink, offset and restore keep composer and panels reachable",
+      "project": "desktop",
+      "status": "skipped",
+      "results": [
+        {
+          "status": "skipped",
+          "duration": 502
+        }
+      ]
+    },
+    {
+      "title": "successful send clears the draft and attachments without adding reply action bars",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 3160
+        }
+      ]
+    },
+    {
+      "title": "desktop queue follows desktop settings and keeps uncertain delivery visible without resending",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 3198
+        }
+      ]
+    },
+    {
+      "title": "resending a retained draft after a failed HTTP request keeps its original delivery ID",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 3394
+        }
+      ]
+    },
+    {
+      "title": "ordinary create failure stays in its panel and panel dismissal returns keyboard focus",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 2527
+        }
+      ]
+    },
+    {
+      "title": "HTTP runtime arriving before an older WS snapshot does not hide the question",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 4593
+        }
+      ]
+    },
+    {
+      "title": "HTTP recovers pending questions without WS; closing preserves them and refresh restores them",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 5755
+        }
+      ]
+    },
+    {
+      "title": "MCP forms send typed controls and cancellation has its own API action",
+      "project": "mobile-375",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 4199
+        }
+      ]
+    },
+    {
+      "title": "HTTP runtime arriving before an older WS snapshot does not hide the question",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 4525
+        }
+      ]
+    },
+    {
+      "title": "HTTP recovers pending questions without WS; closing preserves them and refresh restores them",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 3985
+        }
+      ]
+    },
+    {
+      "title": "MCP forms send typed controls and cancellation has its own API action",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "duration": 2439
+        }
+      ]
+    }
+  ]
+}

@@ -10,6 +10,8 @@ import { findRetryContextForTurn, findRetryContextFromFailedTurns, isCommentaryP
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 import { stripAmbientBrowserContext } from "../shared/messageText";
 import { clearBootstrapSession, readBootstrapSession, writeBootstrapSession } from "./bootstrapSession";
+import { mergeSessionHistory } from "./sessionHistory";
+import { InteractionCard } from "./InteractionCard";
 
 type LoadState = "loading" | "ready" | "error";
 type WebSocketStatus = "idle" | "connecting" | "connected" | "disconnected";
@@ -294,6 +296,7 @@ function Dashboard({
   const [retryDialogOpen, setRetryDialogOpen] = useState(false);
   const lastEventSeqRef = useRef(0);
   const runtimeEventSeqRef = useRef(0);
+  const approvalsEventSeqRef = useRef(0);
   const selectedSessionIdRef = useRef<string | null>(safeInitialRoute.kind === "detail" ? safeInitialRoute.sessionId : null);
   const historyLoadedSessionIdRef = useRef<string | null>(null);
   const historyLoadingSessionIdRef = useRef<string | null>(null);
@@ -572,7 +575,7 @@ function Dashboard({
     loadSessions(search);
   }
 
-  async function loadSessionDetail(sessionId: string, options: { silent?: boolean; includeTurns?: boolean } = {}): Promise<SessionDetail | null> {
+  async function loadSessionDetail(sessionId: string, options: { silent?: boolean; includeTurns?: boolean; turnCursor?: string } = {}): Promise<SessionDetail | null> {
     const includeTurns = options.includeTurns ?? false;
     if (includeTurns && historyLoadingSessionIdRef.current === sessionId) return null;
     if (includeTurns) historyLoadingSessionIdRef.current = sessionId;
@@ -587,10 +590,12 @@ function Dashboard({
     else setDetailError(null);
 
     try {
-      const requestKey = `${sessionId}:${includeTurns ? "turns" : "summary"}`;
+      const current = sessionDetailRef.current?.id === sessionId ? sessionDetailRef.current : null;
+      const history = { turnLimit: 20, turnCursor: options.turnCursor, historyVersion: options.turnCursor ? undefined : current?.historyPage?.version ?? undefined };
+      const requestKey = JSON.stringify([sessionId, includeTurns, history]);
       let request = sessionDetailRequestsRef.current.get(requestKey);
       if (!request) {
-        request = getSessionDetail(sessionId, includeTurns);
+        request = getSessionDetail(sessionId, includeTurns, history);
         sessionDetailRequestsRef.current.set(requestKey, request);
         void request.then(() => {
           if (sessionDetailRequestsRef.current.get(requestKey) === request) {
@@ -604,14 +609,18 @@ function Dashboard({
       }
       const response = await request;
       if (selectedSessionIdRef.current !== sessionId) return null;
-      setSessionDetail(response.session);
+      const latest = sessionDetailRef.current?.id === sessionId ? sessionDetailRef.current : null;
+      const merged = includeTurns ? mergeSessionHistory(latest, response.session, Boolean(options.turnCursor))
+        : { ...response.session, turns: latest?.turns ?? response.session.turns, ...(latest?.historyPage ? { historyPage: latest.historyPage } : {}) };
+      sessionDetailRef.current = merged;
+      setSessionDetail(merged);
       if (includeTurns) {
         historyLoadedSessionIdRef.current = sessionId;
         setHistoryLoadedSessionId(sessionId);
         setHistoryNotice(null);
-        reconcileLiveMessagesWithHistory(response.session);
+        reconcileLiveMessagesWithHistory(merged);
       }
-      return response.session;
+      return merged;
     } catch (caught) {
       if (selectedSessionIdRef.current !== sessionId) return null;
       const message = caught instanceof Error ? caught.message : includeTurns ? "历史会话加载失败" : "会话详情加载失败";
@@ -704,13 +713,19 @@ function Dashboard({
       const response = await getSessionRuntime(sessionId);
       if (selectedSessionIdRef.current !== sessionId) return null;
       syncRuntimeSnapshot(response.runtime);
-      lastEventSeqRef.current = Math.max(lastEventSeqRef.current, response.runtime.eventSeq);
+      if (response.approvals) syncApprovals(response.approvals, response.runtime.eventSeq);
       return response.runtime;
     } catch (caught) {
       if (selectedSessionIdRef.current !== sessionId) return null;
       if (!options.silent) setRuntimeError(caught instanceof Error ? caught.message : "运行状态加载失败");
       return null;
     }
+  }
+
+  function syncApprovals(approvals: ApprovalSummary[], seq: number) {
+    if (seq < approvalsEventSeqRef.current) return;
+    approvalsEventSeqRef.current = seq;
+    setPendingApprovals(approvals.filter(isApprovalSummary).filter(approval => !resolvedApprovalIdsRef.current.has(approval.id)));
   }
 
   async function refreshCurrentSession(sessionId: string, options: { silent?: boolean; includeTurns?: boolean } = {}) {
@@ -968,6 +983,8 @@ function Dashboard({
     }
 
     if (event.type === "approval_requested" && isApprovalSummary(payload.approval)) {
+      if (event.seq < approvalsEventSeqRef.current) return;
+      approvalsEventSeqRef.current = event.seq;
       const approval = payload.approval;
       if (resolvedApprovalIdsRef.current.has(approval.id)) return;
       setPendingApprovals((current) => upsertById(current, approval));
@@ -975,6 +992,8 @@ function Dashboard({
     }
 
     if (event.type === "approval_resolved" && isApprovalSummary(payload.approval)) {
+      if (event.seq < approvalsEventSeqRef.current) return;
+      approvalsEventSeqRef.current = event.seq;
       const approval = payload.approval;
       resolvedApprovalIdsRef.current.add(approval.id);
       setPendingApprovals((current) => current.filter((item) => item.id !== approval.id));
@@ -1077,6 +1096,7 @@ function Dashboard({
     setRetryDialogOpen(false);
     lastEventSeqRef.current = 0;
     runtimeEventSeqRef.current = 0;
+    approvalsEventSeqRef.current = 0;
     resolvedApprovalIdsRef.current.clear();
   }
 
@@ -1228,11 +1248,10 @@ function Dashboard({
     socket.addEventListener("message", (message) => {
       const event = JSON.parse(String(message.data)) as WebSessionEvent;
       if (event.type === "snapshot") {
-        if (event.seq < lastEventSeqRef.current) return;
         const payload = event.payload as Record<string, unknown>;
         if (isRuntimeSnapshot(payload.runtime)) syncRuntimeSnapshot(payload.runtime);
         if (Array.isArray(payload.approvals)) {
-          setPendingApprovals(payload.approvals.filter(isApprovalSummary).filter((approval) => !resolvedApprovalIdsRef.current.has(approval.id)));
+          syncApprovals(payload.approvals.filter(isApprovalSummary), event.seq);
         }
         if (Array.isArray(payload.events)) {
           payload.events
@@ -1495,8 +1514,9 @@ function Dashboard({
 
   async function handleLoadHistory() {
     const sessionId = selectedSessionIdRef.current;
-    if (!sessionId || loadingHistory || historyLoadedSessionIdRef.current === sessionId) return;
-    await loadSessionDetail(sessionId, { includeTurns: true });
+    const cursor = sessionDetailRef.current?.historyPage?.nextCursor;
+    if (!sessionId || loadingHistory || (historyLoadedSessionIdRef.current === sessionId && !cursor)) return;
+    await loadSessionDetail(sessionId, { includeTurns: true, turnCursor: cursor ?? undefined });
   }
 
   function handleBackToList() {
@@ -2394,13 +2414,13 @@ function SessionDetailPanel({
     if (entry.kind === "error") return !desktopQueueErrorIds.has(entry.id);
     if (entry.kind !== "command") return true;
     const command = liveCommands.find((item) => item.id === entry.id);
-    const activeRuntime = runtime?.status === "starting" || runtime?.status === "running" || runtime?.status === "waiting_approval";
+    const activeRuntime = runtime?.status === "starting" || runtime?.status === "running" || runtime?.status === "waiting_approval" || runtime?.status === "waiting_user";
     return Boolean(activeRuntime && command && !isLiveCommandCompleted(command));
   });
   const pendingApprovalCount = Math.max(
     runtime?.pendingApprovalCount ?? 0,
     pendingApprovals.length,
-    runtime?.status === "waiting_approval" ? 1 : 0
+    runtime?.status === "waiting_approval" || runtime?.status === "waiting_user" ? 1 : 0
   );
 
   useEffect(() => {
@@ -2539,7 +2559,8 @@ function SessionDetailPanel({
             <SessionTimeline
               detail={detail}
               visibleTurnCount={visibleTurnCount}
-              onLoadMore={() => {
+              loadingHistory={loadingHistory}
+              onLoadMore={async (fromServer) => {
                 const timelineScroll = timelineScrollRef.current;
                 if (timelineScroll) {
                   pendingHistoryLoadRef.current = {
@@ -2547,6 +2568,7 @@ function SessionDetailPanel({
                     scrollHeight: timelineScroll.scrollHeight
                   };
                 }
+                if (fromServer) await onLoadHistory();
                 setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS);
               }}
               liveMessages={liveMessages}
@@ -2607,7 +2629,7 @@ function SessionDetailPanel({
       <div className="composerDock">
         {runtime?.executionSource === "external_queue" ? (
           <div className="successBanner composerWarning" role="status">
-            此会话由桌面或其他客户端处理。后续文字沿用桌面设置并通过原生队列发送，审批、停止任务和设置请到桌面操作。
+            此会话由桌面或其他客户端处理。后续文字沿用桌面设置并通过原生队列发送，审批、途中提问和界面选择、停止任务及设置请到桌面操作；Web 暂时无法读取或回答桌面的待交互请求。
             {runtime.deliveries?.filter(row => row.status !== "completed").map(row => (
               <div key={row.requestId}>{row.status === "unknown" || row.status === "submitting" ? "投递结果待确认，请勿重复发送" : row.status === "failed" ? "桌面处理失败" : row.status === "observed" ? "消息已进入原会话，等待桌面完成" : "已入队，等待桌面处理"}：{row.text.slice(0, 120)}{row.error ? `（${row.error}）` : ""}</div>
             ))}
@@ -2617,7 +2639,7 @@ function SessionDetailPanel({
           : runtime?.leaseStatus === "blocked" ? <div className="composerWarning" role="status">暂未释放：{runtime.leaseReason}</div> : null}
         {sessionNotice ? <div className="successBanner composerWarning" role="status">{sessionNotice}</div> : null}
         {visibleRuntimeError && !(timelineAtLatestRef.current && liveErrors.some((notice) => notice.message === visibleRuntimeError && visibleLiveTimeline.some((entry) => entry.kind === "error" && entry.id === notice.id))) ? <div className="errorBanner composerWarning" role="alert">{visibleRuntimeError}</div> : null}
-        {runtime?.permissionMode === "full_access" && pendingApprovals.length > 0 ? (
+        {runtime?.permissionMode === "full_access" && pendingApprovals.some(approval => !["tool_user_input", "mcp_elicitation"].includes(approval.kind)) ? (
           <div className="errorBanner composerWarning" role="alert">完全权限模式收到未预期的审批请求，系统未自动处理；你仍可拒绝或取消该请求。</div>
         ) : null}
         <ApprovalPanel
@@ -2753,6 +2775,7 @@ function ApprovalPanel({ approvals, pendingCount, onSubmitApproval }: { approval
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const approval = approvals.find((item) => item.id === selectedId) ?? approvals[0];
   useEffect(() => { if (pendingCount === 0 && approvals.length === 0) setOpen(false); }, [pendingCount, approvals.length]);
+  useEffect(() => { if (approval) setOpen(true); }, [approval?.id]);
   if (approvals.length === 0 && pendingCount === 0) return null;
   return (
     <section id="session-approval-panel" className="approvalPanel" aria-label="审批请求">
@@ -2770,6 +2793,9 @@ function ApprovalCard({ approval, onSubmitApproval, onClose, navigation }: { app
   const [submitting, setSubmitting] = useState<ApprovalDecision | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  if (approval.kind === "tool_user_input" || approval.kind === "mcp_elicitation") {
+    return <InteractionCard approval={approval} onSubmit={onSubmitApproval} onClose={onClose} navigation={navigation} />;
+  }
   async function submit(decision: ApprovalDecision) {
     if (submitting) return;
     setSubmitting(decision);
@@ -2845,6 +2871,7 @@ function approvalKindLabel(kind: ApprovalSummary["kind"]): string {
     case "file_change": return "文件变更";
     case "permissions": return "权限";
     case "tool_user_input": return "需要输入";
+    case "mcp_elicitation": return "需要你确认或补充信息";
     case "legacy_apply_patch": return "应用改动";
     case "legacy_exec": return "执行命令";
     case "command_execution":
@@ -2940,7 +2967,7 @@ function TaskInput({ sessionId, workspace, runtime, onSend, controls }: { sessio
   const submittingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const waitingApproval = runtime?.status === "waiting_approval";
+  const waitingApproval = runtime?.status === "waiting_approval" || runtime?.status === "waiting_user";
   const waitingTurnId = runtime?.status === "running" && !runtime.activeTurnId;
   const disabled = submitting || uploading || waitingApproval || waitingTurnId || runtime?.status === "starting";
 
@@ -3038,7 +3065,7 @@ function TaskInput({ sessionId, workspace, runtime, onSend, controls }: { sessio
         onChange={(event) => setText(event.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        placeholder={uploading ? "正在上传附件" : waitingApproval ? "请先处理审批" : waitingTurnId ? "正在同步任务状态" : "继续提问，或描述新的想法…"}
+        placeholder={uploading ? "正在上传附件" : waitingApproval ? runtime?.status === "waiting_user" ? "请先回答待处理问题" : "请先处理审批" : waitingTurnId ? "正在同步任务状态" : "继续提问，或描述新的想法…"}
         disabled={disabled}
         aria-keyshortcuts="Control+Enter Meta+Enter"
         rows={1}
@@ -3063,6 +3090,7 @@ function SessionTimeline({
   detail,
   visibleTurnCount,
   onLoadMore,
+  loadingHistory = false,
   liveMessages,
   liveCommands,
   liveErrors,
@@ -3074,9 +3102,10 @@ function SessionTimeline({
   historyContinuationPending,
   onContinueFromHistory
 }: {
-  detail: Pick<SessionDetail, "turns">;
+  detail: Pick<SessionDetail, "turns" | "historyPage">;
   visibleTurnCount: number;
-  onLoadMore: () => void;
+  onLoadMore: (fromServer?: boolean) => void;
+  loadingHistory?: boolean;
   liveMessages: LiveMessage[];
   liveCommands: LiveCommand[];
   liveErrors: LiveErrorNotice[];
@@ -3183,9 +3212,9 @@ function SessionTimeline({
 
   return (
     <div className="timeline" aria-label="会话消息">
-      {hasMoreEarlierTurns ? (
-        <button className="ghostButton loadMoreButton" type="button" onClick={onLoadMore}>
-          加载更早 {Math.min(DEFAULT_VISIBLE_TURNS, olderTurnsStart)} 轮
+      {hasMoreEarlierTurns || detail.historyPage?.nextCursor ? (
+        <button className="ghostButton loadMoreButton" type="button" disabled={loadingHistory} onClick={() => onLoadMore(!hasMoreEarlierTurns)}>
+          {loadingHistory ? "正在加载更早消息…" : hasMoreEarlierTurns ? `加载更早 ${Math.min(DEFAULT_VISIBLE_TURNS, olderTurnsStart)} 轮` : "读取更早消息"}
         </button>
       ) : null}
       {loadedEarlierTurns.map((turn, index) => renderTurn(turn, olderTurnsStart + index))}
@@ -4540,6 +4569,8 @@ function runtimeStatusDescription(status: SessionStatus, activeTurnId?: string |
       return activeTurnId === undefined ? "运行中" : activeTurnId ? "运行中" : "运行中 · 正在同步";
     case "waiting_input":
       return "已完成 · 等待输入";
+    case "waiting_user":
+      return "等待你回答";
     case "waiting_approval":
       return "等待审批";
     case "exited":

@@ -25,6 +25,8 @@ export function modelSwitchDisabledReason(status: SessionStatus): string | null 
       return "恢复中，暂不可切换模型";
     case "running":
       return "任务运行中，完成后可切换模型";
+    case "waiting_user":
+      return "请先回答问题，再切换模型";
     case "waiting_approval":
       return "请先处理审批，再切换模型";
     default:

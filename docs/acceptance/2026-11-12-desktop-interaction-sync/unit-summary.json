@@ -1,0 +1,159 @@
+{
+  "numPassedTests": 179,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "success": true,
+  "files": 30,
+  "cases": [
+    {
+      "file": "src/client/bootstrapSession.test.ts",
+      "status": "passed",
+      "tests": 3
+    },
+    {
+      "file": "src/client/modelSelection.test.ts",
+      "status": "passed",
+      "tests": 4
+    },
+    {
+      "file": "src/client/sessionHistory.test.ts",
+      "status": "passed",
+      "tests": 3
+    },
+    {
+      "file": "src/client/sessionInteractions.test.ts",
+      "status": "passed",
+      "tests": 5
+    },
+    {
+      "file": "src/client/sessionRoute.test.ts",
+      "status": "passed",
+      "tests": 5
+    },
+    {
+      "file": "src/shared/api.test.ts",
+      "status": "passed",
+      "tests": 4
+    },
+    {
+      "file": "src/shared/messageText.test.ts",
+      "status": "passed",
+      "tests": 6
+    },
+    {
+      "file": "src/server/config.test.ts",
+      "status": "passed",
+      "tests": 5
+    },
+    {
+      "file": "src/server/modelErrors.test.ts",
+      "status": "passed",
+      "tests": 2
+    },
+    {
+      "file": "src/server/staticClient.test.ts",
+      "status": "passed",
+      "tests": 4
+    },
+    {
+      "file": "src/server/routes/auth.test.ts",
+      "status": "passed",
+      "tests": 3
+    },
+    {
+      "file": "src/server/routes/config.test.ts",
+      "status": "passed",
+      "tests": 2
+    },
+    {
+      "file": "src/server/routes/interaction.integration.test.ts",
+      "status": "passed",
+      "tests": 1
+    },
+    {
+      "file": "src/server/routes/models.test.ts",
+      "status": "passed",
+      "tests": 4
+    },
+    {
+      "file": "src/server/routes/runtime.test.ts",
+      "status": "passed",
+      "tests": 2
+    },
+    {
+      "file": "src/server/routes/sessions.test.ts",
+      "status": "passed",
+      "tests": 25
+    },
+    {
+      "file": "src/server/services/ApprovalService.test.ts",
+      "status": "passed",
+      "tests": 6
+    },
+    {
+      "file": "src/server/services/CodexAppServerClient.test.ts",
+      "status": "passed",
+      "tests": 5
+    },
+    {
+      "file": "src/server/services/CodexConfigWatcher.test.ts",
+      "status": "passed",
+      "tests": 3
+    },
+    {
+      "file": "src/server/services/CollaborationStore.test.ts",
+      "status": "passed",
+      "tests": 2
+    },
+    {
+      "file": "src/server/services/DesktopQueueService.test.ts",
+      "status": "passed",
+      "tests": 6
+    },
+    {
+      "file": "src/server/services/InteractionForms.test.ts",
+      "status": "passed",
+      "tests": 2
+    },
+    {
+      "file": "src/server/services/JsonlSessionParser.test.ts",
+      "status": "passed",
+      "tests": 6
+    },
+    {
+      "file": "src/server/services/ModelCatalogService.test.ts",
+      "status": "passed",
+      "tests": 7
+    },
+    {
+      "file": "src/server/services/RuntimeHandoff.test.ts",
+      "status": "passed",
+      "tests": 7
+    },
+    {
+      "file": "src/server/services/RuntimeManager.test.ts",
+      "status": "passed",
+      "tests": 26
+    },
+    {
+      "file": "src/server/services/SessionMetadataStore.test.ts",
+      "status": "passed",
+      "tests": 5
+    },
+    {
+      "file": "src/server/services/SessionModelService.test.ts",
+      "status": "passed",
+      "tests": 5
+    },
+    {
+      "file": "src/server/services/SessionService.test.ts",
+      "status": "passed",
+      "tests": 20
+    },
+    {
+      "file": "src/server/services/TaskStore.test.ts",
+      "status": "passed",
+      "tests": 1
+    }
+  ]
+}

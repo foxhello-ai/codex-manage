@@ -1,0 +1,154 @@
+{
+  "checkedAt": "2026-11-12T03:31:48.375Z",
+  "results": [
+    {
+      "name": "desktop",
+      "viewport": 1440,
+      "bodyWidth": 1440,
+      "documentWidth": 1440,
+      "images": [
+        {
+          "loaded": true,
+          "width": 1440,
+          "height": 960,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 375,
+          "height": 844,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 1440,
+          "height": 960,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 375,
+          "height": 844,
+          "embedded": true
+        }
+      ],
+      "anchors": [
+        {
+          "target": "#completion",
+          "exists": true
+        },
+        {
+          "target": "#screenshots",
+          "exists": true
+        },
+        {
+          "target": "#validation",
+          "exists": true
+        },
+        {
+          "target": "#desktop",
+          "exists": true
+        },
+        {
+          "target": "#instabox",
+          "exists": true
+        },
+        {
+          "target": "#remaining",
+          "exists": true
+        },
+        {
+          "target": "#evidence",
+          "exists": true
+        }
+      ],
+      "pageErrors": [],
+      "zoomVisible": true,
+      "zoomClosed": true,
+      "sourceEvidence": 7,
+      "evidenceExpanded": true,
+      "anchorWorked": true,
+      "passed": true
+    },
+    {
+      "name": "mobile",
+      "viewport": 375,
+      "bodyWidth": 375,
+      "documentWidth": 375,
+      "images": [
+        {
+          "loaded": true,
+          "width": 1440,
+          "height": 960,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 375,
+          "height": 844,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 1440,
+          "height": 960,
+          "embedded": true
+        },
+        {
+          "loaded": true,
+          "width": 375,
+          "height": 844,
+          "embedded": true
+        }
+      ],
+      "anchors": [
+        {
+          "target": "#completion",
+          "exists": true
+        },
+        {
+          "target": "#screenshots",
+          "exists": true
+        },
+        {
+          "target": "#validation",
+          "exists": true
+        },
+        {
+          "target": "#desktop",
+          "exists": true
+        },
+        {
+          "target": "#instabox",
+          "exists": true
+        },
+        {
+          "target": "#remaining",
+          "exists": true
+        },
+        {
+          "target": "#evidence",
+          "exists": true
+        }
+      ],
+      "pageErrors": [],
+      "zoomVisible": true,
+      "zoomClosed": true,
+      "sourceEvidence": 7,
+      "evidenceExpanded": true,
+      "anchorWorked": true,
+      "passed": true
+    }
+  ],
+  "localLinks": [
+    {
+      "link": "../../desktop-interaction-sync-requirements.md",
+      "exists": true
+    },
+    {
+      "link": "../../implementation-notes/2026-11-12-desktop-interaction-sync.md",
+      "exists": true
+    }
+  ],
+  "passed": true
+}

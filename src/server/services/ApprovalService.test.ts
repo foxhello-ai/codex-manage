@@ -3,7 +3,7 @@ import { ApprovalService } from "./ApprovalService";
 import { EventHub } from "./EventHub";
 
 function createHarness() {
-  const responses: Array<{ id: number; result: unknown }> = [];
+  const responses: Array<{ id: number | string; result: unknown }> = [];
   const pendingCounts: Array<{ threadId: string; count: number }> = [];
   const eventHub = new EventHub();
   const service = new ApprovalService(
@@ -20,6 +20,61 @@ function createHarness() {
 }
 
 describe("ApprovalService", () => {
+  it("keeps a question pending when an approval-only decision or incomplete answer is submitted", () => {
+    const { service, responses } = createHarness();
+    service.handleServerRequest({ id: "ask-1", method: "item/tool/requestUserInput", params: {
+      threadId: "thread-1", questions: [{ id: "design", header: "UI方案", question: "请选择", options: [{ label: "A", description: "紧凑" }, { label: "B", description: "宽松" }] }]
+    } });
+    const pending = service.listPending("thread-1")[0];
+    for (const decision of ["decline", "cancel", "acceptForSession"] as const) {
+      expect(() => service.submit(pending.id, { decision, answers: { design: ["A"] } })).toThrow("仅支持提交回答");
+    }
+    expect(() => service.submit(pending.id, { decision: "accept", answers: {} })).toThrow("请回答");
+    expect(() => service.submit(pending.id, { decision: "accept", answers: { design: ["invalid"] } })).toThrow("选项不正确");
+    expect(responses).toEqual([]);
+    expect(service.listPending("thread-1")).toHaveLength(1);
+    service.submit(pending.id, { decision: "accept", answers: { design: ["B"] } });
+    expect(responses).toEqual([{ id: "ask-1", result: { answers: { design: { answers: ["B"] } } } }]);
+  });
+
+  it("accepts typed MCP form answers and preserves explicit decline/cancel actions", () => {
+    const { service, responses } = createHarness();
+    const request = { method: "mcpServer/elicitation/request", params: {
+      threadId: "thread-1", serverName: "ui-tool", mode: "form", message: "确认发布目标",
+      requestedSchema: { type: "object", required: ["target", "count", "confirm"], properties: {
+        target: { type: "string", enum: ["staging", "production"], enumNames: ["预发", "生产"] },
+        count: { type: "integer", minimum: 1, maximum: 3 }, confirm: { type: "boolean" }, note: { type: "string" }
+      } }
+    } };
+    service.handleServerRequest({ ...request, id: 1 });
+    const form = service.listPending("thread-1")[0];
+    expect(form).toMatchObject({ kind: "mcp_elicitation", interactionMode: "form", reason: "确认发布目标" });
+    expect(form.questions[0].options?.[0]).toMatchObject({ label: "预发", value: "staging" });
+    expect(() => service.submit(form.id, { decision: "accept", answers: { target: ["staging"], count: ["9"], confirm: ["true"] } })).toThrow("数值不正确");
+    service.submit(form.id, { decision: "accept", answers: { target: ["staging"], count: ["2"], confirm: ["false"] } });
+    expect(responses[0].result).toEqual({ action: "accept", content: { target: "staging", count: 2, confirm: false } });
+    for (const [id, decision] of [[2, "decline"], [3, "cancel"]] as const) {
+      service.handleServerRequest({ ...request, id });
+      service.submit(service.listPending("thread-1")[0].id, { decision, answers: { target: ["production"] } });
+      expect(responses.at(-1)?.result).toEqual({ action: decision, content: null });
+    }
+  });
+
+  it("does not accept unsupported verification forms and clears requests resolved by another client", () => {
+    const { service, eventHub, responses } = createHarness();
+    service.handleServerRequest({ id: 9, method: "mcpServer/elicitation/request", params: { threadId: "thread-1", mode: "openai/userVerification", title: "Verify", challenge: "test", description: "在原客户端验证" } });
+    const pending = service.listPending("thread-1")[0];
+    expect(pending.interactionMode).toBe("unsupported");
+    expect(() => service.submit(pending.id, { decision: "accept" })).toThrow("原客户端");
+    expect(responses).toEqual([]);
+    service.resolveRequest("other-thread", 9);
+    expect(service.listPending("thread-1")).toHaveLength(1);
+    service.resolveRequest("thread-1", 9);
+    expect(service.listPending("thread-1")).toEqual([]);
+    expect(eventHub.getEvents("thread-1").at(-1)?.type).toBe("approval_resolved");
+    expect(() => service.submit(pending.id, { decision: "accept" })).toThrow("already resolved");
+  });
+
   it("tracks a command approval through one terminal decision", () => {
     const { service, eventHub, responses, pendingCounts } = createHarness();
 

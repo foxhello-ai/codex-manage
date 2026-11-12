@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-12T02:55:14.048193+00:00",
+  "base": "e3b4986",
+  "branch": "codex/desktop-interaction-sync",
+  "verifiedSourceArchiveSha256": "de4339bfac67878716d7eeb22c1b399a0feee9bcff356b4fee135f9f80cea17d",
+  "linux": {
+    "environment": "instabox ci@2026-11-05.ci.1, Ubuntu 24.04, 4 CPU / 8 GiB, Node 22.23.3, systemd 255",
+    "testFiles": 30,
+    "testsPassed": 179,
+    "testsFailed": 0,
+    "typecheck": "passed",
+    "clientBuild": "passed",
+    "serverBuild": "passed",
+    "openaiAccountLoginTested": false,
+    "realModelInferenceTested": false
+  },
+  "local": {
+    "typecheck": "passed",
+    "clientBuild": "passed",
+    "serverBuild": "passed",
+    "uiRegression": {
+      "passed": 33,
+      "skipped": 1,
+      "failed": 0
+    },
+    "finalInteractionAndHistoryUI": {
+      "passed": 8,
+      "failed": 0
+    },
+    "viewports": [
+      375,
+      1440
+    ],
+    "screenshotsVisuallyInspected": true
+  },
+  "workflowValidation": {
+    "tool": "actionlint 1.7.12",
+    "files": 3,
+    "result": "passed",
+    "customRunnerLabelDeclared": "instabox-medium"
+  },
+  "desktopPrivateBackend": {
+    "crossClientInteractionPassed": false,
+    "finding": "No verified external pending-request read/answer channel in the inspected default desktop installation.",
+    "desktopStartupModified": false,
+    "originalDesktopPid": 32288,
+    "originalBackendPid": 32800
+  },
+  "actions": {
+    "targetRepository": "foxhello-ai/codex-manage",
+    "pilotImplemented": true,
+    "firstTargetActionsRunVerified": false,
+    "appAuthorizationVerified": false,
+    "linuxMigrationActivated": false,
+    "defaultRunner": "ubuntu-24.04",
+    "activationVariable": "LINUX_CI_RUNNER=instabox-medium",
+    "macosRunners": [
+      "macos-15-intel",
+      "macos-15"
+    ],
+    "ownerAuthorizationVerified": true,
+    "ownerLinked": true,
+    "ownerAuthorizationCheckedAt": "2026-11-12T03:18:29.133973+00:00",
+    "repositoryAccessVerified": false,
+    "appAuthorizationScope": "foxhello-ai installation and workspace link confirmed; per-repository access and first Actions run not verified"
+  },
+  "installation": {
+    "report": "instabox-installation.json",
+    "versions": [
+      "1.0.9",
+      "1.0.8"
+    ],
+    "result": "passed",
+    "currentChangePublished": false
+  },
+  "preservation": {
+    "mainUnchanged": true,
+    "existingCanvasUntouched": true,
+    "existingLocalServicePids": [
+      75139,
+      75141
+    ],
+    "existingServicesRestarted": false
+  },
+  "sandbox": {
+    "id": "m_agq43f7acdsthkne74uy454yc4",
+    "name": "codex-manage-interaction-qa",
+    "vaultLoaded": false,
+    "secretsSelected": false,
+    "deleted": true
+  }
+}

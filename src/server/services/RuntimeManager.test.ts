@@ -4,7 +4,8 @@ import { RuntimeManager } from "./RuntimeManager";
 
 class FakeAppServer extends EventEmitter {
   requests: Array<{ method: string; params: unknown }> = [];
-  responses: Array<{ id: number; result: unknown }> = [];
+  responses: Array<{ id: number | string; result: unknown }> = [];
+  rejections: Array<{ id: number | string; message: string }> = [];
 
   async request(method: string, params?: unknown): Promise<unknown> {
     this.requests.push({ method, params });
@@ -14,12 +15,62 @@ class FakeAppServer extends EventEmitter {
     return {};
   }
 
-  respondToServerRequest(id: number, result: unknown) {
+  respondToServerRequest(id: number | string, result: unknown) {
     this.responses.push({ id, result });
   }
+
+  rejectServerRequest(id: number | string, message: string) { this.rejections.push({ id, message }); }
 }
 
 describe("RuntimeManager", () => {
+  it("recognizes native active flags without confusing user interaction with an idle completed turn", () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+    for (const [flags, expected] of [[[], "running"], [["waitingOnUserInput"], "waiting_user"], [["waitingOnApproval"], "waiting_approval"]] as const) {
+      appServer.emit("notification", { method: "thread/status/changed", params: { threadId: "thread-1", status: { type: "active", activeFlags: flags } } });
+      expect(manager.getRuntime("thread-1").status).toBe(expected);
+    }
+  });
+  it("keeps mid-turn input waiting, replies to its original RPC, and resumes the active turn", async () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any, { autoRelease: true, releaseIdleDelayMs: 5 });
+    await manager.resumeThread("thread-1");
+    await manager.sendInput("thread-1", { text: "开始" });
+    appServer.emit("serverRequest", { id: "question-rpc", method: "item/tool/requestUserInput", params: {
+      threadId: "thread-1", turnId: "turn-1", questions: [{ id: "screen", header: "界面", question: "审核哪个版本？" }]
+    } });
+    appServer.emit("notification", { method: "thread/status/changed", params: { threadId: "thread-1", status: { type: "active", activeFlags: [] } } });
+    const pending = manager.approvalService.listPending("thread-1")[0];
+    expect(manager.getRuntime("thread-1")).toMatchObject({ status: "waiting_user", activeTurnId: "turn-1", pendingApprovalCount: 1 });
+    await new Promise(resolve => setTimeout(resolve, 15));
+    expect(appServer.requests.some(request => request.method === "thread/unsubscribe")).toBe(false);
+    await expect(manager.sendInput("thread-1", { text: "其他消息" })).rejects.toThrow("待交互请求");
+    manager.submitApproval("thread-1", pending.id, { decision: "accept", answers: { screen: ["V3"] } });
+    expect(appServer.responses).toEqual([{ id: "question-rpc", result: { answers: { screen: { answers: ["V3"] } } } }]);
+    expect(manager.getRuntime("thread-1")).toMatchObject({ status: "running", pendingApprovalCount: 0 });
+    expect(() => manager.submitApproval("thread-1", pending.id, { decision: "accept" })).toThrow("already resolved");
+    manager.dispose();
+  });
+
+  it("clears externally resolved and disconnected requests without sending a second reply", () => {
+    const appServer = new FakeAppServer();
+    const manager = new RuntimeManager(appServer as any);
+    const ask = () => appServer.emit("serverRequest", { id: "reused-id", method: "item/tool/requestUserInput", params: {
+      threadId: "thread-1", questions: [{ id: "answer", header: "回答" }]
+    } });
+    ask();
+    const firstId = manager.approvalService.listPending("thread-1")[0].id;
+    appServer.emit("notification", { method: "serverRequest/resolved", params: { threadId: "thread-1", requestId: "reused-id" } });
+    expect(manager.approvalService.listPending("thread-1")).toEqual([]);
+    ask();
+    expect(manager.approvalService.listPending("thread-1")[0].id).not.toBe(firstId);
+    appServer.emit("exit");
+    expect(manager.getRuntime("thread-1")).toMatchObject({ status: "failed", pendingApprovalCount: 0 });
+    expect(appServer.responses).toEqual([]);
+    appServer.emit("serverRequest", { id: 10, method: "unknown/interaction", params: { threadId: "thread-1" } });
+    expect(appServer.rejections).toMatchObject([{ id: 10 }]);
+    expect(appServer.responses).toEqual([]);
+  });
   it("starts a new thread in the requested workspace", async () => {
     const appServer = new FakeAppServer();
     const manager = new RuntimeManager(appServer as any);

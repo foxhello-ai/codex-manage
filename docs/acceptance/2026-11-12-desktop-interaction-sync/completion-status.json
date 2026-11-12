@@ -1,0 +1,39 @@
+{
+  "checkedAt": "2026-11-12T03:30:48.319028+00:00",
+  "acceptanceRule": "Only 已实现 / 没实现; evaluate complete original user scenarios. Implementation and deployment are separate.",
+  "implemented": 1,
+  "notImplemented": 3,
+  "deployed": 0,
+  "requests": [
+    {
+      "id": 1,
+      "status": "已实现",
+      "name": "会话打开慢",
+      "evidence": "history-performance.json",
+      "userHelpRequired": false
+    },
+    {
+      "id": 2,
+      "status": "没实现",
+      "name": "官方桌面审批在 Web 展示与处理",
+      "blocker": "No verified external read/reply channel for pending requests on the unchanged desktop private backend.",
+      "userHelpRequired": false,
+      "userHelpNote": "Not an account permission problem; no user action currently resolves the technical blocker."
+    },
+    {
+      "id": 3,
+      "status": "没实现",
+      "name": "官方桌面途中问答与 UI 选择",
+      "blocker": "Same desktop private request-channel blocker as request 2.",
+      "userHelpRequired": false
+    },
+    {
+      "id": 4,
+      "status": "没实现",
+      "name": "instabox Linux CI",
+      "blocker": "First target repository Actions run and Linux runner switch not yet complete.",
+      "userHelpRequired": false,
+      "userHelpNote": "Existing git SSH push dry-run passed. gh identity fmzh2025 is read-only; use branch push to trigger pilot instead of workflow_dispatch."
+    }
+  ]
+}

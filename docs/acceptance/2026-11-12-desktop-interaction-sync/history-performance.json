@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-12T02:38:12.179Z",
+  "threadId": "01a18a9f-b17e-7382-b11d-e08c6ab78943",
+  "samples": [
+    {
+      "mode": "full",
+      "milliseconds": 7094,
+      "bytes": 692814,
+      "turns": 29,
+      "historyMode": "paginated",
+      "nextPage": false,
+      "methods": [
+        "thread/read",
+        "thread/turns/list"
+      ]
+    },
+    {
+      "mode": "recent",
+      "milliseconds": 1966,
+      "bytes": 574428,
+      "turns": 20,
+      "historyMode": "paginated",
+      "nextPage": true,
+      "methods": [
+        "thread/read",
+        "thread/turns/list"
+      ]
+    },
+    {
+      "mode": "full",
+      "milliseconds": 5237,
+      "bytes": 692911,
+      "turns": 29,
+      "historyMode": "paginated",
+      "nextPage": false,
+      "methods": [
+        "thread/read",
+        "thread/turns/list"
+      ]
+    },
+    {
+      "mode": "recent",
+      "milliseconds": 1582,
+      "bytes": 574525,
+      "turns": 20,
+      "historyMode": "paginated",
+      "nextPage": true,
+      "methods": [
+        "thread/read",
+        "thread/turns/list"
+      ]
+    }
+  ],
+  "limits": "Same local thread and reader, sequential samples; not an end-to-end network latency benchmark.",
+  "writerOperations": 0
+}

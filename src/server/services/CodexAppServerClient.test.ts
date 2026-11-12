@@ -40,6 +40,27 @@ function readJsonLines(stream: PassThrough, onMessage: (message: any) => void) {
 }
 
 describe("CodexAppServerClient", () => {
+  it("routes string request IDs and writes protocol replies and unsupported-request errors", async () => {
+    const fake = createFakeProcess();
+    const outgoing: any[] = [];
+    readJsonLines(fake.stdin, message => {
+      outgoing.push(message);
+      if (message.method === "initialize") fake.stdout.write(`${JSON.stringify({ id: message.id, result: {} })}\n`);
+    });
+    const client = new CodexAppServerClient({ codexCliPath: "codex", spawnProcess: (() => fake) as any });
+    const incoming: any[] = [];
+    client.on("serverRequest", request => incoming.push(request));
+    await client.start();
+    fake.stdout.write(`${JSON.stringify({ id: "question-rpc", method: "item/tool/requestUserInput", params: { threadId: "t1" } })}\n`);
+    expect(incoming[0].id).toBe("question-rpc");
+    client.respondToServerRequest("question-rpc", { answers: {} });
+    client.rejectServerRequest("unknown-rpc", "Unsupported request");
+    expect(outgoing.slice(-2)).toEqual([
+      { id: "question-rpc", result: { answers: {} } },
+      { id: "unknown-rpc", error: { code: -32601, message: "Unsupported request" } }
+    ]);
+    await client.stop();
+  });
   it("starts app-server and completes initialize handshake", async () => {
     const fake = createFakeProcess();
     const messages: any[] = [];

@@ -84,7 +84,7 @@ export type RuntimeReloadResponse = {
   };
 };
 
-export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_approval" | "exited" | "failed";
+export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_user" | "waiting_approval" | "exited" | "failed";
 
 export type SessionSummary = {
   id: string;
@@ -261,6 +261,7 @@ export type SessionDetail = SessionSummary & {
   historyMode: string | null;
   modelState: SessionModelState;
   turns: SessionTurn[];
+  historyPage?: { nextCursor: string | null; version: string | null; unchanged: boolean };
 };
 
 export type SessionTurn = {
@@ -365,6 +366,7 @@ export type RuntimeSnapshot = {
 
 export type RuntimeResponse = {
   runtime: RuntimeSnapshot;
+  approvals?: ApprovalSummary[];
 };
 
 export type InputResponse = {
@@ -407,6 +409,7 @@ export type ApprovalKind =
   | "file_change"
   | "permissions"
   | "tool_user_input"
+  | "mcp_elicitation"
   | "legacy_exec"
   | "legacy_apply_patch";
 
@@ -423,7 +426,7 @@ export type ApprovalDecision = "accept" | "acceptForSession" | "decline" | "canc
 
 export type ApprovalSummary = {
   id: string;
-  requestId: number;
+  requestId: number | string;
   threadId: string;
   turnId: string | null;
   itemId: string | null;
@@ -434,6 +437,8 @@ export type ApprovalSummary = {
   cwd: string | null;
   reason: string | null;
   questions: ApprovalQuestion[];
+  interactionMode?: "form" | "url" | "unsupported";
+  interactionUrl?: string;
   raw: Record<string, unknown>;
   createdAt: string;
   resolvedAt: string | null;
@@ -446,11 +451,22 @@ export type ApprovalQuestion = {
   isOther: boolean;
   isSecret: boolean;
   options: ApprovalQuestionOption[] | null;
+  required?: boolean;
+  inputType?: "string" | "number" | "integer" | "boolean" | "multiselect";
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems?: boolean;
+  defaultValue?: string[];
 };
 
 export type ApprovalQuestionOption = {
   label: string;
   description: string;
+  value?: string;
 };
 
 export type ApprovalResponse = {

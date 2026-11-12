@@ -208,7 +208,7 @@ export class SessionModelService {
   }
 
   private assertSwitchAllowed(status: string) {
-    if (status === "starting" || status === "running" || status === "waiting_approval") {
+    if (status === "starting" || status === "running" || status === "waiting_approval" || status === "waiting_user") {
       throw new ModelDomainError("MODEL_SWITCH_NOT_ALLOWED", "当前会话状态不允许切换模型", 409, {
         status
       });

@@ -38,7 +38,10 @@ const SessionParams = z.object({
 });
 
 const SessionDetailQuery = z.object({
-  turns: z.union([z.literal("true"), z.literal("false"), z.boolean()]).optional()
+  turns: z.union([z.literal("true"), z.literal("false"), z.boolean()]).optional(),
+  turnLimit: z.coerce.number().int().positive().max(100).optional(),
+  turnCursor: z.string().min(1).max(8192).optional(),
+  historyVersion: z.string().max(200).optional()
 });
 
 const MetadataBody = z.object({
@@ -311,7 +314,7 @@ export function registerSessionRoutes(
       );
       const refreshed = typeof runtimeManager.refreshExternal === "function"
         ? await runtimeManager.refreshExternal(params.data.id) : runtime;
-      return reply.send({ runtime: refreshed });
+      return reply.send({ runtime: refreshed, approvals: runtimeManager.approvalService.listPending(params.data.id) });
     } catch (error) {
       return sendChildRuntimeError(reply, error);
     }
@@ -670,7 +673,7 @@ export function registerSessionRoutes(
       const threadId = params.data.id;
       if (user.role === "child") {
         const observedRuntime = runtimeManager.getRuntime(threadId);
-        if (observedRuntime.permissionMode === "full_access" && ["starting", "running", "waiting_approval"].includes(observedRuntime.status)) {
+        if (observedRuntime.permissionMode === "full_access" && ["starting", "running", "waiting_approval", "waiting_user"].includes(observedRuntime.status)) {
           socket.close(1008, "controlled mode required");
           return;
         }
@@ -766,7 +769,10 @@ export function registerSessionRoutes(
     const startedAt = performance.now();
     try {
       const session = await sessionService.getSessionDetail(params.data.id, {
-        includeTurns: query.data.turns !== false && query.data.turns !== "false"
+        includeTurns: query.data.turns !== false && query.data.turns !== "false",
+        turnLimit: query.data.turnLimit,
+        turnCursor: query.data.turnCursor,
+        historyVersion: query.data.historyVersion
       });
       const elapsedMs = Math.round(performance.now() - startedAt);
       reply.header("server-timing", `session-detail;dur=${elapsedMs}`);
@@ -887,7 +893,7 @@ async function persistPermissionMode(sessionService: SessionService, sessionId: 
 }
 
 function isLiveRuntime(runtime: ReturnType<RuntimeManager["getRuntime"]>): boolean {
-  return ["starting", "running", "waiting_input", "waiting_approval"].includes(runtime.status);
+  return ["starting", "running", "waiting_input", "waiting_approval", "waiting_user"].includes(runtime.status);
 }
 
 function sendChildRuntimeError(reply: Parameters<typeof sendError>[0], error: unknown) {

@@ -1,0 +1,31 @@
+import { describe, expect, it } from "vitest";
+import { mergeSessionHistory } from "./sessionHistory";
+import type { SessionDetail, SessionTurn } from "../shared/models";
+
+const turn = (id: string, startedAt: string, status = "completed") => ({ id, startedAt, status, items: [] }) as unknown as SessionTurn;
+const detail = (turns: SessionTurn[], nextCursor: string | null, version = "v1") => ({ id: "thread-1", turns, historyPage: { nextCursor, version, unchanged: false } }) as SessionDetail;
+
+describe("mergeSessionHistory", () => {
+  it("preserves server ordering with equal or missing timestamps and does not overwrite recent turns with an older page", () => {
+    const current = detail([turn("t9", ""), turn("t10", "", "running")], "cursor");
+    const merged = mergeSessionHistory(current, detail([turn("t8", ""), turn("t9", ""), turn("t10", "")], null), true);
+    expect(merged.turns.map(turn => turn.id)).toEqual(["t8", "t9", "t10"]);
+    expect(merged.turns[2].status).toBe("running");
+  });
+  it("merges older pages and current-turn updates without losing the older-page cursor", () => {
+    const recent = detail([turn("t2", "2"), turn("t3", "3", "running")], "older");
+    const older = mergeSessionHistory(recent, detail([turn("t1", "1"), turn("t2", "2")], null), true);
+    const refreshed = mergeSessionHistory(older, detail([turn("t3", "3"), turn("t4", "4")], "older", "v2"), false);
+    expect(refreshed.turns.map(turn => turn.id)).toEqual(["t1", "t2", "t3", "t4"]);
+    expect(refreshed.turns[2].status).toBe("completed");
+    expect(refreshed.historyPage).toEqual({ nextCursor: null, version: "v2", unchanged: false });
+  });
+  it("takes the first page after summary load and preserves history when unchanged", () => {
+    const summary = { id: "thread-1", turns: [] } as unknown as SessionDetail;
+    const page = detail([turn("t1", "1")], "next");
+    expect(mergeSessionHistory(summary, page, false)).toBe(page);
+    const unchanged = { ...page, turns: [], historyPage: { nextCursor: null, version: "v1", unchanged: true } };
+    expect(mergeSessionHistory(page, unchanged, false).turns).toEqual(page.turns);
+    expect(mergeSessionHistory(page, unchanged, false).historyPage?.nextCursor).toBe("next");
+  });
+});

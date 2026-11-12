@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-11-12T03:18:29.133973+00:00",
+  "linked": true,
+  "counts": {
+    "all": 12,
+    "running": 0,
+    "waiting": 0,
+    "succeeded": 10,
+    "failed": 0
+  },
+  "observedRepositories": [
+    "fmzh2021/schedule-task-cfworker"
+  ],
+  "installUrl": "https://dashboard.instabox.sh/auth/github-app/install?org=org_65a2b3061d17430aa975eecac2ea15a2",
+  "targetRepository": "foxhello-ai/codex-manage",
+  "targetAuthorizationVerified": false,
+  "targetActionsRunVerified": false,
+  "scope": "Owner installation and workspace link confirmed via authenticated installations API. Recent CI records do not establish per-repository access or first target Actions success.",
+  "ownerAuthorizationVerified": true,
+  "ownerLinked": true,
+  "repositoryAccessVerified": false,
+  "authorizationEvidence": "instabox-authorization.json"
+}

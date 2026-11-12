@@ -237,7 +237,6 @@ for (const [decision, label] of [["accept", "仅允许这一次"], ["acceptForSe
     const h = await installUiHarness(page, { status: "waiting_approval" });
     await openDetail(page);
     await expect(page.getByLabel("发送给 Codex 的消息")).toBeDisabled();
-    await page.locator(".approvalTrigger").click();
     let sheet = page.getByRole("dialog", { name: "允许检查当前项目构建？" });
     await expect(sheet.locator(".workspacePath code")).toHaveText(longPath);
     const header = (await sheet.locator(".sheetHeader").boundingBox())!;

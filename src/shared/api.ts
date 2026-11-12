@@ -160,8 +160,15 @@ export function reloadRuntime(): Promise<RuntimeReloadResponse> {
   });
 }
 
-export function getSessionDetail(sessionId: string, includeTurns = true): Promise<SessionDetailResponse> {
-  const query = includeTurns ? "" : "?turns=false";
+export function getSessionDetail(sessionId: string, includeTurns = true, history?: { turnLimit: number; turnCursor?: string; historyVersion?: string }): Promise<SessionDetailResponse> {
+  const params = new URLSearchParams();
+  if (!includeTurns) params.set("turns", "false");
+  if (includeTurns && history) {
+    params.set("turnLimit", String(history.turnLimit));
+    if (history.turnCursor) params.set("turnCursor", history.turnCursor);
+    if (history.historyVersion) params.set("historyVersion", history.historyVersion);
+  }
+  const query = params.size ? `?${params}` : "";
   return apiRequest<SessionDetailResponse>(`/api/sessions/${encodeURIComponent(sessionId)}${query}`);
 }
 

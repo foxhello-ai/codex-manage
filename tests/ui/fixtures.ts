@@ -15,8 +15,8 @@ export const catalog: ModelCatalogResponse = { models: [
   { id: "model-2", model: "another-supported-model", displayName: "另一个可用模型", description: null, hidden: false, isDefault: false, supportedReasoningEfforts: ["low", "high"], defaultReasoningEffort: "low", upgradeModel: null, upgradeCopy: null }
 ], loadedAt: "2026-11-03T00:00:00Z", stale: false, lastError: null };
 
-export async function installUiHarness(page: Page, options: { status?: SessionStatus; failInput?: boolean; failUpload?: boolean; child?: boolean; externalQueue?: boolean } = {}) {
-  let seq = 10;
+export async function installUiHarness(page: Page, options: { status?: SessionStatus; failInput?: boolean; failUpload?: boolean; child?: boolean; externalQueue?: boolean; approvals?: ApprovalSummary[]; snapshotOnConnect?: boolean; managed?: boolean; runtimeApprovals?: boolean; runtimeSequence?: number } = {}) {
+  let seq = options.runtimeSequence ?? 10;
   const sockets = new Set<WebSocketRoute>();
   const calls: { path: string; method: string; body: Record<string, unknown> | null }[] = [];
   const pageErrors: string[] = [];
@@ -36,6 +36,7 @@ export async function installUiHarness(page: Page, options: { status?: SessionSt
     startedAt: "2026-11-03T01:00:00Z", updatedAt: "2026-11-03T01:00:00Z", lastError: null, pendingApprovalCount: options.status === "waiting_approval" ? 1 : 0,
     eventSeq: seq, model: selection.actualModel, modelProvider: "test-provider", reasoningEffort: "high", modelSelection: selection, modelChangeStatus: "idle", modelChangeError: null
   };
+  if (options.managed) runtime = { ...runtime, executionSource: "manage" };
   if (options.externalQueue) runtime = { ...runtime, executionSource: "external_queue", deliveries: [], status: "history" };
   let tasks: TaskSummary[] = [{ id: "task-ui", name: "手机端体验优化与现有会话分组", pinned: false, sessionIds: [sessionId, "session-1"], sessionCount: 2, recentSessionId: sessionId, recentSessionTitle: longTitle, updatedAt: "2026-11-03T01:00:00Z" }];
   const detail = (id: string): SessionDetail => ({
@@ -52,7 +53,10 @@ export async function installUiHarness(page: Page, options: { status?: SessionSt
   const approval: ApprovalSummary = {
     id: "approval-ui", requestId: 1, threadId: sessionId, turnId: "live-turn", itemId: "command-ui", kind: "command_execution", status: "pending", title: "允许检查当前项目构建？", command: "npm run build -- " + "--long-command-argument ".repeat(20), cwd: longPath, reason: "此请求来自已有审批状态。", questions: [], raw: {}, createdAt: "2026-11-03T01:00:00Z", resolvedAt: null
   };
-  let approvals = options.status === "waiting_approval" ? [approval] : [];
+  let approvals = options.approvals ?? (options.status === "waiting_approval" ? [approval] : []);
+  function snapshot(sequence = seq, pending = approvals) {
+    return JSON.stringify({ seq: sequence, threadId: sessionId, type: "snapshot", payload: { runtime: { ...runtime, eventSeq: sequence }, approvals: pending, events: [] }, createdAt: "2026-11-03T01:00:00Z" });
+  }
   function emit(type: WebSessionEvent["type"], payload: Record<string, unknown>) {
     const event: WebSessionEvent = { seq: ++seq, threadId: sessionId, type, payload, createdAt: "2026-11-03T01:02:00Z" };
     sockets.forEach((socket) => socket.send(JSON.stringify(event)));
@@ -60,7 +64,7 @@ export async function installUiHarness(page: Page, options: { status?: SessionSt
   await page.routeWebSocket(/\/api\/sessions\/.*\/ws/, (socket) => {
     sockets.add(socket);
     socket.onClose(() => sockets.delete(socket));
-    socket.send(JSON.stringify({ seq, threadId: sessionId, type: "snapshot", payload: { runtime, approvals, events: [] }, createdAt: "2026-11-03T01:00:00Z" }));
+    if (options.snapshotOnConnect !== false) socket.send(snapshot());
   });
   await page.route("**/api/**", async (route) => {
     const request = route.request();
@@ -129,11 +133,16 @@ export async function installUiHarness(page: Page, options: { status?: SessionSt
       approvals = []; runtime = { ...runtime, status: "waiting_input", activeTurnId: null, pendingApprovalCount: 0, eventSeq: ++seq };
       return json({ approval: { ...approval, status: "resolved" }, runtime });
     }
-    if (path.endsWith("/runtime")) return json({ runtime });
+    if (path.endsWith("/runtime")) return json({ runtime, ...(options.runtimeApprovals === false ? {} : { approvals }) });
     const id = path.match(/^\/api\/sessions\/([^/]+)$/)?.[1];
     if (id) return json({ session: { ...detail(decodeURIComponent(id)), ...(url.searchParams.get("turns") === "false" ? { turns: [] } : {}) } });
     pageErrors.push(`Unexpected API request: ${method} ${path}`);
     return json({ error: { code: "UNEXPECTED_UI_REQUEST", message: path } }, 404);
   });
-  return { calls, pageErrors, emit, getRuntime: () => runtime };
+  return { calls, pageErrors, emit, getRuntime: () => runtime, getDetail: detail,
+    sendSnapshot: (sequence?: number, pending?: ApprovalSummary[]) => sockets.forEach(socket => socket.send(snapshot(sequence, pending))),
+    setApprovals: (pending: ApprovalSummary[]) => { approvals = pending; },
+    disconnect: () => sockets.forEach(socket => socket.close()),
+    socketCount: () => sockets.size
+  };
 }

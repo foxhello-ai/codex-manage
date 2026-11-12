@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-11-12T03:18:29.133973+00:00",
+  "endpoint": "/v1/orgs/org_65a2b3061d17430aa975eecac2ea15a2/github/installations",
+  "httpStatus": 200,
+  "installations": [
+    {
+      "id": 179118882,
+      "account": "fmzh2021",
+      "orgId": "org_65a2b3061d17430aa975eecac2ea15a2",
+      "suspended": false,
+      "createdAt": "2026-11-06T02:17:36.919077Z"
+    },
+    {
+      "id": 181104874,
+      "account": "foxhello-ai",
+      "orgId": "org_65a2b3061d17430aa975eecac2ea15a2",
+      "suspended": false,
+      "createdAt": "2026-11-12T03:14:07.618067Z"
+    }
+  ],
+  "targetOwnerLinked": true
+}
