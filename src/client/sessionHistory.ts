@@ -1,4 +1,25 @@
-import type { SessionDetail } from "../shared/models";
+import type { SessionDetail, SessionTurn } from "../shared/models";
+
+export function mergeDesktopTurns(persisted: SessionTurn[], desktop: SessionTurn[]): SessionTurn[] {
+  const turns = new Map(persisted.map(turn => [turn.id, turn]));
+  for (const turn of desktop) {
+    const previous = turns.get(turn.id);
+    // A delayed desktop poll must not reopen a durably completed turn.
+    if (previous && ["completed", "failed", "interrupted"].includes(previous.status) && turn.status === "inProgress") continue;
+    const items = new Map(previous?.items.map(item => [item.id, item]));
+    for (const item of turn.items) items.set(item.id, item);
+    turns.set(turn.id, { ...turn, items: [...items.values()] });
+  }
+  // Keep the durable order and place new live turns relative to shared anchors.
+  const ids = persisted.map(turn => turn.id);
+  for (const [index, turn] of desktop.entries()) {
+    if (ids.includes(turn.id)) continue;
+    const anchor = desktop.slice(index + 1).find(next => ids.includes(next.id));
+    if (anchor) ids.splice(ids.indexOf(anchor.id), 0, turn.id);
+    else ids.push(turn.id);
+  }
+  return ids.map(id => turns.get(id)!);
+}
 
 export function mergeSessionHistory(current: SessionDetail | null, incoming: SessionDetail, olderPage: boolean): SessionDetail {
   if (!incoming.historyPage || !current?.historyPage || current.id !== incoming.id) return incoming;

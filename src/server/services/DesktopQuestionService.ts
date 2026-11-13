@@ -4,7 +4,8 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import { DesktopIpcClient } from "./DesktopIpcClient";
 import { ModelDomainError } from "../modelErrors";
-import { encodeQuestionReply, nativeTurns, pendingDesktopQuestions, type DesktopQuestionsState } from "../../shared/desktopQuestions";
+import { encodeQuestionReply, nativeTurns, pendingDesktopQuestions, type DesktopQuestionsState, type DesktopHistoryPage } from "../../shared/desktopQuestions";
+import { toTurn } from "./SessionService";
 
 const LedgerRow = z.object({ threadId: z.string(), turnId: z.string(), questionId: z.string(), answer: z.string(),
   requestId: z.string(), status: z.enum(["accepted", "unknown"]) });
@@ -29,6 +30,10 @@ export class DesktopQuestionService {
     } catch {
       return { available: false, turnId: null, questions: [], submissions: [], reason: "暂时无法连接此会话的桌面；请保持原会话打开。" };
     }
+  }
+  async readHistory(threadId: string, limit: number): Promise<DesktopHistoryPage | null> {
+    try { return this.history(threadId, await this.watch(threadId), limit); }
+    catch { return null; }
   }
   submit(threadId: string, turnId: string, questionId: string, answer: string): Promise<DesktopQuestionsState> {
     const prior = this.chains.get(threadId) ?? Promise.resolve();
@@ -93,9 +98,37 @@ export class DesktopQuestionService {
     }
     if (changed) void this.save().catch(() => {});
     const result = pendingDesktopQuestions(watch.state);
+    const history = this.history(threadId, watch, 20);
     return { available: true, ...result,
+      ...(history ? { history } : {}),
       submissions: this.ledger.filter(row => row.threadId === threadId && row.turnId === result.turnId)
         .map(row => ({ questionId: row.questionId, status: row.status })) };
+  }
+  private history(threadId: string, watch: Watch, limit: number): DesktopHistoryPage | null {
+    const state = watch.state;
+    if (!state || state.id !== threadId) return null;
+    // Only a contiguous tail with a real app-server cursor is a history page.
+    // Never bridge canonical history gaps or invent a cursor after truncation.
+    const canonical = state.turnHistory?.kind === "canonical" ? state.turnHistory.history : null;
+    const tail = canonical?.islands?.findLast((island: any) => island.newerBoundary?.status === "exhausted");
+    const turns = canonical ? tail?.entries?.map((entry: any) => canonical.entitiesByKey?.[entry.value]) : state.turns;
+    const older = canonical ? tail?.olderBoundary : null;
+    const nextCursor = canonical ? older?.handle?.cursor : state.turnsPagination?.olderCursor;
+    const exhausted = canonical ? older?.status === "exhausted" : state.turnsPagination?.hasLoadedOldest === true;
+    if (!Array.isArray(turns) || !turns.length || turns.length > limit || turns.some(turn => !turn || typeof turn.turnId !== "string")
+      || (!exhausted && (typeof nextCursor !== "string" || !nextCursor))) return null;
+    return { version: `desktop:${watch.owner}:${watch.revision}`, nextCursor: exhausted ? null : nextCursor,
+      turns: turns.map((turn, index) => toTurn({
+        ...turn, id: turn.turnId.replace(/^turn:/, ""),
+        startedAt: typeof turn.turnStartedAtMs === "number" ? turn.turnStartedAtMs / 1000 : null,
+        completedAt: turn.status !== "inProgress" && typeof turn.turnStartedAtMs === "number" && typeof turn.durationMs === "number"
+          ? (turn.turnStartedAtMs + turn.durationMs) / 1000 : null,
+        items: (turn.items ?? []).flatMap((item: any) => {
+          if (item.type !== "steeringUserMessage") return [item];
+          return item.status === "accepted" ? [{ ...item, type: "userMessage", id: item.serverUserMessageId ?? item.id,
+            clientId: item.clientUserMessageId, content: item.input }] : [];
+        })
+      }, index, threadId)) };
   }
   private async watch(threadId: string): Promise<Watch> {
     let watch = this.watches.get(threadId);

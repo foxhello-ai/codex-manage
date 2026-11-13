@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-13T09:43:41.778657+08:00",
+  "checkedAt": "2026-11-13T02:14:31.399315+00:00",
   "baseCommit": "b662b355ece7d791065caad30ec2e15e0e02f754",
   "branch": "codex/session-history-503",
   "runningAppVersion": "源码版（b662b35）",
@@ -65,27 +65,80 @@
     "History loading and errors show before detail is available",
     "Errors persist through a background retry until success",
     "Retry latest history without replacing loaded messages",
-    "Server failure log includes request id, session id, duration, query shape and sanitized cause"
+    "Server failure log includes request id, session id, duration, query shape and sanitized cause",
+    "Read a contiguous recent history page from the existing desktop follower with its original older-page cursor",
+    "Merge live desktop messages into the Web timeline without dropping older loaded pages",
+    "Keep active-turn commentary and post-final commentary visible",
+    "Use the desktop older-page cursor even when the initial persisted-history request fails",
+    "Do not wait for desktop subscription when the runtime is owned by Manage"
   ],
   "notImplemented": [
     {
-      "item": "Eliminate the reported real-world 503",
-      "needed": "Identify the affected machine and conversation URL/name; capture the actual failed response or server log."
+      "item": "Eliminate and verify the reported 503 on eric-codex.foxhello.com",
+      "needed": "Full affected conversation URL plus an existing authorized login/access method, or an existing SSH alias/server failure log. No passwords or screenshots are needed."
     }
   ],
   "validation": {
-    "unitTests": 192,
-    "uiTests": 6,
+    "unitTests": 197,
+    "uiTests": 10,
     "uiRegressionTests": 10,
     "typecheck": "passed",
     "clientBuild": "passed",
-    "serverBuild": "passed"
+    "serverBuild": "passed",
+    "htmlReport": {
+      "desktop1440": "passed",
+      "mobile375": "passed",
+      "allImagesLoaded": true,
+      "horizontalOverflow": false
+    }
   },
   "deployment": {
     "merged": false,
     "published": false,
     "userServicesRestarted": false,
     "desktopStartupModified": false,
-    "writerOperations": 0
+    "writerOperations": 0,
+    "isolatedAcceptanceServerStopped": true
+  },
+  "realDesktopAcceptance": {
+    "checkedAt": "2026-11-13T02:12:53.859Z",
+    "threadId": "01a18a9f-b17e-7382-b11d-e08c6ab78943",
+    "source": "Real original desktop IPC, isolated local Web process",
+    "firstVisibleMs": 330,
+    "initialHistoryStatus": 200,
+    "historyTurns": 7,
+    "historyVersionSource": "desktop",
+    "markerInitiallyAbsent": true,
+    "realNewOutputVisible": true,
+    "appearedAfterReadyMs": 21020,
+    "refreshedPage": false,
+    "olderHistory": {
+      "status": 200,
+      "loadedTurns": 20,
+      "beforeVisibleTurns": 5
+    },
+    "writerRequests": [],
+    "browserErrors": [],
+    "remoteEricServiceTested": false,
+    "desktopStartupModified": false,
+    "appearedAfterReadyMsNote": "Includes the time before the assistant authored a new progress message; this is not a measurement of transport latency."
+  },
+  "performanceNotes": {
+    "coldDesktopFirstVisibleMs": [
+      3062,
+      3684
+    ],
+    "warmDesktopFirstVisibleMs": 330,
+    "desktopPollIntervalMs": 3000,
+    "scope": "Local real desktop thread only; these timings do not measure the Eric server."
+  },
+  "remotePublicEvidence": {
+    "url": "https://eric-codex.foxhello.com",
+    "authenticationRequired": true,
+    "publicAsset": "/assets/index-GrHky3MS.js",
+    "sha256": "b6aebb9f698a8638323db4d37ae5ddc6c53fcedacf2c6dd7f75127e5de7e7d27",
+    "comparison": "Byte-identical to the v1.0.11 release client asset; the backend version has not been verified.",
+    "affectedThreadInLocalIndex": false,
+    "affectedThreadTitle": "B · 开发AI · SA角色：补齐提测自测与验收标准"
   }
 }

@@ -19,6 +19,48 @@ function metadataStore(entries: Record<string, { remarkTitle: string | null }> =
 }
 
 describe("SessionService", () => {
+  it("does not wait for a desktop subscription for a Manage-owned runtime", async () => {
+    let desktopReads = 0;
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready", pid: 1, lastError: null, initialized: true }),
+      request: (async (method: string) => method === "thread/read"
+        ? { thread: { id: "thread-1", historyMode: "paginated" } }
+        : { data: [{ id: "manage-turn", items: [] }], nextCursor: null }) as any
+    }, undefined, undefined, undefined, {
+      getRuntime: () => ({ status: "running", executionSource: "manage", modelSelection: {} }) as any
+    }, {
+      readHistory: async () => { desktopReads++; return null; }
+    });
+    expect((await service.getSessionDetail("thread-1", { turnLimit: 20 })).turns[0].id).toBe("manage-turn");
+    expect(desktopReads).toBe(0);
+  });
+
+  it("reads the desktop live page without a persisted-history RPC and keeps its real older-page cursor", async () => {
+    const calls: Array<{ method: string; params: any }> = [];
+    const liveTurn = { id: "live-turn", status: "inProgress", error: null, startedAt: "", completedAt: null, durationMs: null,
+      items: [{ id: "live-message", type: "agent_message" as const, text: "正在执行中的输出", phase: "commentary" }] };
+    const service = new SessionService({
+      getSnapshot: () => ({ status: "ready", pid: 1, lastError: null, initialized: true }),
+      request: (async (method: string, params: any) => {
+        calls.push({ method, params });
+        if (method === "thread/read") return { thread: { id: "thread-1", historyMode: "paginated" } };
+        if (params.cursor !== "native-older-cursor") throw new Error("must not request the initial persisted page");
+        return { data: [{ id: "older-turn", items: [] }], nextCursor: null };
+      }) as any
+    }, undefined, undefined, undefined, undefined, {
+      readHistory: async () => ({ turns: [liveTurn], nextCursor: "native-older-cursor", version: "desktop:owner:1" })
+    });
+    const initial = await service.getSessionDetail("thread-1", { turnLimit: 20 });
+    expect(initial.turns).toEqual([liveTurn]);
+    expect(initial.historyPage?.nextCursor).toBe("native-older-cursor");
+    expect(calls.map(call => call.method)).toEqual(["thread/read"]);
+    const unchanged = await service.getSessionDetail("thread-1", { turnLimit: 20, historyVersion: "desktop:owner:1" });
+    expect(unchanged.turns).toEqual([]);
+    expect(unchanged.historyPage?.unchanged).toBe(true);
+    await service.getSessionDetail("thread-1", { turnLimit: 20, turnCursor: "native-older-cursor" });
+    expect(calls.at(-1)).toMatchObject({ method: "thread/turns/list", params: { cursor: "native-older-cursor" } });
+  });
+
   it("reads just the requested recent or older history page without loading all turns first", async () => {
     const calls: Array<{ method: string; params: any }> = [];
     const service = new SessionService({

@@ -1,3 +1,6 @@
+import type { SessionTurn } from "./models";
+
+export type DesktopHistoryPage = { turns: SessionTurn[]; nextCursor: string | null; version: string };
 // The desktop async question tool uses correlated user text, not a pending RPC reply.
 export type DesktopQuestion = { id: string; title: string; options: string[] };
 export type DesktopQuestionsState = {
@@ -6,6 +9,7 @@ export type DesktopQuestionsState = {
   questions: DesktopQuestion[];
   submissions: Array<{ questionId: string; status: "accepted" | "unknown" }>;
   reason?: string;
+  history?: DesktopHistoryPage;
 };
 export type QuestionReply = { questionItemId: string; question: string; answer: string };
 const start = "<send_user_message_question_reply>";

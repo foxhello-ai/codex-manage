@@ -8,6 +8,7 @@ import { sanitizeModelError } from "../modelErrors";
 import { stripAmbientBrowserContext } from "../../shared/messageText";
 import { performance } from "node:perf_hooks";
 import { stat } from "node:fs/promises";
+import type { DesktopHistoryPage } from "../../shared/desktopQuestions";
 
 export type SessionStatus = "history" | "starting" | "running" | "waiting_input" | "waiting_user" | "waiting_approval" | "exited" | "failed";
 
@@ -109,7 +110,8 @@ export class SessionService {
     private readonly metadataStore?: MetadataStore,
     private readonly jsonlParser?: Pick<JsonlSessionParser, "readModelState">,
     private readonly modelCatalog?: Pick<ModelCatalogService, "isModelSupportedFromCache">,
-    private readonly runtimeManager?: Pick<RuntimeManager, "getRuntime">
+    private readonly runtimeManager?: Pick<RuntimeManager, "getRuntime">,
+    private readonly desktopHistory?: { readHistory(threadId: string, limit: number): Promise<DesktopHistoryPage | null> }
   ) {}
 
   async listSessions(params: ListSessionsParams = {}): Promise<SessionSummary[]> {
@@ -251,7 +253,15 @@ export class SessionService {
 
     const thread = response.thread && typeof response.thread === "object" ? (response.thread as Record<string, unknown>) : {};
     let historyPage: SessionDetail["historyPage"];
-    if (includeTurns && params.turnLimit) {
+    let liveTurns: SessionTurn[] | undefined;
+    const desktopPage = includeTurns && params.turnLimit && !params.turnCursor
+      && this.runtimeManager?.getRuntime(sessionId)?.executionSource !== "manage"
+      ? await this.desktopHistory?.readHistory(sessionId, params.turnLimit) : null;
+    if (desktopPage) {
+      const unchanged = params.historyVersion === desktopPage.version;
+      liveTurns = unchanged ? [] : desktopPage.turns;
+      historyPage = { nextCursor: desktopPage.nextCursor, version: desktopPage.version, unchanged };
+    } else if (includeTurns && params.turnLimit) {
       const signature = typeof thread.path === "string" ? await stat(thread.path).catch(() => null) : null;
       // Only a durable file signature can prove that history is unchanged.
       // Paginated turns live in a separate store: the rollout header's mtime
@@ -293,7 +303,7 @@ export class SessionService {
       historyMode: readString(thread.historyMode),
       modelState,
       ...(historyPage ? { historyPage } : {}),
-      turns: readArray(thread.turns).map((turn, index) => toTurn(turn, index, sessionId))
+      turns: liveTurns ?? readArray(thread.turns).map((turn, index) => toTurn(turn, index, sessionId))
     };
   }
 
@@ -415,7 +425,7 @@ export class SessionService {
   }
 }
 
-function toTurn(value: unknown, index: number, sessionId: string): SessionTurn {
+export function toTurn(value: unknown, index: number, sessionId: string): SessionTurn {
   const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   return {
     id: readString(source.id) ?? `turn-${index + 1}`,

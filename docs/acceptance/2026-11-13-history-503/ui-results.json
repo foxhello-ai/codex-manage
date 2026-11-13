@@ -1,11 +1,552 @@
 {
+  "config": {
+    "argv": [
+      "/Users/fumingzhen/.nvm/versions/node/v22.22.0/bin/node",
+      "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/node_modules/@playwright/test/cli.js",
+      "test",
+      "tests/ui/history-failure.e2e.ts",
+      "--config=playwright.ui.config.ts",
+      "--project=desktop",
+      "--project=mobile-375"
+    ],
+    "configFile": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/playwright.ui.config.ts",
+    "rootDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/tests/ui",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-320",
+        "name": "mobile-320",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-375",
+        "name": "mobile-375",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-390",
+        "name": "mobile-390",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "mobile-430",
+        "name": "mobile-430",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "iphone-16-pro",
+        "name": "iphone-16-pro",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "landscape-736",
+        "name": "landscape-736",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "landscape-844",
+        "name": "landscape-844",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/test-results/ui",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "desktop",
+        "name": "desktop",
+        "testDir": "/Users/fumingzhen/.codex/worktrees/desktop-interaction-sync/codex-manage/tests/ui",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.e2e.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report/ui",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/tmp/codex-manage-history-503-ui-final.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 2,
+    "webServer": {
+      "command": "npx vite preview --host 127.0.0.1 --port 4317 --strictPort",
+      "url": "http://127.0.0.1:4317",
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "history-failure.e2e.ts",
+      "file": "history-failure.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "desktop recent history and current output stay visible when the persisted history endpoint returns 503",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4911,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:02.343Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-d4f1a1021bc05d54fb5d",
+          "file": "history-failure.e2e.ts",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "title": "completed turns fold only progress preceding the last answer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 931,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:07.509Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-a7ac5d375f29ad3435d6",
+          "file": "history-failure.e2e.ts",
+          "line": 47,
+          "column": 1
+        },
+        {
+          "title": "a direct link shows metadata and a desktop question while history is still pending",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 896,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:08.474Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-9d7506eaf667ad5789bd",
+          "file": "history-failure.e2e.ts",
+          "line": 67,
+          "column": 1
+        },
+        {
+          "title": "a first-load 503 stays visible during background retry and clears only after success",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1598,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:09.391Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-2b85d7e0fe0dd438ddb5",
+          "file": "history-failure.e2e.ts",
+          "line": 96,
+          "column": 1
+        },
+        {
+          "title": "a failed refresh preserves loaded messages and manual retry requests the latest page",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-375",
+              "projectName": "mobile-375",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1120,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:11.007Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-2530d964ed7ce58a2843",
+          "file": "history-failure.e2e.ts",
+          "line": 123,
+          "column": 1
+        },
+        {
+          "title": "desktop recent history and current output stay visible when the persisted history endpoint returns 503",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 5092,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:02.311Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-8cd11cad47b1fa09c258",
+          "file": "history-failure.e2e.ts",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "title": "completed turns fold only progress preceding the last answer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 894,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:07.691Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-150681f817360000b615",
+          "file": "history-failure.e2e.ts",
+          "line": 47,
+          "column": 1
+        },
+        {
+          "title": "a direct link shows metadata and a desktop question while history is still pending",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 952,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:08.625Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-d39142eb7096517bf49c",
+          "file": "history-failure.e2e.ts",
+          "line": 67,
+          "column": 1
+        },
+        {
+          "title": "a first-load 503 stays visible during background retry and clears only after success",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1681,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:09.605Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-075a2b175687f990ceda",
+          "file": "history-failure.e2e.ts",
+          "line": 96,
+          "column": 1
+        },
+        {
+          "title": "a failed refresh preserves loaded messages and manual retry requests the latest page",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop",
+              "projectName": "desktop",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1197,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T02:12:11.305Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3fb69751cbc30c055fb8-58fe084ccf29b16b8452",
+          "file": "history-failure.e2e.ts",
+          "line": 123,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
   "stats": {
-    "startTime": "2026-11-13T01:40:54.141Z",
-    "duration": 16192.616,
-    "expected": 6,
+    "startTime": "2026-11-13T02:11:58.549Z",
+    "duration": 14073.252,
+    "expected": 10,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0
-  },
-  "errors": []
+  }
 }

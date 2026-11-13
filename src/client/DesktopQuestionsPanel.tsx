@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../shared/api";
-import type { DesktopQuestionsState } from "../shared/desktopQuestions";
+import type { DesktopQuestionsState, DesktopHistoryPage } from "../shared/desktopQuestions";
 import type { ApprovalSummary } from "../shared/models";
 import { InteractionCard } from "./InteractionCard";
 
-export function DesktopQuestionsPanel({ sessionId, showUnavailable = false }: { sessionId: string; showUnavailable?: boolean }) {
+export function DesktopQuestionsPanel({ sessionId, showUnavailable = false, onHistory }: {
+  sessionId: string; showUnavailable?: boolean; onHistory?: (history: DesktopHistoryPage) => void;
+}) {
   const [state, setState] = useState<DesktopQuestionsState | null>(null);
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const generation = useRef(0);
+  const historyCallback = useRef(onHistory);
+  historyCallback.current = onHistory;
   const endpoint = `/api/sessions/${encodeURIComponent(sessionId)}/desktop-questions`;
   useEffect(() => {
     let stopped = false, timer: ReturnType<typeof setTimeout>;
@@ -19,7 +23,10 @@ export function DesktopQuestionsPanel({ sessionId, showUnavailable = false }: { 
       const version = generation.current;
       try {
         const next = await apiRequest<DesktopQuestionsState>(endpoint, { signal: controller.signal });
-        if (!stopped && version === generation.current) setState(next);
+        if (!stopped && version === generation.current) {
+          setState(next);
+          if (next.available && next.history) historyCallback.current?.(next.history);
+        }
       } catch {
         if (!stopped && version === generation.current) setState({ available: false, turnId: null, questions: [], submissions: [], reason: "桌面问题暂时无法同步，请稍候。" });
       } finally { if (!stopped) timer = setTimeout(() => void poll(), 3000); }
@@ -56,6 +63,7 @@ export function DesktopQuestionsPanel({ sessionId, showUnavailable = false }: { 
         }) });
         generation.current++;
         setState(next);
+        if (next.available && next.history) historyCallback.current?.(next.history);
         setNotice(next.submissions.some(row => row.questionId === approval.id && row.status === "accepted") ? "回答已提交给桌面当前任务。" : null);
         setOpen(false);
       }} /> : null}

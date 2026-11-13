@@ -50,7 +50,8 @@ const sessionService = new SessionService(
   metadataStore,
   jsonlSessionParser,
   modelCatalog,
-  runtime.runtimeManager
+  runtime.runtimeManager,
+  desktopQuestions
 );
 const sessionModelService = new SessionModelService(
   modelCatalog,

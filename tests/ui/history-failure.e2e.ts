@@ -3,6 +3,67 @@ import { installUiHarness, sessionId } from "./fixtures";
 
 const timeoutError = { error: { code: "CODEX_APP_SERVER_UNAVAILABLE", message: "codex app-server request timed out: thread/turns/list" } };
 
+test("desktop recent history and current output stay visible when the persisted history endpoint returns 503", async ({ page }, info) => {
+  const h = await installUiHarness(page, { externalQueue: true });
+  const base = h.getDetail(sessionId);
+  let progress = "正在检查提测与验收标准";
+  let revision = 1;
+  await page.route(`**/api/sessions/${sessionId}?**`, route => {
+    const query = new URL(route.request().url()).searchParams;
+    if (query.get("turns") === "false") {
+      return route.fulfill({ json: { session: { ...base, turns: [] } } });
+    }
+    if (query.get("turnCursor") === "native-older-page") return route.fulfill({ json: { session: {
+      ...base, historyPage: { nextCursor: null, version: null, unchanged: false },
+      turns: [{ ...base.turns[0], id: "older-history", items: [{ id: "older-message", type: "agent_message", text: "来自真实游标的更早历史", phase: "final_answer" }] }]
+    } } });
+    return route.fulfill({ status: 503, json: timeoutError });
+  });
+  await page.route("**/api/sessions/*/desktop-questions", route => route.fulfill({ json: {
+    available: true, turnId: "desktop-live-turn", questions: [], submissions: [],
+    history: { version: `desktop:owner:${revision}`, nextCursor: "native-older-page", turns: [
+      { ...base.turns[0], id: "desktop-previous", items: [{ id: "previous-answer", type: "agent_message", text: "上一轮历史回复仍可阅读", phase: "final_answer" }] },
+      { ...base.turns[0], id: "desktop-live-turn", status: "inProgress", items: [
+        { id: "desktop-earlier-answer", type: "agent_message", text: "同一轮较早的答复", phase: "final_answer" },
+        { id: "desktop-progress", type: "agent_message", text: progress, phase: "commentary" }
+      ] }
+    ] }
+  } }));
+  await page.goto(`/${sessionId}`);
+  await expect(page.getByText("上一轮历史回复仍可阅读", { exact: true })).toBeVisible();
+  await expect(page.getByText(progress, { exact: true })).toBeVisible();
+  progress = "检查完成，正在补充验收用例"; revision++;
+  await expect(page.getByText(progress, { exact: true })).toBeVisible();
+  await expect(page.getByText("正在检查提测与验收标准", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".turnBlock")).toHaveCount(2);
+  await page.screenshot({ path: `docs/acceptance/2026-11-13-history-503/${info.project.name}-desktop-live-output.jpg` });
+  await page.getByRole("button", { name: "读取更早消息", exact: true }).click();
+  await expect(page.getByText("来自真实游标的更早历史", { exact: true })).toBeVisible();
+  await expect(page.getByText(progress, { exact: true })).toBeVisible();
+  expect(h.calls.filter(call => ["/resume", "/input"].some(suffix => call.path.endsWith(suffix)))).toHaveLength(0);
+  expect(h.pageErrors).toEqual([]);
+});
+
+test("completed turns fold only progress preceding the last answer", async ({ page }) => {
+  const h = await installUiHarness(page);
+  const base = h.getDetail(sessionId);
+  await page.route(`**/api/sessions/${sessionId}?**`, route => route.fulfill({ json: { session: {
+    ...base, turns: [{ ...base.turns[0], status: "completed", items: [
+      { id: "early-progress", type: "agent_message", text: "答复之前的过程", phase: "commentary" },
+      { id: "early-answer", type: "agent_message", text: "第一条答复", phase: "final_answer" },
+      { id: "last-answer", type: "agent_message", text: "最后一条答复", phase: "final_answer" },
+      { id: "later-progress", type: "agent_message", text: "答复之后的补充", phase: "commentary" }
+    ] }]
+  } } }));
+  await page.goto(`/${sessionId}`);
+  await expect(page.getByText("答复之后的补充", { exact: true })).toBeVisible();
+  await expect(page.getByText("答复之前的过程", { exact: true })).toBeHidden();
+  await expect(page.locator(".commentaryDetails")).toHaveCount(1);
+  await page.getByText("查看 1 条过程消息", { exact: true }).click();
+  await expect(page.getByText("答复之前的过程", { exact: true })).toBeVisible();
+  expect(h.pageErrors).toEqual([]);
+});
+
 test("a direct link shows metadata and a desktop question while history is still pending", async ({ page }) => {
   const h = await installUiHarness(page, { externalQueue: true });
   const base = h.getDetail(sessionId);

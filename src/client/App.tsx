@@ -12,7 +12,8 @@ import { findRetryContextForTurn, findRetryContextFromFailedTurns, isCommentaryP
 import { buildSessionDetailPath, parseSessionRoute, type SessionRoute } from "./sessionRoute";
 import { stripAmbientBrowserContext } from "../shared/messageText";
 import { clearBootstrapSession, readBootstrapSession, writeBootstrapSession } from "./bootstrapSession";
-import { mergeSessionHistory } from "./sessionHistory";
+import { mergeSessionHistory, mergeDesktopTurns } from "./sessionHistory";
+import type { DesktopHistoryPage } from "../shared/desktopQuestions";
 import { InteractionCard } from "./InteractionCard";
 
 type LoadState = "loading" | "ready" | "error";
@@ -1525,9 +1526,9 @@ function Dashboard({
     await Promise.all([loadSessions(search), sessionId ? refreshCurrentSession(sessionId) : Promise.resolve()]);
   }
 
-  async function handleLoadHistory() {
+  async function handleLoadHistory(desktopCursor?: string) {
     const sessionId = selectedSessionIdRef.current;
-    const cursor = sessionDetailRef.current?.historyPage?.nextCursor;
+    const cursor = desktopCursor ?? sessionDetailRef.current?.historyPage?.nextCursor;
     if (!sessionId || loadingHistory || (historyLoadedSessionIdRef.current === sessionId && !cursor)) return;
     await loadSessionDetail(sessionId, { includeTurns: true, turnCursor: cursor ?? undefined });
   }
@@ -2409,11 +2410,18 @@ function SessionDetailPanel({
   onOpenRetry: (context: RetryContext) => void;
   onBranchSession: (mode: SessionBranchMode, retryContext?: RetryContext | null) => Promise<void>;
   onContinueFromHistory: (retryContext?: RetryContext | null) => void;
-  onLoadHistory: () => Promise<void>;
+  onLoadHistory: (desktopCursor?: string) => Promise<void>;
   onRetryHistory: () => void;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
   const session = detail ?? fallbackSession;
+  const [desktopHistory, setDesktopHistory] = useState<{ sessionId: string; page: DesktopHistoryPage } | null>(null);
+  const desktopPage = desktopHistory?.sessionId === session.id ? desktopHistory.page : null;
+  const displayedHistory = useMemo(() => ({
+    turns: mergeDesktopTurns(detail?.turns ?? [], desktopPage?.turns ?? []),
+    historyPage: detail?.historyPage ?? (desktopPage ? { nextCursor: desktopPage.nextCursor, version: desktopPage.version, unchanged: false } : undefined)
+  }), [detail, desktopPage]);
+  const historyAvailable = historyLoaded || Boolean(desktopPage?.turns.length);
   const [copiedSessionId, setCopiedSessionId] = useState(false);
   const [visibleTurnCount, setVisibleTurnCount] = useState(DEFAULT_VISIBLE_TURNS);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
@@ -2421,7 +2429,7 @@ function SessionDetailPanel({
   const initialScrollSessionRef = useRef<string | null>(null);
   const pendingHistoryLoadRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
   const [timelineScrollState, setTimelineScrollState] = useState({ canScrollUp: false, canScrollDown: false });
-  const hasVisibleHistory = Boolean(detail?.turns.some((turn) => turn.items.some((item) => item.type !== "unknown" && item.type !== "file_change")));
+  const hasVisibleHistory = displayedHistory.turns.some((turn) => turn.items.some((item) => item.type !== "unknown" && item.type !== "file_change"));
   const desktopQueueErrorIds = new Set(runtime?.executionSource === "external_queue"
     ? liveErrors.filter((notice) => notice.code === "DESKTOP_QUEUE_TEXT_ONLY" || notice.code === "SESSION_ACTIVE_WRITER").map((notice) => notice.id)
     : []);
@@ -2457,13 +2465,13 @@ function SessionDetailPanel({
 
   useLayoutEffect(() => {
     const timelineScroll = timelineScrollRef.current;
-    if (!timelineScroll || !historyLoaded || initialScrollSessionRef.current === session.id) return;
+    if (!timelineScroll || !historyAvailable || initialScrollSessionRef.current === session.id) return;
 
     timelineScroll.scrollTop = timelineScroll.scrollHeight;
     timelineAtLatestRef.current = true;
     initialScrollSessionRef.current = session.id;
     updateTimelineScrollState();
-  }, [detail, historyLoaded, session.id]);
+  }, [displayedHistory, historyAvailable, session.id]);
 
   async function copySessionId() {
     if (!await copyTextToClipboard(session.id)) return;
@@ -2476,7 +2484,7 @@ function SessionDetailPanel({
     if (!timelineScroll || !timelineAtLatestRef.current) return;
     timelineScroll.scrollTop = timelineScroll.scrollHeight;
     updateTimelineScrollState();
-  }, [liveTimeline, liveMessages, liveCommands, liveErrors]);
+  }, [liveTimeline, liveMessages, liveCommands, liveErrors, displayedHistory]);
 
   useEffect(() => {
     const element = timelineScrollRef.current;
@@ -2559,7 +2567,7 @@ function SessionDetailPanel({
               重新加载历史消息
             </button>
           </div> : null}
-          {!historyLoaded ? (
+          {!historyAvailable ? (
             historyNotice ? (
               <div className="historyNotice" role="status">
                 <strong>新会话</strong>
@@ -2576,10 +2584,10 @@ function SessionDetailPanel({
               </div>
             )
           ) : null}
-          {historyLoaded && detail && !hasVisibleHistory && visibleLiveTimeline.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
-          {historyLoaded && detail && hasVisibleHistory ? (
+          {historyAvailable && !hasVisibleHistory && visibleLiveTimeline.length === 0 ? <div className="emptyState">暂无历史消息</div> : null}
+          {historyAvailable && hasVisibleHistory ? (
             <SessionTimeline
-              detail={detail}
+              detail={displayedHistory}
               visibleTurnCount={visibleTurnCount}
               loadingHistory={loadingHistory}
               onLoadMore={async (fromServer) => {
@@ -2590,7 +2598,7 @@ function SessionDetailPanel({
                     scrollHeight: timelineScroll.scrollHeight
                   };
                 }
-                if (fromServer) await onLoadHistory();
+                if (fromServer) await onLoadHistory(displayedHistory.historyPage?.nextCursor ?? undefined);
                 setVisibleTurnCount((count) => count + DEFAULT_VISIBLE_TURNS);
               }}
               liveMessages={liveMessages}
@@ -2664,7 +2672,9 @@ function SessionDetailPanel({
         {runtime?.permissionMode === "full_access" && pendingApprovals.some(approval => !["tool_user_input", "mcp_elicitation"].includes(approval.kind)) ? (
           <div className="errorBanner composerWarning" role="alert">完全权限模式收到未预期的审批请求，系统未自动处理；你仍可拒绝或取消该请求。</div>
         ) : null}
-        {runtime?.executionSource !== "manage" && !isChild ? <DesktopQuestionsPanel key={`desktop-questions-${session.id}`} sessionId={session.id} showUnavailable={runtime?.executionSource === "external_queue"} /> : null}
+        {runtime?.executionSource !== "manage" && !isChild ? <DesktopQuestionsPanel key={`desktop-questions-${session.id}`} sessionId={session.id}
+          showUnavailable={runtime?.executionSource === "external_queue"} onHistory={page => setDesktopHistory(current =>
+            current?.sessionId === session.id && current.page.version === page.version ? current : { sessionId: session.id, page })} /> : null}
         <ApprovalPanel
           approvals={pendingApprovals}
           pendingCount={pendingApprovalCount}
@@ -3152,13 +3162,15 @@ function SessionTimeline({
   const historicalItemIds = new Set(turns.flatMap((turn) => turn.items.map((item) => item.id)));
 
   function renderTurn(turn: SessionDetail["turns"][number], absoluteIndex: number) {
-    const finalAnswerExists = turn.items.some((item) => item.type === "agent_message" && isFinalAnswerPhase(item.phase));
-    const commentaryItems = finalAnswerExists
-      ? turn.items.filter((item) => item.type === "agent_message" && isCommentaryPhase(item.phase))
-      : [];
-    const visibleItems = finalAnswerExists
-      ? turn.items.filter((item) => !(item.type === "agent_message" && isCommentaryPhase(item.phase)))
-      : turn.items;
+    // A desktop turn can continue after a final answer (for example after
+    // compaction). Keep active progress and any post-answer messages visible.
+    const finalAnswerIndex = ["completed", "failed", "interrupted"].includes(turn.status)
+      ? turn.items.findLastIndex((item) => item.type === "agent_message" && isFinalAnswerPhase(item.phase))
+      : -1;
+    const isFoldedCommentary = (item: SessionTurnItem, index: number) => index < finalAnswerIndex
+      && item.type === "agent_message" && isCommentaryPhase(item.phase);
+    const commentaryItems = turn.items.filter(isFoldedCommentary);
+    const visibleItems = turn.items.filter((item, index) => !isFoldedCommentary(item, index));
 
     const commentaryDetails = commentaryItems.length > 0 ? (
       <details className="commentaryDetails" key={`${turn.id}-commentary`}>
@@ -3181,7 +3193,7 @@ function SessionTimeline({
         <div className="turnItems">
           {visibleItems.map((item) => (
             <Fragment key={item.id}>
-              {item.type === "agent_message" && isFinalAnswerPhase(item.phase) ? commentaryDetails : null}
+              {item === turn.items[finalAnswerIndex] ? commentaryDetails : null}
               <TurnItemView item={item} />
             </Fragment>
           ))}

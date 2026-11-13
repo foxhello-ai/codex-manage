@@ -12,7 +12,8 @@ afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await c
 const questionId = JSON.stringify(["request_user_input_async", "call_async", 0]);
 function state() {
   return { id: "thread-a", cwd: "/test/workspace", turns: [], turnHistory: { kind: "canonical", history: {
-    islands: [{ entries: [{ value: "active" }] }], entitiesByKey: { active: { turnId: "turn-a", status: "inProgress", items: [
+    islands: [{ entries: [{ value: "active" }], newerBoundary: { status: "exhausted" },
+      olderBoundary: { status: "available", handle: { cursor: "native-older-cursor" } } }], entitiesByKey: { active: { turnId: "turn-a", status: "inProgress", turnStartedAtMs: 1794530000000, items: [
       { type: "agentMessage", id: "call_async", delivery: "async", questions: [{ title: "请选择界面", options: ["方案 A", "方案 B"] }] }
     ] } }
   } } };
@@ -28,6 +29,7 @@ async function fixture(mode: "accept" | "unknown" = "accept") {
   }
   const server = createServer(socket => {
     sockets.add(socket); socket.on("close", () => sockets.delete(socket));
+    socket.on("error", () => sockets.delete(socket));
     let buffer = Buffer.alloc(0);
     socket.on("data", chunk => {
       buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
@@ -59,6 +61,28 @@ async function fixture(mode: "accept" | "unknown" = "accept") {
   } };
 }
 describe("desktop async question IPC", () => {
+  it("projects recent history and updates streaming text from patches without reopening the desktop", async () => {
+    const f = await fixture(), service = f.service();
+    const page = await service.readHistory("thread-a", 20);
+    expect(page).toMatchObject({ nextCursor: "native-older-cursor", turns: [{ id: "turn-a", status: "inProgress", startedAt: new Date(1794530000000).toISOString() }] });
+    const path = ["turnHistory", "history", "entitiesByKey", "active", "items", 1];
+    f.patch([{ op: "add", path, value: { type: "agentMessage", id: "live-message", text: "执行进度", phase: "commentary" } }]);
+    await expect.poll(async () => (await service.read("thread-a")).history?.turns[0].items.at(-1)).toMatchObject({ id: "live-message", text: "执行进度" });
+    f.patch([{ op: "replace", path: [...path, "text"], value: "执行进度：检查完成" }]);
+    await expect.poll(async () => (await service.readHistory("thread-a", 20))?.turns[0].items.at(-1)).toMatchObject({ id: "live-message", text: "执行进度：检查完成" });
+    expect((await service.readHistory("thread-a", 20))?.version).not.toBe(page?.version);
+    expect(f.steers).toHaveLength(0);
+  });
+  it("does not claim a paginated history page for a gap, a missing cursor or a truncated page", async () => {
+    const f = await fixture(), service = f.service();
+    const island = f.native.turnHistory.history.islands[0];
+    island.olderBoundary = { status: "available", handle: { cursor: "" } };
+    expect(await service.readHistory("thread-a", 20)).toBeNull();
+    expect(await service.readHistory("thread-a", 0)).toBeNull();
+    expect(await service.readHistory("thread-b", 20)).toBeNull();
+    f.patch([{ op: "replace", path: ["turnHistory", "history", "islands", 0, "newerBoundary", "status"], value: "available" }]);
+    await expect.poll(async () => service.readHistory("thread-a", 20)).toBeNull();
+  });
   it("reads a canonical live turn and submits a correlated custom answer once across concurrent clients", async () => {
     const f = await fixture(), service = f.service();
     expect(await service.read("thread-a")).toMatchObject({ available: true, turnId: "turn-a", questions: [{ id: questionId, options: ["方案 A", "方案 B"] }] });

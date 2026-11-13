@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-11-13T02:12:53.859Z",
+  "threadId": "01a18a9f-b17e-7382-b11d-e08c6ab78943",
+  "source": "Real original desktop IPC, isolated local Web process",
+  "firstVisibleMs": 330,
+  "initialHistoryStatus": 200,
+  "historyTurns": 7,
+  "historyVersionSource": "desktop",
+  "markerInitiallyAbsent": true,
+  "realNewOutputVisible": true,
+  "appearedAfterReadyMs": 21020,
+  "refreshedPage": false,
+  "olderHistory": {
+    "status": 200,
+    "loadedTurns": 20,
+    "beforeVisibleTurns": 5
+  },
+  "writerRequests": [],
+  "browserErrors": [],
+  "remoteEricServiceTested": false,
+  "desktopStartupModified": false,
+  "appearedAfterReadyMsNote": "Includes the time before the assistant authored a new progress message; this is not a measurement of transport latency."
+}
