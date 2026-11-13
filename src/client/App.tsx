@@ -581,12 +581,12 @@ function Dashboard({
     const includeTurns = options.includeTurns ?? false;
     if (includeTurns && historyLoadingSessionIdRef.current === sessionId) return null;
     if (includeTurns) historyLoadingSessionIdRef.current = sessionId;
-    if (!options.silent) {
+    const showLoading = !options.silent || (includeTurns && historyLoadedSessionIdRef.current !== sessionId);
+    if (showLoading) {
       if (includeTurns) setLoadingHistory(true);
       else setLoadingDetail(true);
     }
     if (includeTurns) {
-      setHistoryError(null);
       setHistoryNotice(null);
     }
     else setDetailError(null);
@@ -616,7 +616,9 @@ function Dashboard({
         : { ...response.session, turns: latest?.turns ?? response.session.turns, ...(latest?.historyPage ? { historyPage: latest.historyPage } : {}) };
       sessionDetailRef.current = merged;
       setSessionDetail(merged);
+      setDetailError(null);
       if (includeTurns) {
+        setHistoryError(null);
         historyLoadedSessionIdRef.current = sessionId;
         setHistoryLoadedSessionId(sessionId);
         setHistoryNotice(null);
@@ -625,14 +627,18 @@ function Dashboard({
       return merged;
     } catch (caught) {
       if (selectedSessionIdRef.current !== sessionId) return null;
-      const message = caught instanceof Error ? caught.message : includeTurns ? "历史会话加载失败" : "会话详情加载失败";
+      const message = includeTurns && caught instanceof ApiRequestError && caught.statusCode === 503
+        && /request timed out: thread\/turns\/list/i.test(caught.message)
+        ? "历史消息读取超时（503），请重新加载历史消息。"
+        : caught instanceof Error ? caught.message : includeTurns ? "历史会话加载失败" : "会话详情加载失败";
       if (includeTurns) {
         if (isUnmaterializedThreadHistoryError(message)) {
+          setHistoryError(null);
           setHistoryNotice("新会话已创建，可以正常开始对话。发送第一条消息后，历史消息会显示在这里。");
           return null;
         }
         setHistoryError(message);
-      } else {
+      } else if (!isSameSession(sessionDetailRef.current, sessionId)) {
         if (!options.silent) setSessionDetail(null);
         setDetailError(message);
       }
@@ -641,7 +647,7 @@ function Dashboard({
       if (includeTurns && historyLoadingSessionIdRef.current === sessionId) {
         historyLoadingSessionIdRef.current = null;
       }
-      if (!options.silent && selectedSessionIdRef.current === sessionId) {
+      if (showLoading && selectedSessionIdRef.current === sessionId) {
         if (includeTurns) {
           setLoadingHistory(false);
           setLoadingDetail(false);
@@ -733,6 +739,10 @@ function Dashboard({
   async function refreshCurrentSession(sessionId: string, options: { silent?: boolean; includeTurns?: boolean } = {}) {
     const includeTurns = options.includeTurns ?? true;
     await Promise.all([
+      // The history RPC can be much slower than the metadata read. Keep the
+      // session shell and desktop questions available even if history fails.
+      ...(includeTurns && !isSameSession(sessionDetailRef.current, sessionId)
+        ? [loadSessionDetail(sessionId, { ...options, includeTurns: false })] : []),
       loadSessionDetail(sessionId, {
         ...options,
         includeTurns
@@ -1073,6 +1083,7 @@ function Dashboard({
     if (sessionId) completionRefreshInFlightRef.current.delete(sessionId);
     setSelectedSessionId(sessionId);
     setSessionDetail(null);
+    sessionDetailRef.current = null;
     historyLoadedSessionIdRef.current = null;
     historyLoadingSessionIdRef.current = null;
     setHistoryLoadedSessionId(null);
@@ -1731,6 +1742,7 @@ function Dashboard({
                   historyContinuationPending={historyContinuationPending}
                   onContinueFromHistory={(context) => void handleHistoryContinuation(context)}
                   onLoadHistory={handleLoadHistory}
+                  onRetryHistory={() => void loadSessionDetail(selectedSession.id, { includeTurns: true })}
                   onSubmitApproval={handleSubmitApproval}
                 />
               ) : loadingDetail ? (
@@ -2366,6 +2378,7 @@ function SessionDetailPanel({
   onBranchSession,
   onContinueFromHistory,
   onLoadHistory,
+  onRetryHistory,
   onSubmitApproval
 }: {
   fallbackSession: SessionSummary;
@@ -2397,6 +2410,7 @@ function SessionDetailPanel({
   onBranchSession: (mode: SessionBranchMode, retryContext?: RetryContext | null) => Promise<void>;
   onContinueFromHistory: (retryContext?: RetryContext | null) => void;
   onLoadHistory: () => Promise<void>;
+  onRetryHistory: () => void;
   onSubmitApproval: (approval: ApprovalSummary, decision: ApprovalDecision, answers?: Record<string, string[]>) => Promise<void>;
 }) {
   const session = detail ?? fallbackSession;
@@ -2539,8 +2553,13 @@ function SessionDetailPanel({
           <div className="historyContent" ref={timelineScrollRef} onScroll={handleTimelineScroll}>
           {loading ? <div className="emptyState">正在加载详情...</div> : null}
           {error ? <div className="errorBanner">{error}</div> : null}
-          {historyError ? <div className="errorBanner">{historyError}</div> : null}
-          {detail && !historyLoaded ? (
+          {historyError ? <div className="errorBanner" role="alert">
+            <p>{historyError}</p>
+            <button className="ghostButton" type="button" disabled={loadingHistory} onClick={onRetryHistory}>
+              重新加载历史消息
+            </button>
+          </div> : null}
+          {!historyLoaded ? (
             historyNotice ? (
               <div className="historyNotice" role="status">
                 <strong>新会话</strong>
@@ -2549,7 +2568,7 @@ function SessionDetailPanel({
             ) : (
               <div className="emptyState">
                 <p>{loadingHistory ? "正在加载最新历史消息..." : "历史消息暂未加载。"}</p>
-                {!loadingHistory ? (
+                {!loadingHistory && !historyError ? (
                   <button className="ghostButton" type="button" onClick={() => void onLoadHistory()}>
                     重新加载历史消息
                   </button>

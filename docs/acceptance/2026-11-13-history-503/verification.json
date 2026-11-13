@@ -1,0 +1,91 @@
+{
+  "checkedAt": "2026-11-13T09:43:41.778657+08:00",
+  "baseCommit": "b662b355ece7d791065caad30ec2e15e0e02f754",
+  "branch": "codex/session-history-503",
+  "runningAppVersion": "源码版（b662b35）",
+  "manageCliVersion": "0.163.0",
+  "desktopCliVersion": "0.162.0-alpha.2",
+  "httpSamples": [
+    {
+      "query": "turns=false",
+      "status": 200,
+      "elapsedMs": [
+        133,
+        128
+      ]
+    },
+    {
+      "query": "turnLimit=20",
+      "status": 200,
+      "elapsedMs": [
+        2629,
+        3020
+      ]
+    },
+    {
+      "port": 4311,
+      "query": "turnLimit=20",
+      "status": 200,
+      "elapsedMs": 938,
+      "serverDurationMs": 890,
+      "bytes": 485886
+    },
+    {
+      "port": 4310,
+      "query": "turnLimit=20",
+      "status": 200,
+      "elapsedMs": 857,
+      "serverDurationMs": 804,
+      "bytes": 485983
+    }
+  ],
+  "rawRpcComparison": {
+    "full": {
+      "elapsedMs": 2192,
+      "bytes": 11249770,
+      "turnLimit": 20
+    },
+    "summary": {
+      "elapsedMs": 101,
+      "bytes": 125974,
+      "turnLimit": 20
+    },
+    "summaryOmittedItems": {
+      "agentMessage": 97,
+      "contextCompaction": 9,
+      "fileChange": 63,
+      "userMessage": 2
+    },
+    "decision": "Do not switch to summary silently: it omits currently displayed history."
+  },
+  "real503Reproduced": false,
+  "ui503Source": "Injected API failure in isolated browser tests, not a reproduction of the user server failure.",
+  "implemented": [
+    "Metadata loads independently of history",
+    "History loading and errors show before detail is available",
+    "Errors persist through a background retry until success",
+    "Retry latest history without replacing loaded messages",
+    "Server failure log includes request id, session id, duration, query shape and sanitized cause"
+  ],
+  "notImplemented": [
+    {
+      "item": "Eliminate the reported real-world 503",
+      "needed": "Identify the affected machine and conversation URL/name; capture the actual failed response or server log."
+    }
+  ],
+  "validation": {
+    "unitTests": 192,
+    "uiTests": 6,
+    "uiRegressionTests": 10,
+    "typecheck": "passed",
+    "clientBuild": "passed",
+    "serverBuild": "passed"
+  },
+  "deployment": {
+    "merged": false,
+    "published": false,
+    "userServicesRestarted": false,
+    "desktopStartupModified": false,
+    "writerOperations": 0
+  }
+}

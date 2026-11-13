@@ -812,6 +812,14 @@ export function registerSessionRoutes(
         return sendError(reply, 404, "SESSION_NOT_FOUND", "会话不存在");
       }
 
+      request.log.warn({
+        sessionId: params.data.id,
+        elapsedMs: Math.round(performance.now() - startedAt),
+        includeTurns: query.data.turns !== false && query.data.turns !== "false",
+        turnLimit: query.data.turnLimit,
+        hasCursor: Boolean(query.data.turnCursor),
+        cause: sanitizeModelError(error)
+      }, "session detail read failed");
       return sendError(
         reply,
         503,
