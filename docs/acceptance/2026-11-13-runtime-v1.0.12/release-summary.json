@@ -1,0 +1,78 @@
+{
+  "version": "1.0.12",
+  "status": "published-and-installation-verified",
+  "checkedAt": "2026-11-13T10:41:49.955010+08:00",
+  "sourceCommit": "78d21b69a557d4bbc1e9734c4b949aa543766ade",
+  "mergedIntoMain": true,
+  "releaseUrl": "https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.12",
+  "releaseRunUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43353117556",
+  "postPublicationRunUrl": "https://github.com/foxhello-ai/codex-manage/actions/runs/43353472449",
+  "postPublicationWorkflowCommit": "c1cc4d93ab7546a0576511790876ed0d4a8358e3",
+  "publishedAt": "2026-11-13T10:35:28+08:00",
+  "packageSha256": "2e78aa561db678dd638585f079b84698be3884b2a1bac7e56153d7cade03a3e1",
+  "installerSha256": "6970baf73fbc24d2aede91fc9e8bf030dde6756c2d1f4fafd80a3c54d8701549",
+  "runtimeTagAnnotated": true,
+  "testsPassed": 197,
+  "uiTestsPassed": 20,
+  "productionBuild": "passed",
+  "postPublicationPlatforms": [
+    {
+      "os": "ubuntu-24.04",
+      "arch": "x64",
+      "checks": 8,
+      "runningVersionChecks": 6,
+      "appVersion": "v1.0.12",
+      "status": "passed",
+      "evidence": "linux-ci.json"
+    },
+    {
+      "os": "macos-15-intel",
+      "arch": "x64",
+      "checks": 10,
+      "runningVersionChecks": 8,
+      "appVersion": "v1.0.12",
+      "status": "passed",
+      "evidence": "macos-intel-ci.json"
+    },
+    {
+      "os": "macos-15",
+      "arch": "arm64",
+      "checks": 10,
+      "runningVersionChecks": 8,
+      "appVersion": "v1.0.12",
+      "status": "passed",
+      "evidence": "macos-arm64-ci.json"
+    }
+  ],
+  "localMacChecks": 10,
+  "settingsUI": {
+    "version": "1.0.12",
+    "sourceCommit": "78d21b69a557d4bbc1e9734c4b949aa543766ade",
+    "status": "passed",
+    "checkedAt": "2026-11-13T02:39:50.413Z",
+    "downloadedOfficialPackage": true,
+    "isolatedCodexHome": true,
+    "results": [
+      {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "appVersion": "v1.0.12",
+        "status": "passed"
+      },
+      {
+        "viewport": 375,
+        "documentWidth": 375,
+        "appVersion": "v1.0.12",
+        "status": "passed"
+      }
+    ],
+    "userInstallationUpgraded": false,
+    "modelRequests": 0
+  },
+  "publishedDownloadVerified": true,
+  "websiteDeployment": "passed",
+  "localProductionInstallationUpgraded": false,
+  "remoteAffectedThreadVerified": false,
+  "realAccountLoginTested": false,
+  "modelInferenceTested": false
+}

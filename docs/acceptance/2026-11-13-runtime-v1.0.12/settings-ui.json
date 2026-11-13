@@ -1,0 +1,24 @@
+{
+  "version": "1.0.12",
+  "sourceCommit": "78d21b69a557d4bbc1e9734c4b949aa543766ade",
+  "status": "passed",
+  "checkedAt": "2026-11-13T02:39:50.413Z",
+  "downloadedOfficialPackage": true,
+  "isolatedCodexHome": true,
+  "results": [
+    {
+      "viewport": 1440,
+      "documentWidth": 1440,
+      "appVersion": "v1.0.12",
+      "status": "passed"
+    },
+    {
+      "viewport": 375,
+      "documentWidth": 375,
+      "appVersion": "v1.0.12",
+      "status": "passed"
+    }
+  ],
+  "userInstallationUpgraded": false,
+  "modelRequests": 0
+}

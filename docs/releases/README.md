@@ -18,8 +18,9 @@
 | v1.0.9 | `release/v1.0.9`、`v1.0.9`、`runtime/v1.0.9` → `a921a7a` | 桌面原会话文字投递、空闲 writer 释放、工作台与性能改进、安装验收门禁 | 已验证发布：Ubuntu 24.04/systemd 的 tgz/zip 安装、升级/回滚、启停、配置保留及发布后下载复核均通过；真实账号与模型请求未测 |
 | v1.0.10 | `release/v1.0.10`、`v1.0.10`、`runtime/v1.0.10` → `e375a3a` | 历史分页、Web 审批恢复、原桌面异步问题的 Web 答复、instabox Linux CI、跨平台安装器 | 已验证发布：Linux / Intel macOS / Apple ARM macOS 正式发布包安装、升级/回滚和启停均通过 |
 | v1.0.11 | `release/v1.0.11`、`v1.0.11`、`runtime/v1.0.11` → `2315e46` | 设置页当前版本、源码提交标识、安装/升级后的运行版本核对 | 已验证发布：Linux / Intel macOS / Apple ARM macOS 安装、升级/回滚、启停及设置页版本显示均通过 |
+| v1.0.12 | `release/v1.0.12`、`v1.0.12`、`runtime/v1.0.12` → `78d21b6` | 桌面历史与实时输出同步、运行进度展开、错误保留及桌面历史游标翻页 | 已验证发布：Linux / Intel macOS / Apple ARM macOS 安装、升级/回滚、启停及设置页 v1.0.12 核对均通过；远端原会话效果待用户升级复测 |
 
-详见 [`runtime-v1.0.1.md`](runtime-v1.0.1.md)、[`runtime-v1.0.9.md`](runtime-v1.0.9.md)、[`runtime-v1.0.10.md`](runtime-v1.0.10.md) 和 [`runtime-v1.0.11.md`](runtime-v1.0.11.md)。
+详见 [`runtime-v1.0.1.md`](runtime-v1.0.1.md)、[`runtime-v1.0.9.md`](runtime-v1.0.9.md)、[`runtime-v1.0.10.md`](runtime-v1.0.10.md)、[`runtime-v1.0.11.md`](runtime-v1.0.11.md) 和 [`runtime-v1.0.12.md`](runtime-v1.0.12.md)。
 
 ## Desktop
 

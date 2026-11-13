@@ -15,7 +15,7 @@ a{color:#0067b7}code{overflow-wrap:anywhere}figure{margin:22px 0}figcaption{font
 <main>
 <h1>桌面会话历史、实时输出与 503 验收</h1>
 <p>2026-11-13 · 分支 <code>codex/session-history-503</code> · 基线 <code>b662b35</code></p>
-<p class="note">本机代码修复与真实桌面验收已实现。<strong>远端 eric-codex.foxhello.com 原会话的 503 消除、远端验收和本次修复部署没实现。</strong>尚未合并发布；不能用本机成功替代远端验收。</p>
+<p class="note">修复已合并 main，并正式发布 <a href="https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.12">v1.0.12</a>，三平台安装验收通过。<strong>远端 eric-codex.foxhello.com 原会话的 503 消除与远端验收没实现，需要用户升级后在原会话复测。</strong></p>
 <h2>说明原因</h2>
 <p>本机已确认三个问题：首屏被历史读取阻塞；Web 没有把已有桌面订阅中的历史和新输出用于消息时间线；一轮只要出现过 final_answer，就把该轮全部过程消息折叠。</p>
 <p>真实桌面样本仍处于 inProgress，较早 final_answer 之后继续产生 commentary。这些新进度已经到达 Web 接口，但被折叠隐藏。修复后，运行中的消息直接展示。</p>
@@ -41,7 +41,8 @@ a{color:#0067b7}code{overflow-wrap:anywhere}figure{margin:22px 0}figcaption{font
 <tr><td>加载、持久错误、手动重试、刷新失败保留消息</td><td class="passed">已实现</td><td>桌面 / 375px 故障注入测试通过</td></tr>
 <tr><td>服务端失败日志</td><td class="passed">已实现</td><td>请求 ID、会话、耗时、查询形态及脱敏原因</td></tr>
 <tr><td>消除远端本次实际 503 并在原会话验收</td><td class="pending">没实现</td><td>需要完整出错会话链接及已有登录访问方式，或服务器 SSH 别名 / 失败日志；无需发送密码</td></tr>
-<tr><td>本次修复合并、发布和部署至远端</td><td class="pending">没实现</td><td>当前仍在独立分支，未更改用户现有运行服务</td></tr>
+<tr><td>修复合并 main、正式发布 v1.0.12</td><td class="passed">已实现</td><td>源码 78d21b6，规范 Runtime tag、正式包、三平台验收齐全</td></tr>
+<tr><td>远端服务升级到 v1.0.12</td><td class="pending">没实现</td><td>由用户在原机器执行升级命令，在设置页核对 v1.0.12</td></tr>
 </tbody></table></div>
 <h2>真实桌面验证</h2>
 <p>使用隔离的本机 Web 进程读取当前原桌面会话，没有 API 模拟。冷订阅首条消息约 3.1～3.7 秒；已有订阅约 330ms。确认页面初次打开时没有下面的消息，助手随后发出进度后，Web 自动出现了它，且没有被弹窗遮挡。</p>
@@ -55,6 +56,16 @@ a{color:#0067b7}code{overflow-wrap:anywhere}figure{margin:22px 0}figcaption{font
 <h2>远端核对与后续条件</h2>
 <p><a href="https://eric-codex.foxhello.com">eric-codex.foxhello.com</a> 的公开前端 <code>index-GrHky3MS.js</code> 与正式 v1.0.11 发布包字节一致，SHA-256：<code>b6aebb9f698a8638323db4d37ae5ddc6c53fcedacf2c6dd7f75127e5de7e7d27</code>。它不含本次修复；后台版本未验证。</p>
 <p>远端业务接口要求登录。需要在原出错会话下捕获失败接口和服务端原因，才能判断 503 来自 RPC、后台还是代理，并继续修复和验收。域名已确认，无需重复提供；目前缺少完整会话链接和可用访问方式。</p>
+<h2 id="release">v1.0.12 正式发布与安装验收</h2>
+<p>2026-11-13 10:35:28（北京时间）正式发布，修复已合并 main。源码 <code>78d21b69a557d4bbc1e9734c4b949aa543766ade</code>；release/v1.0.12、v1.0.12、annotated runtime/v1.0.12 指向同一源码。</p>
+<p><a href="https://github.com/foxhello-ai/codex-manage/actions/runs/43353117556">发布流水线</a>和<a href="https://github.com/foxhello-ai/codex-manage/actions/runs/43353472449">三平台复验</a>全部通过：Linux 8 项、Intel Mac 10 项、Apple ARM Mac 10 项。本机 Intel Mac 的 10 项 launchd 检查也通过。覆盖新装、升级、回滚、启停、配置保留和实际运行版本。</p>
+<p>正式下载包 SHA-256：<code>2e78aa561db678dd638585f079b84698be3884b2a1bac7e56153d7cade03a3e1</code>。下图来自正式发布包启动的隔离服务，没有自动升级用户原安装。</p>
+<figure><img src="../2026-11-13-runtime-v1.0.12/settings-1440.jpg" loading="lazy" alt="正式发布包桌面设置页：当前版本 v1.0.12"><figcaption>1440px：真实发布包的设置页显示 v1.0.12。</figcaption></figure>
+<figure><img class="mobile" src="../2026-11-13-runtime-v1.0.12/settings-375.jpg" loading="lazy" alt="正式发布包手机设置页：当前版本 v1.0.12"><figcaption>375px：运行正常，当前版本 v1.0.12。</figcaption></figure>
+<p>macOS 升级命令（当前桌面用户执行）：</p>
+<pre style="overflow:auto;background:white;padding:14px;border-radius:8px"><code>curl -fsSL https://github.com/foxhello-ai/codex-manage/releases/download/v1.0.12/install-runtime.sh \
+  | bash -s -- --version 1.0.12</code></pre>
+<p>升级后刷新 Web，在设置和诊断检查“当前版本”为 v1.0.12。Linux 升级命令见<a href="../../releases/runtime-v1.0.12.md">版本说明</a>；<a href="../2026-11-13-runtime-v1.0.12/README.md">完整安装记录</a>与<a href="../2026-11-13-runtime-v1.0.12/release-summary.json">汇总 JSON</a>已保存。</p>
 <p><a href="verification.json">完整验证记录</a> · <a href="real-desktop-output.json">真实桌面记录</a> · <a href="ui-results.json">专项结果</a> · <a href="regression-results.json">回归结果</a> · <a href="README.md">详细记录</a></p>
 </main>
 </html>

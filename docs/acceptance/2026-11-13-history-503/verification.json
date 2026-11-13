@@ -93,12 +93,18 @@
     }
   },
   "deployment": {
-    "merged": false,
-    "published": false,
-    "userServicesRestarted": false,
+    "merged": true,
+    "published": true,
+    "userServicesRestarted": true,
     "desktopStartupModified": false,
     "writerOperations": 0,
-    "isolatedAcceptanceServerStopped": true
+    "isolatedAcceptanceServerStopped": true,
+    "releaseVersion": "1.0.12",
+    "releaseSourceCommit": "78d21b69a557d4bbc1e9734c4b949aa543766ade",
+    "releaseUrl": "https://github.com/foxhello-ai/codex-manage/releases/tag/v1.0.12",
+    "localInstalledRuntimeUpgraded": false,
+    "remoteInstalledRuntimeUpgraded": false,
+    "sourceDevServiceReloadedOnMainMerge": true
   },
   "realDesktopAcceptance": {
     "checkedAt": "2026-11-13T02:12:53.859Z",

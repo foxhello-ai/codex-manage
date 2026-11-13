@@ -16,7 +16,9 @@
 
 197 项单元/集成、10 项专项浏览器测试、10 项审批与历史回归、类型检查及前后端构建通过。本机真实桌面会话验证了最近历史、新进度自动出现和更早 20 轮读取；[验收报告](../acceptance/2026-11-13-history-503/report.html) 含截图。
 
-发布流水线还将验证安装、升级、回滚、服务启停、配置保留及实际运行版本，正式发布后补充发布包和三平台安装证据。
+正式发布于 2026-11-13 10:35:28（北京时间），源码 `78d21b69a557d4bbc1e9734c4b949aa543766ade`。[发布流水线](https://github.com/foxhello-ai/codex-manage/actions/runs/43353117556) 和[三平台安装复验](https://github.com/foxhello-ai/codex-manage/actions/runs/43353472449) 均通过：Linux 8 项、Intel Mac 10 项、Apple ARM Mac 10 项，覆盖安装、升级、回滚、启停、配置保留与运行版本。本机 Intel Mac 10 项 launchd 检查也通过。
+
+正式下载包 SHA-256：`2e78aa561db678dd638585f079b84698be3884b2a1bac7e56153d7cade03a3e1`。设置页桌面与 375px 均显示 v1.0.12。[完整发布证据](../acceptance/2026-11-13-runtime-v1.0.12/README.md)。
 
 远端原会话的实际 503 尚未捕获。本版修复已确认的代码缺陷，远端效果需要升级后在原会话复测。
 
